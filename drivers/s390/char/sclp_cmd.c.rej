@@ -1,0 +1,11 @@
+--- drivers/s390/char/sclp_cmd.c
++++ drivers/s390/char/sclp_cmd.c
+@@ -560,8 +548,6 @@
+ 		return;
+ 	new_incr->rn = rn;
+ 	new_incr->standby = standby;
+-	if (!standby)
+-		new_incr->usecount = 1;
+ 	last_rn = 0;
+ 	prev = &sclp_mem_list;
+ 	list_for_each_entry(incr, &sclp_mem_list, list) {

@@ -1,0 +1,10 @@
+--- drivers/scsi/isci/probe_roms.c
++++ drivers/scsi/isci/probe_roms.c
+@@ -104,7 +104,6 @@
+ 
+ 	if (i >= len) {
+ 		dev_err(&pdev->dev, "oprom parse error\n");
+-		devm_kfree(&pdev->dev, rom);
+ 		rom = NULL;
+ 	}
+ 	pci_unmap_biosrom(oprom);

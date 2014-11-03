@@ -371,7 +371,12 @@ repeat:
 	goto repeat;
 }
 
-void nilfs_clear_dirty_pages(struct address_space *mapping)
+/**
+ * nilfs_clear_dirty_pages - discard dirty pages in address space
+ * @mapping: address space with dirty pages for discarding
+ * @silent: suppress [true] or print [false] warning messages
+ */
+void nilfs_clear_dirty_pages(struct address_space *mapping, bool silent)
 {
 	struct pagevec pvec;
 	unsigned int i;
@@ -410,6 +415,51 @@ void nilfs_clear_dirty_pages(struct address_space *mapping)
 	}
 }
 
+/**
+ * nilfs_clear_dirty_page - discard dirty page
+ * @page: dirty page that will be discarded
+ * @silent: suppress [true] or print [false] warning messages
+ */
+void nilfs_clear_dirty_page(struct page *page, bool silent)
+{
+	struct inode *inode = page->mapping->host;
+	struct super_block *sb = inode->i_sb;
+
+	BUG_ON(!PageLocked(page));
+
+	if (!silent) {
+		nilfs_warning(sb, __func__,
+				"discard page: offset %lld, ino %lu",
+				page_offset(page), inode->i_ino);
+	}
+
+	ClearPageUptodate(page);
+	ClearPageMappedToDisk(page);
+
+	if (page_has_buffers(page)) {
+		struct buffer_head *bh, *head;
+
+		bh = head = page_buffers(page);
+		do {
+			lock_buffer(bh);
+			if (!silent) {
+				nilfs_warning(sb, __func__,
+					"discard block %llu, size %zu",
+					(u64)bh->b_blocknr, bh->b_size);
+			}
+			clear_buffer_dirty(bh);
+			clear_buffer_nilfs_volatile(bh);
+			clear_buffer_nilfs_checked(bh);
+			clear_buffer_nilfs_redirected(bh);
+			clear_buffer_uptodate(bh);
+			clear_buffer_mapped(bh);
+			unlock_buffer(bh);
+		} while (bh = bh->b_this_page, bh != head);
+	}
+
+	__nilfs_clear_page_dirty(page);
+}
+
 unsigned nilfs_page_count_clean_buffers(struct page *page,
 					unsigned from, unsigned to)
 {
@@ -433,7 +483,7 @@ void nilfs_mapping_init(struct address_space *mapping, struct inode *inode,
 	mapping->host = inode;
 	mapping->flags = 0;
 	mapping_set_gfp_mask(mapping, GFP_NOFS);
-	mapping->assoc_mapping = NULL;
+	mapping->private_data = NULL;
 	mapping->backing_dev_info = bdi;
 	mapping->a_ops = &empty_aops;
 }

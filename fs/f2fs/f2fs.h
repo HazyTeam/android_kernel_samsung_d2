@@ -171,6 +171,20 @@ static inline int update_sits_in_cursum(struct f2fs_summary_block *rs, int i)
 #endif
 
 /*
+ * ioctl commands
+ */
+#define F2FS_IOC_GETFLAGS               FS_IOC_GETFLAGS
+#define F2FS_IOC_SETFLAGS               FS_IOC_SETFLAGS
+
+#if defined(__KERNEL__) && defined(CONFIG_COMPAT)
+/*
+ * ioctl commands in 32 bit emulation
+ */
+#define F2FS_IOC32_GETFLAGS             FS_IOC32_GETFLAGS
+#define F2FS_IOC32_SETFLAGS             FS_IOC32_SETFLAGS
+#endif
+
+/*
  * For INODE and NODE manager
  */
 /*
@@ -745,6 +759,14 @@ static inline int get_pages(struct f2fs_sb_info *sbi, int count_type)
 static inline int get_dirty_dents(struct inode *inode)
 {
 	return atomic_read(&F2FS_I(inode)->dirty_dents);
+}
+
+static inline int get_blocktype_secs(struct f2fs_sb_info *sbi, int block_type)
+{
+	unsigned int pages_per_sec = sbi->segs_per_sec *
+					(1 << sbi->log_blocks_per_seg);
+	return ((get_pages(sbi, block_type) + pages_per_sec - 1)
+			>> sbi->log_blocks_per_seg) / sbi->segs_per_sec;
 }
 
 static inline int get_blocktype_secs(struct f2fs_sb_info *sbi, int block_type)

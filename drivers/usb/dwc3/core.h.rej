@@ -1,0 +1,24 @@
+--- drivers/usb/dwc3/core.h
++++ drivers/usb/dwc3/core.h
+@@ -154,8 +154,9 @@
+ /* OTG Registers */
+ #define DWC3_OCFG		0xcc00
+ #define DWC3_OCTL		0xcc04
+-#define DWC3_OEVTEN		0xcc08
+-#define DWC3_OSTS		0xcc0C
++#define DWC3_OEVT		0xcc08
++#define DWC3_OEVTEN		0xcc0C
++#define DWC3_OSTS		0xcc10
+ 
+ /* Bit fields */
+ 
+@@ -712,6 +731,9 @@
+ #define DWC3_REVISION_202A	0x5533202a
+ #define DWC3_REVISION_210A	0x5533210a
+ #define DWC3_REVISION_220A	0x5533220a
++#define DWC3_REVISION_230A	0x5533230a
++#define DWC3_REVISION_240A	0x5533240a
++#define DWC3_REVISION_250A	0x5533250a
+ 
+ 	unsigned		is_selfpowered:1;
+ 	unsigned		three_stage_setup:1;

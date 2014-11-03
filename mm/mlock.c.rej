@@ -1,0 +1,79 @@
+--- mm/mlock.c
++++ mm/mlock.c
+@@ -102,13 +102,16 @@
+  * can't isolate the page, we leave it for putback_lru_page() and vmscan
+  * [page_referenced()/try_to_unmap()] to deal with.
+  */
+-void munlock_vma_page(struct page *page)
++unsigned int munlock_vma_page(struct page *page)
+ {
++	unsigned int page_mask = 0;
++
+ 	BUG_ON(!PageLocked(page));
+ 
+ 	if (TestClearPageMlocked(page)) {
+-		mod_zone_page_state(page_zone(page), NR_MLOCK,
+-				    -hpage_nr_pages(page));
++		unsigned int nr_pages = hpage_nr_pages(page);
++		mod_zone_page_state(page_zone(page), NR_MLOCK, -nr_pages);
++		page_mask = nr_pages - 1;
+ 		if (!isolate_lru_page(page)) {
+ 			int ret = SWAP_AGAIN;
+ 
+@@ -206,56 +213,6 @@
+ 	return retval;
+ }
+ 
+-/**
+- * mlock_vma_pages_range() - mlock pages in specified vma range.
+- * @vma - the vma containing the specfied address range
+- * @start - starting address in @vma to mlock
+- * @end   - end address [+1] in @vma to mlock
+- *
+- * For mmap()/mremap()/expansion of mlocked vma.
+- *
+- * return 0 on success for "normal" vmas.
+- *
+- * return number of pages [> 0] to be removed from locked_vm on success
+- * of "special" vmas.
+- */
+-long mlock_vma_pages_range(struct vm_area_struct *vma,
+-			unsigned long start, unsigned long end)
+-{
+-	int nr_pages = (end - start) / PAGE_SIZE;
+-	BUG_ON(!(vma->vm_flags & VM_LOCKED));
+-
+-	/*
+-	 * filter unlockable vmas
+-	 */
+-	if (vma->vm_flags & (VM_IO | VM_PFNMAP))
+-		goto no_mlock;
+-
+-	if (!((vma->vm_flags & VM_DONTEXPAND) ||
+-			is_vm_hugetlb_page(vma) ||
+-			vma == get_gate_vma(current->mm))) {
+-
+-		__mlock_vma_pages_range(vma, start, end, NULL);
+-
+-		/* Hide errors from mmap() and other callers */
+-		return 0;
+-	}
+-
+-	/*
+-	 * User mapped kernel pages or huge pages:
+-	 * make these pages present to populate the ptes, but
+-	 * fall thru' to reset VM_LOCKED--no need to unlock, and
+-	 * return nr_pages so these don't get counted against task's
+-	 * locked limit.  huge pages are already counted against
+-	 * locked vm limit.
+-	 */
+-	make_pages_present(start, end);
+-
+-no_mlock:
+-	vma->vm_flags &= ~VM_LOCKED;	/* and don't come back! */
+-	return nr_pages;		/* error or pages NOT mlocked */
+-}
+-
+ /*
+  * munlock_vma_pages_range() - munlock all pages in the vma range.'
+  * @vma - vma containing range to be munlock()ed.

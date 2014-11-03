@@ -1,0 +1,10 @@
+--- arch/unicore32/Kconfig
++++ arch/unicore32/Kconfig
+@@ -216,7 +213,6 @@
+ config PUV3_GPIO
+ 	bool
+ 	depends on !ARCH_FPGA
+-	select GENERIC_GPIO
+ 	select GPIO_SYSFS
+ 	default y
+ 

@@ -1,0 +1,26 @@
+--- net/ieee802154/6lowpan.c
++++ net/ieee802154/6lowpan.c
+@@ -823,9 +827,9 @@
+ 	 * ECN + DSCP (1 byte), Flow Label is elided
+ 	 */
+ 	case 1: /* 10b */
+-		if (!skb->len)
++		if (lowpan_fetch_skb_u8(skb, &tmp))
+ 			goto drop;
+-		tmp = lowpan_fetch_skb_u8(skb);
++
+ 		hdr.priority = ((tmp >> 2) & 0x0f);
+ 		hdr.flow_lbl[0] = ((tmp << 6) & 0xC0) | ((tmp >> 2) & 0x30);
+ 		hdr.flow_lbl[1] = 0;
+@@ -836,9 +840,9 @@
+ 	 * ECN + 2-bit Pad + Flow Label (3 bytes), DSCP is elided
+ 	 */
+ 	case 2: /* 01b */
+-		if (!skb->len)
++		if (lowpan_fetch_skb_u8(skb, &tmp))
+ 			goto drop;
+-		tmp = lowpan_fetch_skb_u8(skb);
++
+ 		hdr.flow_lbl[0] = (skb->data[0] & 0x0F) | ((tmp >> 2) & 0x30);
+ 		memcpy(&hdr.flow_lbl[1], &skb->data[0], 2);
+ 		skb_pull(skb, 2);

@@ -1,0 +1,12 @@
+--- net/bridge/br_netfilter.c
++++ net/bridge/br_netfilter.c
+@@ -265,6 +265,9 @@
+ 	struct net_device *dev = skb->dev;
+ 	u32 len;
+ 
++	if (!pskb_may_pull(skb, sizeof(struct iphdr)))
++		goto inhdr_error;
++
+ 	iph = ip_hdr(skb);
+ 	opt = &(IPCB(skb)->opt);
+ 

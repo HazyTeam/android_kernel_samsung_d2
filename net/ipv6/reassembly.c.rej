@@ -1,0 +1,10 @@
+--- net/ipv6/reassembly.c
++++ net/ipv6/reassembly.c
+@@ -330,6 +341,7 @@
+ 	}
+ 	fq->q.stamp = skb->tstamp;
+ 	fq->q.meat += skb->len;
++	fq->ecn |= ecn;
+ 	add_frag_mem_limit(&fq->q, skb->truesize);
+ 
+ 	/* The first fragment.

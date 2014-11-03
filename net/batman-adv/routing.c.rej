@@ -1,0 +1,11 @@
+--- net/batman-adv/routing.c
++++ net/batman-adv/routing.c
+@@ -615,7 +612,7 @@
+ 	case BATADV_TT_RESPONSE:
+ 		batadv_inc_counter(bat_priv, BATADV_CNT_TT_RESPONSE_RX);
+ 
+-		if (batadv_is_my_mac(tt_query->dst)) {
++		if (batadv_is_my_mac(bat_priv, tt_query->dst)) {
+ 			/* packet needs to be linearized to access the TT
+ 			 * changes
+ 			 */

@@ -1,0 +1,166 @@
+--- drivers/staging/vt6656/hostap.c
++++ drivers/staging/vt6656/hostap.c
+@@ -133,7 +133,7 @@
+             DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO "%s: Netdevice %s unregistered\n",
+ 		       pDevice->dev->name, pDevice->apdev->name);
+ 	}
+-	kfree(pDevice->apdev);
++	free_netdev(pDevice->apdev);
+ 	pDevice->apdev = NULL;
+     pDevice->bEnable8021x = false;
+     pDevice->bEnableHostWEP = false;
+@@ -142,7 +142,6 @@
+ 	return 0;
+ }
+ 
+-
+ /*
+  * Description:
+  *      Set enable/disable hostapd mode
+@@ -174,7 +173,6 @@
+ 		return hostap_disable_hostapd(pDevice, rtnl_locked);
+ }
+ 
+-
+ /*
+  * Description:
+  *      remove station function supported for hostap daemon
+@@ -193,7 +191,6 @@
+ {
+ 	unsigned int uNodeIndex;
+ 
+-
+     if (BSSbIsSTAInNodeDB(pDevice, param->sta_addr, &uNodeIndex)) {
+         BSSvRemoveOneNode(pDevice, uNodeIndex);
+     }
+@@ -242,7 +239,7 @@
+     pMgmt->sNodeDBTable[uNodeIndex].bShortPreamble =
+             WLAN_GET_CAP_INFO_SHORTPREAMBLE(pMgmt->sNodeDBTable[uNodeIndex].wCapInfo);
+ 
+-    pMgmt->sNodeDBTable[uNodeIndex].wAID = (WORD)param->u.add_sta.aid;
++    pMgmt->sNodeDBTable[uNodeIndex].wAID = (u16)param->u.add_sta.aid;
+ 
+     pMgmt->sNodeDBTable[uNodeIndex].ulLastRxJiffer = jiffies;
+ 
+@@ -294,7 +291,6 @@
+ 	return 0;
+ }
+ 
+-
+ /*
+  * Description:
+  *      set station flag
+@@ -327,8 +323,6 @@
+ 	return 0;
+ }
+ 
+-
+-
+ /*
+  * Description:
+  *      set generic element (wpa ie)
+@@ -347,8 +341,6 @@
+ {
+ 	struct vnt_manager *pMgmt = &pDevice->vnt_mgmt;
+ 
+-
+-
+     memcpy( pMgmt->abyWPAIE,
+             param->u.generic_elem.data,
+             param->u.generic_elem.len
+@@ -425,13 +417,11 @@
+ 	int bKeyTableFull = false;
+ 	u16 wKeyCtl = 0;
+ 
+-
+ 	param->u.crypt.err = 0;
+ 
+ 	if (param->u.crypt.alg > WPA_ALG_CCMP)
+ 		return -EINVAL;
+ 
+-
+ 	if ((param->u.crypt.idx > 3) || (param->u.crypt.key_len > MAX_KEY_LEN)) {
+ 		param->u.crypt.err = HOSTAP_CRYPT_ERR_KEY_SET_FAILED;
+ 		DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO " HOSTAP_CRYPT_ERR_KEY_SET_FAILED\n");
+@@ -489,9 +479,9 @@
+             param->u.crypt.key_len
+            );
+ 
+-    dwKeyIndex = (DWORD)(param->u.crypt.idx);
++    dwKeyIndex = (u32)(param->u.crypt.idx);
+     if (param->u.crypt.flags & HOSTAP_CRYPT_FLAG_SET_TX_KEY) {
+-        pDevice->byKeyIndex = (BYTE)dwKeyIndex;
++        pDevice->byKeyIndex = (u8)dwKeyIndex;
+         pDevice->bTransmitKey = true;
+         dwKeyIndex |= (1 << 31);
+     }
+@@ -515,11 +505,10 @@
+ 			&param->sta_addr[0],
+ 			dwKeyIndex & ~(USE_KEYRSC),
+ 			param->u.crypt.key_len,
+-			&KeyRSC, (PBYTE)abyKey,
++			&KeyRSC, (u8 *)abyKey,
+ 			KEY_CTL_WEP
+                            ) == true) {
+ 
+-
+                 pMgmt->sNodeDBTable[iNodeIndex].bOnFly = true;
+ 
+             } else {
+@@ -565,7 +554,6 @@
+         pMgmt->byCSSGK = KEY_CTL_CCMP;
+     }
+ 
+-
+     if (iNodeIndex == 0) {
+        KeybSetDefaultKey(  pDevice,
+                            &(pDevice->sKey),
+@@ -585,7 +573,7 @@
+                        dwKeyIndex,
+                        param->u.crypt.key_len,
+ 			&KeyRSC,
+-                       (PBYTE)abyKey,
++                       (u8 *)abyKey,
+                         byKeyDecMode
+                        ) == true) {
+ 
+@@ -631,8 +619,6 @@
+ 	return ret;
+ }
+ 
+-
+-
+ /*
+  * Description:
+  *      get each stations encryption key
+@@ -655,7 +641,6 @@
+ 	int ii;
+ 	s32 iNodeIndex = 0;
+ 
+-
+ 	param->u.crypt.err = 0;
+ 
+ 	if (is_broadcast_ether_addr(param->sta_addr)) {
+@@ -670,13 +655,12 @@
+ 	DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO "hostap_get_encryption: %d\n", iNodeIndex);
+     memset(param->u.crypt.seq, 0, 8);
+     for (ii = 0 ; ii < 8 ; ii++) {
+-        param->u.crypt.seq[ii] = (BYTE)pMgmt->sNodeDBTable[iNodeIndex].KeyRSC >> (ii * 8);
++        param->u.crypt.seq[ii] = (u8)pMgmt->sNodeDBTable[iNodeIndex].KeyRSC >> (ii * 8);
+     }
+ 
+ 	return ret;
+ }
+ 
+-
+ /*
+  * Description:
+  *      vt6656_hostap_ioctl main function supported for hostap daemon.
+@@ -779,7 +763,6 @@
+ 		goto out;
+ 	}
+ 
+-
+ 	if ((ret == 0) && ap_ioctl) {
+ 		if (copy_to_user(p->pointer, param, p->length)) {
+ 			ret = -EFAULT;

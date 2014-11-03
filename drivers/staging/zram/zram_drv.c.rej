@@ -1,0 +1,62 @@
+--- drivers/staging/zram/zram_drv.c
++++ drivers/staging/zram/zram_drv.c
+@@ -150,20 +112,21 @@
+ 	int ret = LZO_E_OK;
+ 	size_t clen = PAGE_SIZE;
+ 	unsigned char *cmem;
+-	unsigned long handle = zram->table[index].handle;
++	struct zram_meta *meta = zram->meta;
++	unsigned long handle = meta->table[index].handle;
+ 
+-	if (!handle || zram_test_flag(zram, index, ZRAM_ZERO)) {
++	if (!handle || zram_test_flag(meta, index, ZRAM_ZERO)) {
+ 		memset(mem, 0, PAGE_SIZE);
+ 		return 0;
+ 	}
+ 
+-	cmem = zs_map_object(zram->mem_pool, handle, ZS_MM_RO);
+-	if (zram->table[index].size == PAGE_SIZE)
++	cmem = zs_map_object(meta->mem_pool, handle, ZS_MM_RO);
++	if (meta->table[index].size == PAGE_SIZE)
+ 		memcpy(mem, cmem, PAGE_SIZE);
+ 	else
+-		ret = lzo1x_decompress_safe(cmem, zram->table[index].size,
++		ret = lzo1x_decompress_safe(cmem, meta->table[index].size,
+ 						mem, &clen);
+-	zs_unmap_object(zram->mem_pool, handle);
++	zs_unmap_object(meta->mem_pool, handle);
+ 
+ 	/* Should NEVER happen. Return bio error if it does. */
+ 	if (unlikely(ret != LZO_E_OK)) {
+@@ -233,18 +197,18 @@
+ 	unsigned long handle;
+ 	struct page *page;
+ 	unsigned char *user_mem, *cmem, *src, *uncmem = NULL;
++	struct zram_meta *meta = zram->meta;
+ 
+ 	page = bvec->bv_page;
+-	src = zram->compress_buffer;
++	src = meta->compress_buffer;
+ 
+ 	if (is_partial_io(bvec)) {
+ 		/*
+ 		 * This is a partial IO. We need to read the full page
+ 		 * before to write the changes.
+ 		 */
+-		uncmem = kmalloc(PAGE_SIZE, GFP_KERNEL);
++		uncmem = kmalloc(PAGE_SIZE, GFP_NOIO);
+ 		if (!uncmem) {
+-			pr_info("Error allocating temp memory!\n");
+ 			ret = -ENOMEM;
+ 			goto out;
+ 		}
+@@ -730,8 +697,7 @@
+ 		zram = &zram_devices[i];
+ 
+ 		destroy_device(zram);
+-		if (zram->init_done)
+-			zram_reset_device(zram);
++		zram_reset_device(zram);
+ 	}
+ 
+ 	unregister_blkdev(zram_major, "zram");

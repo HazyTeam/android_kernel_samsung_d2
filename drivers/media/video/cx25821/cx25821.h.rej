@@ -1,0 +1,11 @@
+--- drivers/media/video/cx25821/cx25821.h
++++ drivers/media/video/cx25821/cx25821.h
+@@ -187,7 +187,7 @@
+ };
+ 
+ struct cx25821_board {
+-	char *name;
++	const char *name;
+ 	enum port porta;
+ 	enum port portb;
+ 	enum port portc;

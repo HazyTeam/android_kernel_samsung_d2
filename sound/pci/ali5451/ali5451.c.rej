@@ -1,0 +1,11 @@
+--- sound/pci/ali5451/ali5451.c
++++ sound/pci/ali5451/ali5451.c
+@@ -1435,7 +1435,7 @@
+ 
+ 	spin_lock(&codec->reg_lock);
+ 	if (!pvoice->running) {
+-		spin_unlock_irq(&codec->reg_lock);
++		spin_unlock(&codec->reg_lock);
+ 		return 0;
+ 	}
+ 	outb(pvoice->number, ALI_REG(codec, ALI_GC_CIR));

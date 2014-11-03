@@ -1,0 +1,11 @@
+--- drivers/rtc/hctosys.c
++++ drivers/rtc/hctosys.c
+@@ -22,8 +22,6 @@
+  * the best guess is to add 0.5s.
+  */
+ 
+-int rtc_hctosys_ret = -ENODEV;
+-
+ static int __init rtc_hctosys(void)
+ {
+ 	int err = -ENODEV;

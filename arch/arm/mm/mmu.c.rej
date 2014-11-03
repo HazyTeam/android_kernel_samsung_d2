@@ -1,0 +1,11 @@
+--- arch/arm/mm/mmu.c
++++ arch/arm/mm/mmu.c
+@@ -488,7 +488,7 @@
+ #endif
+ 
+ 	for (i = 0; i < 16; i++) {
+-		unsigned long v = pgprot_val(protection_map[i]);
++		pteval_t v = pgprot_val(protection_map[i]);
+ 		protection_map[i] = __pgprot(v | user_pgprot);
+ 	}
+ 

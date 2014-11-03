@@ -1,0 +1,11 @@
+--- fs/proc/array.c
++++ fs/proc/array.c
+@@ -212,7 +212,7 @@
+ 	group_info = cred->group_info;
+ 	task_unlock(p);
+ 
+-	for (g = 0; g < min(group_info->ngroups, NGROUPS_SMALL); g++)
++	for (g = 0; g < group_info->ngroups; g++)
+ 		seq_printf(m, "%d ",
+ 			   from_kgid_munged(user_ns, GROUP_AT(group_info, g)));
+ 	put_cred(cred);

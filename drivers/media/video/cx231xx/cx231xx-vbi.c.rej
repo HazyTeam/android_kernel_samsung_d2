@@ -1,0 +1,11 @@
+--- drivers/media/video/cx231xx/cx231xx-vbi.c
++++ drivers/media/video/cx231xx/cx231xx-vbi.c
+@@ -448,7 +444,7 @@
+ 			return -ENOMEM;
+ 		}
+ 		dev->vbi_mode.bulk_ctl.urb[i] = urb;
+-		urb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
++		urb->transfer_flags = 0;
+ 
+ 		dev->vbi_mode.bulk_ctl.transfer_buffer[i] =
+ 		    kzalloc(sb_size, GFP_KERNEL);

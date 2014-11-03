@@ -1,0 +1,11 @@
+--- drivers/bluetooth/hci_ath.c
++++ drivers/bluetooth/hci_ath.c
+@@ -58,7 +58,7 @@
+ 		return status;
+ 
+ 	/* Disable Automatic RTSCTS */
+-	memcpy(&ktermios, tty->termios, sizeof(ktermios));
++	ktermios = tty->termios;
+ 	ktermios.c_cflag &= ~CRTSCTS;
+ 	tty_set_termios(tty, &ktermios);
+ 

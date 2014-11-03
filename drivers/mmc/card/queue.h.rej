@@ -1,0 +1,21 @@
+--- drivers/mmc/card/queue.h
++++ drivers/mmc/card/queue.h
+@@ -37,6 +54,8 @@
+ 	struct scatterlist	*bounce_sg;
+ 	unsigned int		bounce_sg_len;
+ 	struct mmc_async_req	mmc_active;
++	enum mmc_packed_type	cmd_type;
++	struct mmc_packed	*packed;
+ };
+ 
+ struct mmc_queue {
+@@ -44,6 +63,9 @@
+ 	struct task_struct	*thread;
+ 	struct semaphore	thread_sem;
+ 	unsigned int		flags;
++#define MMC_QUEUE_SUSPENDED	(1 << 0)
++#define MMC_QUEUE_NEW_REQUEST	(1 << 1)
++
+ 	int			(*issue_fn)(struct mmc_queue *, struct request *);
+ 	void			*data;
+ 	struct request_queue	*queue;

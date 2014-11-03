@@ -1,0 +1,21 @@
+--- scripts/checkpatch.pl
++++ scripts/checkpatch.pl
+@@ -1769,15 +1764,15 @@
+ # check we are in a valid source file if not then ignore this hunk
+ 		next if ($realfile !~ /\.(h|c|s|S|pl|sh)$/);
+ 
+-#80 column limit
++#line length limit
+ 		if ($line =~ /^\+/ && $prevrawline !~ /\/\*\*/ &&
+ 		    $rawline !~ /^.\s*\*\s*\@$Ident\s/ &&
+ 		    !($line =~ /^\+\s*$logFunctions\s*\(\s*(?:(KERN_\S+\s*|[^"]*))?"[X\t]*"\s*(?:|,|\)\s*;)\s*$/ ||
+ 		    $line =~ /^\+\s*"[^"]*"\s*(?:\s*|,|\)\s*;)\s*$/) &&
+-		    $length > 80)
++		    $length > $max_line_length)
+ 		{
+ 			WARN("LONG_LINE",
+-			     "line over 80 characters\n" . $herecurr);
++			     "line over $max_line_length characters\n" . $herecurr);
+ 		}
+ 
+ # Check for user-visible strings broken across lines, which breaks the ability

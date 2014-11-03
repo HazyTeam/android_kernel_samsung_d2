@@ -1,0 +1,10 @@
+--- arch/arm/mach-msm/board-mahimahi.c
++++ arch/arm/mach-msm/board-mahimahi.c
+@@ -30,7 +30,6 @@
+ 
+ #include <mach/board.h>
+ #include <mach/hardware.h>
+-#include <mach/system.h>
+ 
+ #include "board-mahimahi.h"
+ #include "devices.h"

@@ -1,0 +1,71 @@
+--- kernel/kmod.c
++++ kernel/kmod.c
+@@ -542,56 +564,38 @@
+ 	sub_info->path = path;
+ 	sub_info->argv = argv;
+ 	sub_info->envp = envp;
++
++	sub_info->cleanup = cleanup;
++	sub_info->init = init;
++	sub_info->data = data;
+   out:
+ 	return sub_info;
+ }
+-
+-/**
+- * call_usermodehelper_setfns - set a cleanup/init function
+- * @info: a subprocess_info returned by call_usermodehelper_setup
+- * @cleanup: a cleanup function
+- * @init: an init function
+- * @data: arbitrary context sensitive data
+- *
+- * The init function is used to customize the helper process prior to
+- * exec.  A non-zero return code causes the process to error out, exit,
+- * and return the failure to the calling process
+- *
+- * The cleanup function is just before ethe subprocess_info is about to
+- * be freed.  This can be used for freeing the argv and envp.  The
+- * Function must be runnable in either a process context or the
+- * context in which call_usermodehelper_exec is called.
+- */
+-static
+-void call_usermodehelper_setfns(struct subprocess_info *info,
+-		    int (*init)(struct subprocess_info *info, struct cred *new),
+-		    void (*cleanup)(struct subprocess_info *info),
+-		    void *data)
+-{
+-	info->cleanup = cleanup;
+-	info->init = init;
+-	info->data = data;
+-}
++EXPORT_SYMBOL(call_usermodehelper_setup);
+ 
+ /**
+  * call_usermodehelper_exec - start a usermode application
+  * @sub_info: information about the subprocessa
+  * @wait: wait for the application to finish and return status.
+- *        when -1 don't wait at all, but you get no useful error back when
+- *        the program couldn't be exec'ed. This makes it safe to call
++ *        when UMH_NO_WAIT don't wait at all, but you get no useful error back
++ *        when the program couldn't be exec'ed. This makes it safe to call
+  *        from interrupt context.
+  *
+  * Runs a user-space application.  The application is started
+  * asynchronously if wait is not set, and runs as a child of keventd.
+  * (ie. it runs with full root capabilities).
+  */
+-static
+ int call_usermodehelper_exec(struct subprocess_info *sub_info, int wait)
+ {
+ 	DECLARE_COMPLETION_ONSTACK(done);
+ 	int retval = 0;
+ 
+ 	helper_lock();
++	if (!sub_info->path) {
++		retval = -EINVAL;
++		goto out;
++	}
++
+ 	if (sub_info->path[0] == '\0')
+ 		goto out;
+ 

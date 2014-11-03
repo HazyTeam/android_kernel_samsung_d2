@@ -1,0 +1,22 @@
+--- arch/parisc/kernel/signal32.c
++++ arch/parisc/kernel/signal32.c
+@@ -65,7 +65,8 @@
+ {
+ 	compat_sigset_t s;
+ 
+-	if (sz != sizeof *set) panic("put_sigset32()");
++	if (sz != sizeof *set)
++		return -EINVAL;
+ 	sigset_64to32(&s, set);
+ 
+ 	return copy_to_user(up, &s, sizeof s);
+@@ -77,7 +78,8 @@
+ 	compat_sigset_t s;
+ 	int r;
+ 
+-	if (sz != sizeof *set) panic("put_sigset32()");
++	if (sz != sizeof *set)
++		return -EINVAL;
+ 
+ 	if ((r = copy_from_user(&s, up, sz)) == 0) {
+ 		sigset_32to64(set, &s);

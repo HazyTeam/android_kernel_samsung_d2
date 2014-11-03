@@ -1,0 +1,28 @@
+--- drivers/rapidio/devices/tsi721.c
++++ drivers/rapidio/devices/tsi721.c
+@@ -471,6 +471,10 @@
+ 	u32 intval;
+ 	u32 ch_inte;
+ 
++	/* For MSI mode disable all device-level interrupts */
++	if (priv->flags & TSI721_USING_MSI)
++		iowrite32(0, priv->regs + TSI721_DEV_INTE);
++
+ 	dev_int = ioread32(priv->regs + TSI721_DEV_INT);
+ 	if (!dev_int)
+ 		return IRQ_NONE;
+@@ -560,6 +564,14 @@
+ 		}
+ 	}
+ #endif
++
++	/* For MSI mode re-enable device-level interrupts */
++	if (priv->flags & TSI721_USING_MSI) {
++		dev_int = TSI721_DEV_INT_SR2PC_CH | TSI721_DEV_INT_SRIO |
++			TSI721_DEV_INT_SMSG_CH | TSI721_DEV_INT_BDMA_CH;
++		iowrite32(dev_int, priv->regs + TSI721_DEV_INTE);
++	}
++
+ 	return IRQ_HANDLED;
+ }
+ 

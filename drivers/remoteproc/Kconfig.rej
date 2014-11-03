@@ -1,0 +1,19 @@
+--- drivers/remoteproc/Kconfig
++++ drivers/remoteproc/Kconfig
+@@ -4,13 +4,15 @@
+ config REMOTEPROC
+ 	tristate
+ 	depends on HAS_DMA
++	select CRC32
+ 	select FW_LOADER
+ 	select VIRTIO
++	select VIRTUALIZATION
+ 
+ config OMAP_REMOTEPROC
+ 	tristate "OMAP remoteproc support"
+ 	depends on HAS_DMA
+-	depends on ARCH_OMAP4
++	depends on ARCH_OMAP4 || SOC_OMAP5
+ 	depends on OMAP_IOMMU
+ 	depends on OMAP_MBOX_FWK
+ 	select REMOTEPROC

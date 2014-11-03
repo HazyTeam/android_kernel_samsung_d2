@@ -1,0 +1,20 @@
+--- arch/powerpc/platforms/pseries/iommu.c
++++ arch/powerpc/platforms/pseries/iommu.c
+@@ -106,7 +106,7 @@
+ 		tcep++;
+ 	}
+ 
+-	if (tbl->it_type == TCE_PCI_SWINV_CREATE)
++	if (tbl->it_type & TCE_PCI_SWINV_CREATE)
+ 		tce_invalidate_pSeries_sw(tbl, tces, tcep - 1);
+ 	return 0;
+ }
+@@ -121,7 +121,7 @@
+ 	while (npages--)
+ 		*(tcep++) = 0;
+ 
+-	if (tbl->it_type == TCE_PCI_SWINV_FREE)
++	if (tbl->it_type & TCE_PCI_SWINV_FREE)
+ 		tce_invalidate_pSeries_sw(tbl, tces, tcep - 1);
+ }
+ 

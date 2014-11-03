@@ -43,6 +43,8 @@ static void __iomem *timer_base;
 
 static struct delay_timer arch_delay_timer;
 
+extern void init_current_timer_delay(unsigned long freq);
+
 /*
  * Architected system timer support.
  */
@@ -352,6 +354,14 @@ static unsigned long arch_timer_read_current_timer(void)
 	return arch_counter_get_cntpct();
 }
 
+int read_current_timer(unsigned long *timer_val)
+{
+	if (!arch_timer_rate)
+		return -ENXIO;
+	*timer_val = arch_counter_get_cntpct();
+	return 0;
+}
+
 static struct clocksource clocksource_counter = {
 	.name	= "arch_sys_counter",
 	.rating	= 400,
@@ -454,20 +464,29 @@ static int __init arch_timer_common_register(void)
 		arch_timer_global_evt.cpumask = cpumask_of(0);
 		err = arch_timer_setup(&arch_timer_global_evt);
 	}
-
 	if (err)
 		goto out_free_irq;
 
+	/* Use the architected timer for the delay loop. */
+	arch_delay_timer.read_current_timer = &arch_timer_read_current_timer;
+	arch_delay_timer.freq = arch_timer_rate;
+	register_current_timer_delay(&arch_delay_timer);
 	return 0;
 
 out_free_irq:
-	free_percpu_irq(arch_timer_ppi, arch_timer_evt);
-	if (arch_timer_ppi2)
-		free_percpu_irq(arch_timer_ppi2, arch_timer_evt);
+	if (arch_timer_use_virtual)
+		free_percpu_irq(arch_timer_ppi[VIRT_PPI], arch_timer_evt);
+	else {
+		free_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI],
+				arch_timer_evt);
+		if (arch_timer_ppi[PHYS_NONSECURE_PPI])
+			free_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI],
+					arch_timer_evt);
+	}
 
 out_free:
 	free_percpu(arch_timer_evt);
-
+out:
 	return err;
 }
 

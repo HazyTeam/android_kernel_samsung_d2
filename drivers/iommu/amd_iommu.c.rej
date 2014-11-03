@@ -1,0 +1,88 @@
+--- drivers/iommu/amd_iommu.c
++++ drivers/iommu/amd_iommu.c
+@@ -696,9 +691,6 @@
+ static void iommu_poll_events(struct amd_iommu *iommu)
+ {
+ 	u32 head, tail;
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&iommu->lock, flags);
+ 
+ 	head = readl(iommu->mmio_base + MMIO_EVT_HEAD_OFFSET);
+ 	tail = readl(iommu->mmio_base + MMIO_EVT_TAIL_OFFSET);
+@@ -733,17 +723,11 @@
+ 
+ static void iommu_poll_ppr_log(struct amd_iommu *iommu)
+ {
+-	unsigned long flags;
+ 	u32 head, tail;
+ 
+ 	if (iommu->ppr_log == NULL)
+ 		return;
+ 
+-	/* enable ppr interrupts again */
+-	writel(MMIO_STATUS_PPR_INT_MASK, iommu->mmio_base + MMIO_STATUS_OFFSET);
+-
+-	spin_lock_irqsave(&iommu->lock, flags);
+-
+ 	head = readl(iommu->mmio_base + MMIO_PPR_HEAD_OFFSET);
+ 	tail = readl(iommu->mmio_base + MMIO_PPR_TAIL_OFFSET);
+ 
+@@ -4007,9 +3990,9 @@
+ 			index -= count - 1;
+ 
+ 			cfg->remapped	      = 1;
+-			irte_info             = &cfg->irq_2_iommu;
+-			irte_info->sub_handle = devid;
+-			irte_info->irte_index = index;
++			irte_info             = &cfg->irq_2_irte;
++			irte_info->devid      = devid;
++			irte_info->index      = index;
+ 
+ 			goto out;
+ 		}
+@@ -4117,8 +4100,8 @@
+ 
+ 	/* Setup IRQ remapping info */
+ 	cfg->remapped	      = 1;
+-	irte_info->sub_handle = devid;
+-	irte_info->irte_index = index;
++	irte_info->devid      = devid;
++	irte_info->index      = index;
+ 
+ 	/* Setup IRTE for IOMMU */
+ 	irte.val		= 0;
+@@ -4275,18 +4258,18 @@
+ 		return 0;
+ 
+ 	devid		= get_device_id(&pdev->dev);
+-	irte_info	= &cfg->irq_2_iommu;
++	irte_info	= &cfg->irq_2_irte;
+ 
+ 	cfg->remapped	      = 1;
+-	irte_info->sub_handle = devid;
+-	irte_info->irte_index = index + offset;
++	irte_info->devid      = devid;
++	irte_info->index      = index + offset;
+ 
+ 	return 0;
+ }
+ 
+ static int setup_hpet_msi(unsigned int irq, unsigned int id)
+ {
+-	struct irq_2_iommu *irte_info;
++	struct irq_2_irte *irte_info;
+ 	struct irq_cfg *cfg;
+ 	int index, devid;
+ 
+@@ -4304,8 +4287,8 @@
+ 		return index;
+ 
+ 	cfg->remapped	      = 1;
+-	irte_info->sub_handle = devid;
+-	irte_info->irte_index = index;
++	irte_info->devid      = devid;
++	irte_info->index      = index;
+ 
+ 	return 0;
+ }

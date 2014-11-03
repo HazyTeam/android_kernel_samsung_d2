@@ -1,0 +1,43 @@
+--- sound/pci/hda/patch_realtek.c
++++ sound/pci/hda/patch_realtek.c
+@@ -825,17 +845,7 @@
+ 	snd_hda_shutup_pins(codec);
+ }
+ 
+-static void alc_free(struct hda_codec *codec)
+-{
+-	struct alc_spec *spec = codec->spec;
+-
+-	if (!spec)
+-		return;
+-
+-	snd_hda_gen_spec_free(&spec->gen);
+-	snd_hda_detach_beep_device(codec);
+-	kfree(spec);
+-}
++#define alc_free	snd_hda_gen_free
+ 
+ #ifdef CONFIG_PM
+ static void alc_power_eapd(struct hda_codec *codec)
+@@ -3220,11 +3638,21 @@
+ 	ALC269_FIXUP_HP_MUTE_LED,
+ 	ALC269_FIXUP_HP_MUTE_LED_MIC1,
+ 	ALC269_FIXUP_HP_MUTE_LED_MIC2,
++	ALC269_FIXUP_HP_GPIO_LED,
+ 	ALC269_FIXUP_INV_DMIC,
+ 	ALC269_FIXUP_LENOVO_DOCK,
+ 	ALC269_FIXUP_PINCFG_NO_HP_TO_LINEOUT,
++	ALC269_FIXUP_DELL1_MIC_NO_PRESENCE,
++	ALC269_FIXUP_DELL2_MIC_NO_PRESENCE,
++	ALC269_FIXUP_HEADSET_MODE,
++	ALC269_FIXUP_HEADSET_MODE_NO_HP_MIC,
++	ALC269_FIXUP_ASUS_X101_FUNC,
++	ALC269_FIXUP_ASUS_X101_VERB,
++	ALC269_FIXUP_ASUS_X101,
+ 	ALC271_FIXUP_AMIC_MIC2,
+ 	ALC271_FIXUP_HP_GATE_MIC_JACK,
++	ALC269_FIXUP_ACER_AC700,
++	ALC269_FIXUP_LIMIT_INT_MIC_BOOST,
+ };
+ 
+ static const struct hda_fixup alc269_fixups[] = {

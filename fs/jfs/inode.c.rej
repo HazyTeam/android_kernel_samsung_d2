@@ -1,0 +1,11 @@
+--- fs/jfs/inode.c
++++ fs/jfs/inode.c
+@@ -126,7 +127,7 @@
+ {
+ 	int wait = wbc->sync_mode == WB_SYNC_ALL;
+ 
+-	if (test_cflag(COMMIT_Nolink, inode))
++	if (inode->i_nlink == 0)
+ 		return 0;
+ 	/*
+ 	 * If COMMIT_DIRTY is not set, the inode isn't really dirty.

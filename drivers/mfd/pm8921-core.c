@@ -19,7 +19,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/err.h>
-#include <linux/msm_ssbi.h>
+#include <linux/ssbi.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/pm8xxx/pm8921.h>
 #include <linux/mfd/pm8xxx/core.h>
@@ -71,7 +71,7 @@ static int pm8921_readb(const struct device *dev, u16 addr, u8 *val)
 	const struct pm8xxx_drvdata *pm8921_drvdata = dev_get_drvdata(dev);
 	const struct pm8921 *pmic = pm8921_drvdata->pm_chip_data;
 
-	return msm_ssbi_read(pmic->dev->parent, addr, val, 1);
+	return ssbi_read(pmic->dev->parent, addr, val, 1);
 }
 
 static int pm8921_writeb(const struct device *dev, u16 addr, u8 val)
@@ -79,7 +79,7 @@ static int pm8921_writeb(const struct device *dev, u16 addr, u8 val)
 	const struct pm8xxx_drvdata *pm8921_drvdata = dev_get_drvdata(dev);
 	const struct pm8921 *pmic = pm8921_drvdata->pm_chip_data;
 
-	return msm_ssbi_write(pmic->dev->parent, addr, &val, 1);
+	return ssbi_write(pmic->dev->parent, addr, &val, 1);
 }
 
 static int pm8921_read_buf(const struct device *dev, u16 addr, u8 *buf,
@@ -88,7 +88,7 @@ static int pm8921_read_buf(const struct device *dev, u16 addr, u8 *buf,
 	const struct pm8xxx_drvdata *pm8921_drvdata = dev_get_drvdata(dev);
 	const struct pm8921 *pmic = pm8921_drvdata->pm_chip_data;
 
-	return msm_ssbi_read(pmic->dev->parent, addr, buf, cnt);
+	return ssbi_read(pmic->dev->parent, addr, buf, cnt);
 }
 
 static int pm8921_write_buf(const struct device *dev, u16 addr, u8 *buf,
@@ -97,7 +97,7 @@ static int pm8921_write_buf(const struct device *dev, u16 addr, u8 *buf,
 	const struct pm8xxx_drvdata *pm8921_drvdata = dev_get_drvdata(dev);
 	const struct pm8921 *pmic = pm8921_drvdata->pm_chip_data;
 
-	return msm_ssbi_write(pmic->dev->parent, addr, buf, cnt);
+	return ssbi_write(pmic->dev->parent, addr, buf, cnt);
 }
 
 static int pm8921_read_irq_stat(const struct device *dev, int irq)
@@ -848,7 +848,7 @@ static const char * const pm8917_rev_names[] = {
 	[PM8XXX_REVISION_8917_1p0]	= "1.0",
 };
 
-static int __devinit pm8921_probe(struct platform_device *pdev)
+static int pm8921_probe(struct platform_device *pdev)
 {
 	const struct pm8921_platform_data *pdata = pdev->dev.platform_data;
 	const char *revision_name = "unknown";
@@ -870,7 +870,7 @@ static int __devinit pm8921_probe(struct platform_device *pdev)
 	}
 
 	/* Read PMIC chip revision */
-	rc = msm_ssbi_read(pdev->dev.parent, REG_HWREV, &val, sizeof(val));
+	rc = ssbi_read(pdev->dev.parent, REG_HWREV, &val, sizeof(val));
 	if (rc) {
 		pr_err("Failed to read hw rev reg %d:rc=%d\n", REG_HWREV, rc);
 		goto err_read_rev;
@@ -879,7 +879,7 @@ static int __devinit pm8921_probe(struct platform_device *pdev)
 	pmic->rev_registers = val;
 
 	/* Read PMIC chip revision 2 */
-	rc = msm_ssbi_read(pdev->dev.parent, REG_HWREV_2, &val, sizeof(val));
+	rc = ssbi_read(pdev->dev.parent, REG_HWREV_2, &val, sizeof(val));
 	if (rc) {
 		pr_err("Failed to read hw rev 2 reg %d:rc=%d\n",
 			REG_HWREV_2, rc);
@@ -944,7 +944,7 @@ err_read_rev:
 	return rc;
 }
 
-static int __devexit pm8921_remove(struct platform_device *pdev)
+static int pm8921_remove(struct platform_device *pdev)
 {
 	struct pm8xxx_drvdata *drvdata;
 	struct pm8921 *pmic = NULL;
@@ -976,7 +976,7 @@ static int __devexit pm8921_remove(struct platform_device *pdev)
 
 static struct platform_driver pm8921_driver = {
 	.probe		= pm8921_probe,
-	.remove		= __devexit_p(pm8921_remove),
+	.remove		= pm8921_remove,
 	.driver		= {
 		.name	= "pm8921-core",
 		.owner	= THIS_MODULE,

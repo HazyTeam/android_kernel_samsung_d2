@@ -106,7 +106,7 @@ static unsigned armv6_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 		},
 		[C(OP_WRITE)] = {
 			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-			[C(RESULT_MISS)]	= ARMV6_PERFCTR_ICACHE_MISS,
+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
 		},
 		[C(OP_PREFETCH)] = {
 			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
@@ -259,7 +259,7 @@ static unsigned armv6mpcore_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 		},
 		[C(OP_WRITE)] = {
 			[C(RESULT_ACCESS)]  = CACHE_OP_UNSUPPORTED,
-			[C(RESULT_MISS)]    = ARMV6MPCORE_PERFCTR_ICACHE_MISS,
+			[C(RESULT_MISS)]    = CACHE_OP_UNSUPPORTED,
 		},
 		[C(OP_PREFETCH)] = {
 			[C(RESULT_ACCESS)]  = CACHE_OP_UNSUPPORTED,
@@ -401,9 +401,10 @@ armv6_pmcr_counter_has_overflowed(unsigned long pmcr,
 	return ret;
 }
 
-static inline u32
-armv6pmu_read_counter(int counter)
+static inline u32 armv6pmu_read_counter(struct perf_event *event)
 {
+	struct hw_perf_event *hwc = &event->hw;
+	int counter = hwc->idx;
 	unsigned long value = 0;
 
 	if (ARMV6_CYCLE_COUNTER == counter)
@@ -418,10 +419,11 @@ armv6pmu_read_counter(int counter)
 	return value;
 }
 
-static inline void
-armv6pmu_write_counter(int counter,
-		       u32 value)
+static inline void armv6pmu_write_counter(struct perf_event *event, u32 value)
 {
+	struct hw_perf_event *hwc = &event->hw;
+	int counter = hwc->idx;
+
 	if (ARMV6_CYCLE_COUNTER == counter)
 		asm volatile("mcr   p15, 0, %0, c15, c12, 1" : : "r"(value));
 	else if (ARMV6_COUNTER0 == counter)
@@ -432,12 +434,13 @@ armv6pmu_write_counter(int counter,
 		WARN_ONCE(1, "invalid counter number (%d)\n", counter);
 }
 
-static void
-armv6pmu_enable_event(struct hw_perf_event *hwc,
-		      int idx)
+static void armv6pmu_enable_event(struct perf_event *event)
 {
 	unsigned long val, mask, evt, flags;
+	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
+	struct hw_perf_event *hwc = &event->hw;
 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
+	int idx = hwc->idx;
 
 	if (ARMV6_CYCLE_COUNTER == idx) {
 		mask	= 0;
@@ -473,7 +476,8 @@ armv6pmu_handle_irq(int irq_num,
 {
 	unsigned long pmcr = armv6_pmcr_read();
 	struct perf_sample_data data;
-	struct pmu_hw_events *cpuc;
+	struct arm_pmu *cpu_pmu = (struct arm_pmu *)dev;
+	struct pmu_hw_events *cpuc = cpu_pmu->get_hw_events();
 	struct pt_regs *regs;
 	int idx;
 
@@ -489,9 +493,6 @@ armv6pmu_handle_irq(int irq_num,
 	 */
 	armv6_pmcr_write(pmcr);
 
-	perf_sample_data_init(&data, 0);
-
-	cpuc = &__get_cpu_var(cpu_hw_events);
 	for (idx = 0; idx < cpu_pmu->num_events; ++idx) {
 		struct perf_event *event = cpuc->events[idx];
 		struct hw_perf_event *hwc;
@@ -508,13 +509,13 @@ armv6pmu_handle_irq(int irq_num,
 			continue;
 
 		hwc = &event->hw;
-		armpmu_event_update(event, hwc, idx);
-		data.period = event->hw.last_period;
-		if (!armpmu_event_set_period(event, hwc, idx))
+		armpmu_event_update(event);
+		perf_sample_data_init(&data, 0, hwc->last_period);
+		if (!armpmu_event_set_period(event))
 			continue;
 
 		if (perf_event_overflow(event, &data, regs))
-			cpu_pmu->disable(hwc, idx);
+			cpu_pmu->disable(event);
 	}
 
 	/*
@@ -529,8 +530,7 @@ armv6pmu_handle_irq(int irq_num,
 	return IRQ_HANDLED;
 }
 
-static void
-armv6pmu_start(void)
+static void armv6pmu_start(struct arm_pmu *cpu_pmu)
 {
 	unsigned long flags, val;
 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
@@ -542,8 +542,7 @@ armv6pmu_start(void)
 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
 }
 
-static void
-armv6pmu_stop(void)
+static void armv6pmu_stop(struct arm_pmu *cpu_pmu)
 {
 	unsigned long flags, val;
 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
@@ -557,10 +556,11 @@ armv6pmu_stop(void)
 
 static int
 armv6pmu_get_event_idx(struct pmu_hw_events *cpuc,
-		       struct hw_perf_event *event)
+				struct perf_event *event)
 {
+	struct hw_perf_event *hwc = &event->hw;
 	/* Always place a cycle counter into the cycle counter. */
-	if (ARMV6_PERFCTR_CPU_CYCLES == event->config_base) {
+	if (ARMV6_PERFCTR_CPU_CYCLES == hwc->config_base) {
 		if (test_and_set_bit(ARMV6_CYCLE_COUNTER, cpuc->used_mask))
 			return -EAGAIN;
 
@@ -581,12 +581,13 @@ armv6pmu_get_event_idx(struct pmu_hw_events *cpuc,
 	}
 }
 
-static void
-armv6pmu_disable_event(struct hw_perf_event *hwc,
-		       int idx)
+static void armv6pmu_disable_event(struct perf_event *event)
 {
 	unsigned long val, mask, evt, flags;
+	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
+	struct hw_perf_event *hwc = &event->hw;
 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
+	int idx = hwc->idx;
 
 	if (ARMV6_CYCLE_COUNTER == idx) {
 		mask	= ARMV6_PMCR_CCOUNT_IEN;
@@ -615,12 +616,13 @@ armv6pmu_disable_event(struct hw_perf_event *hwc,
 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
 }
 
-static void
-armv6mpcore_pmu_disable_event(struct hw_perf_event *hwc,
-			      int idx)
+static void armv6mpcore_pmu_disable_event(struct perf_event *event)
 {
 	unsigned long val, mask, flags, evt = 0;
+	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
+	struct hw_perf_event *hwc = &event->hw;
 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
+	int idx = hwc->idx;
 
 	if (ARMV6_CYCLE_COUNTER == idx) {
 		mask	= ARMV6_PMCR_CCOUNT_IEN;
@@ -647,12 +649,11 @@ armv6mpcore_pmu_disable_event(struct hw_perf_event *hwc,
 
 static int armv6_map_event(struct perf_event *event)
 {
-	return map_cpu_event(event, &armv6_perf_map,
+	return armpmu_map_event(event, &armv6_perf_map,
 				&armv6_perf_cache_map, 0xFF);
 }
 
 static struct arm_pmu armv6pmu = {
-	.id			= ARM_PERF_PMU_ID_V6,
 	.name			= "v6",
 	.handle_irq		= armv6pmu_handle_irq,
 	.request_pmu_irq	= armpmu_generic_request_irq,
@@ -669,7 +670,7 @@ static struct arm_pmu armv6pmu = {
 	.max_period		= (1LLU << 32) - 1,
 };
 
-static struct arm_pmu *__init armv6pmu_init(void)
+static struct arm_pmu *__devinit armv6pmu_init(void)
 {
 	return &armv6pmu;
 }
@@ -684,12 +685,11 @@ static struct arm_pmu *__init armv6pmu_init(void)
 
 static int armv6mpcore_map_event(struct perf_event *event)
 {
-	return map_cpu_event(event, &armv6mpcore_perf_map,
+	return armpmu_map_event(event, &armv6mpcore_perf_map,
 				&armv6mpcore_perf_cache_map, 0xFF);
 }
 
 static struct arm_pmu armv6mpcore_pmu = {
-	.id			= ARM_PERF_PMU_ID_V6MP,
 	.name			= "v6mpcore",
 	.handle_irq		= armv6pmu_handle_irq,
 	.request_pmu_irq	= armpmu_generic_request_irq,
@@ -706,17 +706,17 @@ static struct arm_pmu armv6mpcore_pmu = {
 	.max_period		= (1LLU << 32) - 1,
 };
 
-static struct arm_pmu *__init armv6mpcore_pmu_init(void)
+static struct arm_pmu *__devinit armv6mpcore_pmu_init(void)
 {
 	return &armv6mpcore_pmu;
 }
 #else
-static struct arm_pmu *__init armv6pmu_init(void)
+static struct arm_pmu *__devinit armv6pmu_init(void)
 {
 	return NULL;
 }
 
-static struct arm_pmu *__init armv6mpcore_pmu_init(void)
+static struct arm_pmu *__devinit armv6mpcore_pmu_init(void)
 {
 	return NULL;
 }

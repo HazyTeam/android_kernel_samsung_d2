@@ -145,6 +145,10 @@
 			 * the clock is enabled.
 			 */
 		};
+		adt7461@4c {
+			compatible = "adi,adt7461";
+			reg = <0x4c>;
+		};
 	};
 
 	spi@7000 {

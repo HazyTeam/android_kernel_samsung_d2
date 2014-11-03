@@ -1,0 +1,10 @@
+--- net/core/filter.c
++++ net/core/filter.c
+@@ -615,6 +618,7 @@
+ 			ANCILLARY(ALU_XOR_X);
+ 			ANCILLARY(VLAN_TAG);
+ 			ANCILLARY(VLAN_TAG_PRESENT);
++			ANCILLARY(PAY_OFFSET);
+ 			}
+ 
+ 			/* ancillary operation unknown or unsupported */

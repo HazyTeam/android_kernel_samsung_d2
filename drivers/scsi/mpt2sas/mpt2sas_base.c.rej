@@ -1,0 +1,10 @@
+--- drivers/scsi/mpt2sas/mpt2sas_base.c
++++ drivers/scsi/mpt2sas/mpt2sas_base.c
+@@ -4410,6 +4434,7 @@
+ 	if (missing_delay[0] != -1 && missing_delay[1] != -1)
+ 		_base_update_missing_delay(ioc, missing_delay[0],
+ 		    missing_delay[1]);
++	ioc->non_operational_loop = 0;
+ 
+ 	return 0;
+ 

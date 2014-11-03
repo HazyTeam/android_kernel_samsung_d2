@@ -1,0 +1,87 @@
+--- arch/sparc/mm/ultra.S
++++ arch/sparc/mm/ultra.S
+@@ -470,10 +543,9 @@
+ 	nop
+ 	nop
+ 
+-	.globl		xcall_flush_tlb_pending
+-xcall_flush_tlb_pending:	/* 21 insns */
+-	/* %g5=context, %g1=nr, %g7=vaddrs[] */
+-	sllx		%g1, 3, %g1
++	.globl		xcall_flush_tlb_page
++xcall_flush_tlb_page:	/* 17 insns */
++	/* %g5=context, %g1=vaddr */
+ 	mov		PRIMARY_CONTEXT, %g4
+ 	ldxa		[%g4] ASI_DMMU, %g2
+ 	srlx		%g2, CTX_PGSZ1_NUC_SHIFT, %g4
+@@ -481,20 +553,16 @@
+ 	or		%g5, %g4, %g5
+ 	mov		PRIMARY_CONTEXT, %g4
+ 	stxa		%g5, [%g4] ASI_DMMU
+-1:	sub		%g1, (1 << 3), %g1
+-	ldx		[%g7 + %g1], %g5
+-	andcc		%g5, 0x1, %g0
++	andcc		%g1, 0x1, %g0
+ 	be,pn		%icc, 2f
+-
+-	 andn		%g5, 0x1, %g5
++	 andn		%g1, 0x1, %g5
+ 	stxa		%g0, [%g5] ASI_IMMU_DEMAP
+ 2:	stxa		%g0, [%g5] ASI_DMMU_DEMAP
+ 	membar		#Sync
+-	brnz,pt		%g1, 1b
+-	 nop
+ 	stxa		%g2, [%g4] ASI_DMMU
+ 	retry
+ 	nop
++	nop
+ 
+ 	.globl		xcall_flush_tlb_kernel_range
+ xcall_flush_tlb_kernel_range:	/* 25 insns */
+@@ -729,15 +797,13 @@
+ 	membar		#Sync
+ 	retry
+ 
+-	.globl		__hypervisor_xcall_flush_tlb_pending
+-__hypervisor_xcall_flush_tlb_pending: /* 21 insns */
+-	/* %g5=ctx, %g1=nr, %g7=vaddrs[], %g2,%g3,%g4,g6=scratch */
+-	sllx		%g1, 3, %g1
++	.globl		__hypervisor_xcall_flush_tlb_page
++__hypervisor_xcall_flush_tlb_page: /* 17 insns */
++	/* %g5=ctx, %g1=vaddr */
+ 	mov		%o0, %g2
+ 	mov		%o1, %g3
+ 	mov		%o2, %g4
+-1:	sub		%g1, (1 << 3), %g1
+-	ldx		[%g7 + %g1], %o0	/* ARG0: virtual address */
++	mov		%g1, %o0	        /* ARG0: virtual address */
+ 	mov		%g5, %o1		/* ARG1: mmu context */
+ 	mov		HV_MMU_ALL, %o2		/* ARG2: flags */
+ 	srlx		%o0, PAGE_SHIFT, %o0
+@@ -746,8 +812,6 @@
+ 	mov		HV_MMU_UNMAP_ADDR_TRAP, %g6
+ 	brnz,a,pn	%o0, __hypervisor_tlb_xcall_error
+ 	 mov		%o0, %g5
+-	brnz,pt		%g1, 1b
+-	 nop
+ 	mov		%g2, %o0
+ 	mov		%g3, %o1
+ 	mov		%g4, %o2
+@@ -868,12 +939,12 @@
+ 	call		tlb_patch_one
+ 	 mov		21, %o2
+ 
+-	sethi		%hi(xcall_flush_tlb_pending), %o0
+-	or		%o0, %lo(xcall_flush_tlb_pending), %o0
+-	sethi		%hi(__hypervisor_xcall_flush_tlb_pending), %o1
+-	or		%o1, %lo(__hypervisor_xcall_flush_tlb_pending), %o1
++	sethi		%hi(xcall_flush_tlb_page), %o0
++	or		%o0, %lo(xcall_flush_tlb_page), %o0
++	sethi		%hi(__hypervisor_xcall_flush_tlb_page), %o1
++	or		%o1, %lo(__hypervisor_xcall_flush_tlb_page), %o1
+ 	call		tlb_patch_one
+-	 mov		21, %o2
++	 mov		17, %o2
+ 
+ 	sethi		%hi(xcall_flush_tlb_kernel_range), %o0
+ 	or		%o0, %lo(xcall_flush_tlb_kernel_range), %o0

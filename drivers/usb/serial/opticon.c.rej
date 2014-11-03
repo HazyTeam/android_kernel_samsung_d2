@@ -1,0 +1,41 @@
+--- drivers/usb/serial/opticon.c
++++ drivers/usb/serial/opticon.c
+@@ -155,7 +152,11 @@
+ {
+ 	struct usb_serial *serial = port->serial;
+ 	int retval;
+-	u8 buffer[2];
++	u8 *buffer;
++
++	buffer = kzalloc(1, GFP_KERNEL);
++	if (!buffer)
++		return -ENOMEM;
+ 
+ 	buffer[0] = val;
+ 	/* Send the message to the vendor control endpoint
+@@ -164,6 +165,7 @@
+ 				requesttype,
+ 				USB_DIR_OUT|USB_TYPE_VENDOR|USB_RECIP_INTERFACE,
+ 				0, 0, buffer, 1, 0);
++	kfree(buffer);
+ 
+ 	return retval;
+ }
+@@ -281,7 +283,7 @@
+ 	if (!dr) {
+ 		dev_err(&port->dev, "out of memory\n");
+ 		count = -ENOMEM;
+-		goto error;
++		goto error_no_dr;
+ 	}
+ 
+ 	dr->bRequestType = USB_TYPE_VENDOR | USB_RECIP_INTERFACE | USB_DIR_OUT;
+@@ -311,6 +313,8 @@
+ 
+ 	return count;
+ error:
++	kfree(dr);
++error_no_dr:
+ 	usb_free_urb(urb);
+ error_no_urb:
+ 	kfree(buffer);

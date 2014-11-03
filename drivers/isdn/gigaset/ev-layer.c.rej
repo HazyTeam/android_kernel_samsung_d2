@@ -1,0 +1,189 @@
+--- drivers/isdn/gigaset/ev-layer.c
++++ drivers/isdn/gigaset/ev-layer.c
+@@ -153,103 +153,104 @@
+  * action, command */
+ 
+ /* initialize device, set cid mode if possible */
+-	{RSP_INIT,	 -1,  -1, SEQ_INIT,		100,  1, {ACT_TIMEOUT} },
++	{RSP_INIT,	 -1,  -1, SEQ_INIT,	100,  1, {ACT_TIMEOUT} },
+ 
+-	{EV_TIMEOUT,	100, 100, -1,			101,  3, {0},	"Z\r"},
+-	{RSP_OK,	101, 103, -1,			120,  5, {ACT_GETSTRING},
+-	 "+GMR\r"},
++	{EV_TIMEOUT,	100, 100, -1,		101,  3, {0},	"Z\r"},
++	{RSP_OK,	101, 103, -1,		120,  5, {ACT_GETSTRING},
++								"+GMR\r"},
+ 
+-	{EV_TIMEOUT,	101, 101, -1,			102,  5, {0},	"Z\r"},
+-	{RSP_ERROR,	101, 101, -1,			102,  5, {0},	"Z\r"},
++	{EV_TIMEOUT,	101, 101, -1,		102,  5, {0},	"Z\r"},
++	{RSP_ERROR,	101, 101, -1,		102,  5, {0},	"Z\r"},
+ 
+-	{EV_TIMEOUT,	102, 102, -1,			108,  5, {ACT_SETDLE1},
+-	 "^SDLE=0\r"},
+-	{RSP_OK,	108, 108, -1,			104, -1},
+-	{RSP_ZDLE,	104, 104,  0,			103,  5, {0},	"Z\r"},
+-	{EV_TIMEOUT,	104, 104, -1,			  0,  0, {ACT_FAILINIT} },
+-	{RSP_ERROR,	108, 108, -1,			  0,  0, {ACT_FAILINIT} },
++	{EV_TIMEOUT,	102, 102, -1,		108,  5, {ACT_SETDLE1},
++								"^SDLE=0\r"},
++	{RSP_OK,	108, 108, -1,		104, -1},
++	{RSP_ZDLE,	104, 104,  0,		103,  5, {0},	"Z\r"},
++	{EV_TIMEOUT,	104, 104, -1,		  0,  0, {ACT_FAILINIT} },
++	{RSP_ERROR,	108, 108, -1,		  0,  0, {ACT_FAILINIT} },
+ 
+-	{EV_TIMEOUT,	108, 108, -1,			105,  2, {ACT_SETDLE0,
+-								  ACT_HUPMODEM,
+-								  ACT_TIMEOUT} },
+-	{EV_TIMEOUT,	105, 105, -1,			103,  5, {0},	"Z\r"},
++	{EV_TIMEOUT,	108, 108, -1,		105,  2, {ACT_SETDLE0,
++							  ACT_HUPMODEM,
++							  ACT_TIMEOUT} },
++	{EV_TIMEOUT,	105, 105, -1,		103,  5, {0},	"Z\r"},
+ 
+-	{RSP_ERROR,	102, 102, -1,			107,  5, {0},	"^GETPRE\r"},
+-	{RSP_OK,	107, 107, -1,			  0,  0, {ACT_CONFIGMODE} },
+-	{RSP_ERROR,	107, 107, -1,			  0,  0, {ACT_FAILINIT} },
+-	{EV_TIMEOUT,	107, 107, -1,			  0,  0, {ACT_FAILINIT} },
++	{RSP_ERROR,	102, 102, -1,		107,  5, {0},	"^GETPRE\r"},
++	{RSP_OK,	107, 107, -1,		  0,  0, {ACT_CONFIGMODE} },
++	{RSP_ERROR,	107, 107, -1,		  0,  0, {ACT_FAILINIT} },
++	{EV_TIMEOUT,	107, 107, -1,		  0,  0, {ACT_FAILINIT} },
+ 
+-	{RSP_ERROR,	103, 103, -1,			  0,  0, {ACT_FAILINIT} },
+-	{EV_TIMEOUT,	103, 103, -1,			  0,  0, {ACT_FAILINIT} },
++	{RSP_ERROR,	103, 103, -1,		  0,  0, {ACT_FAILINIT} },
++	{EV_TIMEOUT,	103, 103, -1,		  0,  0, {ACT_FAILINIT} },
+ 
+-	{RSP_STRING,	120, 120, -1,			121, -1, {ACT_SETVER} },
++	{RSP_STRING,	120, 120, -1,		121, -1, {ACT_SETVER} },
+ 
+-	{EV_TIMEOUT,	120, 121, -1,			  0,  0, {ACT_FAILVER,
+-								  ACT_INIT} },
+-	{RSP_ERROR,	120, 121, -1,			  0,  0, {ACT_FAILVER,
+-								  ACT_INIT} },
+-	{RSP_OK,	121, 121, -1,			  0,  0, {ACT_GOTVER,
+-								  ACT_INIT} },
++	{EV_TIMEOUT,	120, 121, -1,		  0,  0, {ACT_FAILVER,
++							  ACT_INIT} },
++	{RSP_ERROR,	120, 121, -1,		  0,  0, {ACT_FAILVER,
++							  ACT_INIT} },
++	{RSP_OK,	121, 121, -1,		  0,  0, {ACT_GOTVER,
++							  ACT_INIT} },
++	{RSP_NONE,	121, 121, -1,		120,  0, {ACT_GETSTRING} },
+ 
+ /* leave dle mode */
+-	{RSP_INIT,	  0,   0, SEQ_DLE0,		201,  5, {0},	"^SDLE=0\r"},
+-	{RSP_OK,	201, 201, -1,			202, -1},
+-	{RSP_ZDLE,	202, 202,  0,			  0,  0, {ACT_DLE0} },
+-	{RSP_NODEV,	200, 249, -1,			  0,  0, {ACT_FAKEDLE0} },
+-	{RSP_ERROR,	200, 249, -1,			  0,  0, {ACT_FAILDLE0} },
+-	{EV_TIMEOUT,	200, 249, -1,			  0,  0, {ACT_FAILDLE0} },
++	{RSP_INIT,	  0,   0, SEQ_DLE0,	201,  5, {0},	"^SDLE=0\r"},
++	{RSP_OK,	201, 201, -1,		202, -1},
++	{RSP_ZDLE,	202, 202,  0,		  0,  0, {ACT_DLE0} },
++	{RSP_NODEV,	200, 249, -1,		  0,  0, {ACT_FAKEDLE0} },
++	{RSP_ERROR,	200, 249, -1,		  0,  0, {ACT_FAILDLE0} },
++	{EV_TIMEOUT,	200, 249, -1,		  0,  0, {ACT_FAILDLE0} },
+ 
+ /* enter dle mode */
+-	{RSP_INIT,	  0,   0, SEQ_DLE1,		251,  5, {0},	"^SDLE=1\r"},
+-	{RSP_OK,	251, 251, -1,			252, -1},
+-	{RSP_ZDLE,	252, 252,  1,			  0,  0, {ACT_DLE1} },
+-	{RSP_ERROR,	250, 299, -1,			  0,  0, {ACT_FAILDLE1} },
+-	{EV_TIMEOUT,	250, 299, -1,			  0,  0, {ACT_FAILDLE1} },
++	{RSP_INIT,	  0,   0, SEQ_DLE1,	251,  5, {0},	"^SDLE=1\r"},
++	{RSP_OK,	251, 251, -1,		252, -1},
++	{RSP_ZDLE,	252, 252,  1,		  0,  0, {ACT_DLE1} },
++	{RSP_ERROR,	250, 299, -1,		  0,  0, {ACT_FAILDLE1} },
++	{EV_TIMEOUT,	250, 299, -1,		  0,  0, {ACT_FAILDLE1} },
+ 
+ /* incoming call */
+-	{RSP_RING,	 -1,  -1, -1,			 -1, -1, {ACT_RING} },
++	{RSP_RING,	 -1,  -1, -1,		 -1, -1, {ACT_RING} },
+ 
+ /* get cid */
+-	{RSP_INIT,	  0,   0, SEQ_CID,		301,  5, {0},	"^SGCI?\r"},
+-	{RSP_OK,	301, 301, -1,			302, -1},
+-	{RSP_ZGCI,	302, 302, -1,			  0,  0, {ACT_CID} },
+-	{RSP_ERROR,	301, 349, -1,			  0,  0, {ACT_FAILCID} },
+-	{EV_TIMEOUT,	301, 349, -1,			  0,  0, {ACT_FAILCID} },
++	{RSP_INIT,	  0,   0, SEQ_CID,	301,  5, {0},	"^SGCI?\r"},
++	{RSP_OK,	301, 301, -1,		302, -1},
++	{RSP_ZGCI,	302, 302, -1,		  0,  0, {ACT_CID} },
++	{RSP_ERROR,	301, 349, -1,		  0,  0, {ACT_FAILCID} },
++	{EV_TIMEOUT,	301, 349, -1,		  0,  0, {ACT_FAILCID} },
+ 
+ /* enter cid mode */
+-	{RSP_INIT,	  0,   0, SEQ_CIDMODE,		150,  5, {0},	"^SGCI=1\r"},
+-	{RSP_OK,	150, 150, -1,			  0,  0, {ACT_CMODESET} },
+-	{RSP_ERROR,	150, 150, -1,			  0,  0, {ACT_FAILCMODE} },
+-	{EV_TIMEOUT,	150, 150, -1,			  0,  0, {ACT_FAILCMODE} },
++	{RSP_INIT,	  0,   0, SEQ_CIDMODE,	150,  5, {0},	"^SGCI=1\r"},
++	{RSP_OK,	150, 150, -1,		  0,  0, {ACT_CMODESET} },
++	{RSP_ERROR,	150, 150, -1,		  0,  0, {ACT_FAILCMODE} },
++	{EV_TIMEOUT,	150, 150, -1,		  0,  0, {ACT_FAILCMODE} },
+ 
+ /* leave cid mode */
+-	{RSP_INIT,	  0,   0, SEQ_UMMODE,		160,  5, {0},	"Z\r"},
+-	{RSP_OK,	160, 160, -1,			  0,  0, {ACT_UMODESET} },
+-	{RSP_ERROR,	160, 160, -1,			  0,  0, {ACT_FAILUMODE} },
+-	{EV_TIMEOUT,	160, 160, -1,			  0,  0, {ACT_FAILUMODE} },
++	{RSP_INIT,	  0,   0, SEQ_UMMODE,	160,  5, {0},	"Z\r"},
++	{RSP_OK,	160, 160, -1,		  0,  0, {ACT_UMODESET} },
++	{RSP_ERROR,	160, 160, -1,		  0,  0, {ACT_FAILUMODE} },
++	{EV_TIMEOUT,	160, 160, -1,		  0,  0, {ACT_FAILUMODE} },
+ 
+ /* abort getting cid */
+-	{RSP_INIT,	  0,   0, SEQ_NOCID,		  0,  0, {ACT_ABORTCID} },
++	{RSP_INIT,	  0,   0, SEQ_NOCID,	  0,  0, {ACT_ABORTCID} },
+ 
+ /* reset */
+-	{RSP_INIT,	  0,   0, SEQ_SHUTDOWN,		504,  5, {0},	"Z\r"},
+-	{RSP_OK,	504, 504, -1,			  0,  0, {ACT_SDOWN} },
+-	{RSP_ERROR,	501, 599, -1,			  0,  0, {ACT_FAILSDOWN} },
+-	{EV_TIMEOUT,	501, 599, -1,			  0,  0, {ACT_FAILSDOWN} },
+-	{RSP_NODEV,	501, 599, -1,			  0,  0, {ACT_FAKESDOWN} },
+-
+-	{EV_PROC_CIDMODE, -1, -1, -1,			 -1, -1, {ACT_PROC_CIDMODE} },
+-	{EV_IF_LOCK,	 -1,  -1, -1,			 -1, -1, {ACT_IF_LOCK} },
+-	{EV_IF_VER,	 -1,  -1, -1,			 -1, -1, {ACT_IF_VER} },
+-	{EV_START,	 -1,  -1, -1,			 -1, -1, {ACT_START} },
+-	{EV_STOP,	 -1,  -1, -1,			 -1, -1, {ACT_STOP} },
+-	{EV_SHUTDOWN,	 -1,  -1, -1,			 -1, -1, {ACT_SHUTDOWN} },
++	{RSP_INIT,	  0,   0, SEQ_SHUTDOWN,	504,  5, {0},	"Z\r"},
++	{RSP_OK,	504, 504, -1,		  0,  0, {ACT_SDOWN} },
++	{RSP_ERROR,	501, 599, -1,		  0,  0, {ACT_FAILSDOWN} },
++	{EV_TIMEOUT,	501, 599, -1,		  0,  0, {ACT_FAILSDOWN} },
++	{RSP_NODEV,	501, 599, -1,		  0,  0, {ACT_FAKESDOWN} },
++
++	{EV_PROC_CIDMODE, -1, -1, -1,		 -1, -1, {ACT_PROC_CIDMODE} },
++	{EV_IF_LOCK,	 -1,  -1, -1,		 -1, -1, {ACT_IF_LOCK} },
++	{EV_IF_VER,	 -1,  -1, -1,		 -1, -1, {ACT_IF_VER} },
++	{EV_START,	 -1,  -1, -1,		 -1, -1, {ACT_START} },
++	{EV_STOP,	 -1,  -1, -1,		 -1, -1, {ACT_STOP} },
++	{EV_SHUTDOWN,	 -1,  -1, -1,		 -1, -1, {ACT_SHUTDOWN} },
+ 
+ /* misc. */
+-	{RSP_ERROR,	 -1,  -1, -1,			 -1, -1, {ACT_ERROR} },
+-	{RSP_ZCAU,	 -1,  -1, -1,			 -1, -1, {ACT_ZCAU} },
+-	{RSP_NONE,	 -1,  -1, -1,			 -1, -1, {ACT_DEBUG} },
+-	{RSP_ANY,	 -1,  -1, -1,			 -1, -1, {ACT_WARN} },
++	{RSP_ERROR,	 -1,  -1, -1,		 -1, -1, {ACT_ERROR} },
++	{RSP_ZCAU,	 -1,  -1, -1,		 -1, -1, {ACT_ZCAU} },
++	{RSP_NONE,	 -1,  -1, -1,		 -1, -1, {ACT_DEBUG} },
++	{RSP_ANY,	 -1,  -1, -1,		 -1, -1, {ACT_WARN} },
+ 	{RSP_LAST}
+ };
+ 
+@@ -1314,8 +1315,9 @@
+ 		s = ev->ptr;
+ 
+ 		if (!strcmp(s, "OK")) {
++			/* OK without version string: assume old response */
+ 			*p_genresp = 1;
+-			*p_resp_code = RSP_ERROR;
++			*p_resp_code = RSP_NONE;
+ 			break;
+ 		}
+ 

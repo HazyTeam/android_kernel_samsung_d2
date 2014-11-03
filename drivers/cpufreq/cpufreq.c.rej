@@ -1,0 +1,75 @@
+--- drivers/cpufreq/cpufreq.c
++++ drivers/cpufreq/cpufreq.c
+@@ -142,7 +147,7 @@
+ 		goto err_out;
+ 
+ 	/* get the cpufreq driver */
+-	spin_lock_irqsave(&cpufreq_driver_lock, flags);
++	read_lock_irqsave(&cpufreq_driver_lock, flags);
+ 
+ 	if (!cpufreq_driver)
+ 		goto err_out_unlock;
+@@ -160,13 +165,13 @@
+ 	if (!sysfs && !kobject_get(&data->kobj))
+ 		goto err_out_put_module;
+ 
+-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
++	read_unlock_irqrestore(&cpufreq_driver_lock, flags);
+ 	return data;
+ 
+ err_out_put_module:
+ 	module_put(cpufreq_driver->owner);
+ err_out_unlock:
+-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
++	read_unlock_irqrestore(&cpufreq_driver_lock, flags);
+ err_out:
+ 	return NULL;
+ }
+@@ -1016,12 +1024,12 @@
+ 
+ 	pr_debug("%s: unregistering CPU %u\n", __func__, cpu);
+ 
+-	spin_lock_irqsave(&cpufreq_driver_lock, flags);
++	write_lock_irqsave(&cpufreq_driver_lock, flags);
+ 
+ 	data = per_cpu(cpufreq_cpu_data, cpu);
+ 	per_cpu(cpufreq_cpu_data, cpu) = NULL;
+ 
+-	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
++	write_unlock_irqrestore(&cpufreq_driver_lock, flags);
+ 
+ 	if (!data) {
+ 		pr_debug("%s: No cpu_data found\n", __func__);
+@@ -1039,7 +1047,9 @@
+ 
+ 	WARN_ON(lock_policy_rwsem_write(cpu));
+ 	cpus = cpumask_weight(data->cpus);
+-	cpumask_clear_cpu(cpu, data->cpus);
++
++	if (cpus > 1)
++		cpumask_clear_cpu(cpu, data->cpus);
+ 	unlock_policy_rwsem_write(cpu);
+ 
+ 	if (cpu != data->cpu) {
+@@ -1055,9 +1065,9 @@
+ 			WARN_ON(lock_policy_rwsem_write(cpu));
+ 			cpumask_set_cpu(cpu, data->cpus);
+ 
+-			spin_lock_irqsave(&cpufreq_driver_lock, flags);
++			write_lock_irqsave(&cpufreq_driver_lock, flags);
+ 			per_cpu(cpufreq_cpu_data, cpu) = data;
+-			spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
++			write_unlock_irqrestore(&cpufreq_driver_lock, flags);
+ 
+ 			unlock_policy_rwsem_write(cpu);
+ 
+@@ -1073,6 +1083,9 @@
+ 				__func__, cpu_dev->id, cpu);
+ 	}
+ 
++	if ((cpus == 1) && (cpufreq_driver->target))
++		__cpufreq_governor(data, CPUFREQ_GOV_POLICY_EXIT);
++
+ 	pr_debug("%s: removing link, cpu: %d\n", __func__, cpu);
+ 	cpufreq_cpu_put(data);
+ 

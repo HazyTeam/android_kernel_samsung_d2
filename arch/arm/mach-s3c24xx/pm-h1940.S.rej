@@ -1,0 +1,8 @@
+--- arch/arm/mach-s3c24xx/pm-h1940.S
++++ arch/arm/mach-s3c24xx/pm-h1940.S
+@@ -30,4 +30,4 @@
+ 
+ h1940_pm_return:
+ 	mov	r0, #S3C2410_PA_GPIO
+-	ldr	pc, [ r0, #S3C2410_GSTATUS3 - S3C24XX_VA_GPIO ]
++	ldr	pc, [r0, #S3C2410_GSTATUS3 - S3C24XX_VA_GPIO]

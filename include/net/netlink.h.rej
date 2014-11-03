@@ -1,0 +1,35 @@
+--- include/net/netlink.h
++++ include/net/netlink.h
+@@ -98,6 +98,10 @@
+  *   nla_put_u16(skb, type, value)	add u16 attribute to skb
+  *   nla_put_u32(skb, type, value)	add u32 attribute to skb
+  *   nla_put_u64(skb, type, value)	add u64 attribute to skb
++ *   nla_put_s8(skb, type, value)	add s8 attribute to skb
++ *   nla_put_s16(skb, type, value)	add s16 attribute to skb
++ *   nla_put_s32(skb, type, value)	add s32 attribute to skb
++ *   nla_put_s64(skb, type, value)	add s64 attribute to skb
+  *   nla_put_string(skb, type, str)	add string attribute to skb
+  *   nla_put_flag(skb, type)		add flag attribute to skb
+  *   nla_put_msecs(skb, type, jiffies)	add msecs attribute to skb
+@@ -121,6 +125,10 @@
+  *   nla_get_u16(nla)			get payload for a u16 attribute
+  *   nla_get_u32(nla)			get payload for a u32 attribute
+  *   nla_get_u64(nla)			get payload for a u64 attribute
++ *   nla_get_s8(nla)			get payload for a s8 attribute
++ *   nla_get_s16(nla)			get payload for a s16 attribute
++ *   nla_get_s32(nla)			get payload for a s32 attribute
++ *   nla_get_s64(nla)			get payload for a s64 attribute
+  *   nla_get_flag(nla)			return 1 if flag is true
+  *   nla_get_msecs(nla)			get payload for a msecs attribute
+  *
+@@ -160,6 +168,10 @@
+ 	NLA_NESTED_COMPAT,
+ 	NLA_NUL_STRING,
+ 	NLA_BINARY,
++	NLA_S8,
++	NLA_S16,
++	NLA_S32,
++	NLA_S64,
+ 	__NLA_TYPE_MAX,
+ };
+ 

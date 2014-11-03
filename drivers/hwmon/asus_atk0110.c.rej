@@ -1,0 +1,15 @@
+--- drivers/hwmon/asus_atk0110.c
++++ drivers/hwmon/asus_atk0110.c
+@@ -34,6 +34,12 @@
+ 		.matches = {
+ 			DMI_MATCH(DMI_BOARD_NAME, "SABERTOOTH X58")
+ 		}
++	}, {
++		/* Old interface reads the same sensor for fan0 and fan1 */
++		.ident = "Asus M5A78L",
++		.matches = {
++			DMI_MATCH(DMI_BOARD_NAME, "M5A78L")
++		}
+ 	},
+ 	{ }
+ };

@@ -1,0 +1,16 @@
+--- fs/ext4/ext4.h
++++ fs/ext4/ext4.h
+@@ -1905,6 +1902,13 @@
+ 				  struct buffer_head *bh);
+ 
+ /* balloc.c */
++extern void ext4_get_group_no_and_offset(struct super_block *sb,
++					 ext4_fsblk_t blocknr,
++					 ext4_group_t *blockgrpp,
++					 ext4_grpblk_t *offsetp);
++extern ext4_group_t ext4_get_group_number(struct super_block *sb,
++					  ext4_fsblk_t block);
++
+ extern void ext4_validate_block_bitmap(struct super_block *sb,
+ 				       struct ext4_group_desc *desc,
+ 				       unsigned int block_group,

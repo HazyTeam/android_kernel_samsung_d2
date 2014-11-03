@@ -1,0 +1,10 @@
+--- include/linux/gfp.h
++++ include/linux/gfp.h
+@@ -23,6 +23,7 @@
+ #define ___GFP_REPEAT		0x400u
+ #define ___GFP_NOFAIL		0x800u
+ #define ___GFP_NORETRY		0x1000u
++#define ___GFP_MEMALLOC		0x2000u
+ #define ___GFP_COMP		0x4000u
+ #define ___GFP_ZERO		0x8000u
+ #define ___GFP_NOMEMALLOC	0x10000u

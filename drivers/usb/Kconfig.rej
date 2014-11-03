@@ -1,0 +1,11 @@
+--- drivers/usb/Kconfig
++++ drivers/usb/Kconfig
+@@ -134,8 +134,6 @@
+ 
+ source "drivers/usb/musb/Kconfig"
+ 
+-source "drivers/usb/chipidea/Kconfig"
+-
+ source "drivers/usb/renesas_usbhs/Kconfig"
+ 
+ source "drivers/usb/class/Kconfig"

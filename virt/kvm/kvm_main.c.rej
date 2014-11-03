@@ -1,0 +1,33 @@
+--- virt/kvm/kvm_main.c
++++ virt/kvm/kvm_main.c
+@@ -929,26 +926,23 @@
+ EXPORT_SYMBOL_GPL(__kvm_set_memory_region);
+ 
+ int kvm_set_memory_region(struct kvm *kvm,
+-			  struct kvm_userspace_memory_region *mem,
+-			  bool user_alloc)
++			  struct kvm_userspace_memory_region *mem)
+ {
+ 	int r;
+ 
+ 	mutex_lock(&kvm->slots_lock);
+-	r = __kvm_set_memory_region(kvm, mem, user_alloc);
++	r = __kvm_set_memory_region(kvm, mem);
+ 	mutex_unlock(&kvm->slots_lock);
+ 	return r;
+ }
+ EXPORT_SYMBOL_GPL(kvm_set_memory_region);
+ 
+ int kvm_vm_ioctl_set_memory_region(struct kvm *kvm,
+-				   struct
+-				   kvm_userspace_memory_region *mem,
+-				   bool user_alloc)
++				   struct kvm_userspace_memory_region *mem)
+ {
+ 	if (mem->slot >= KVM_USER_MEM_SLOTS)
+ 		return -EINVAL;
+-	return kvm_set_memory_region(kvm, mem, user_alloc);
++	return kvm_set_memory_region(kvm, mem);
+ }
+ 
+ int kvm_get_dirty_log(struct kvm *kvm,

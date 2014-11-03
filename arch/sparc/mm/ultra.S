@@ -80,6 +80,33 @@ __flush_tlb_page:	/* 22 insns */
 	nop
 
 	.align		32
+	.globl		__flush_tlb_page
+__flush_tlb_page:	/* 22 insns */
+	/* %o0 = context, %o1 = vaddr */
+	rdpr		%pstate, %g7
+	andn		%g7, PSTATE_IE, %g2
+	wrpr		%g2, %pstate
+	mov		SECONDARY_CONTEXT, %o4
+	ldxa		[%o4] ASI_DMMU, %g2
+	stxa		%o0, [%o4] ASI_DMMU
+	andcc		%o1, 1, %g0
+	andn		%o1, 1, %o3
+	be,pn		%icc, 1f
+	 or		%o3, 0x10, %o3
+	stxa		%g0, [%o3] ASI_IMMU_DEMAP
+1:	stxa		%g0, [%o3] ASI_DMMU_DEMAP
+	membar		#Sync
+	stxa		%g2, [%o4] ASI_DMMU
+	sethi		%hi(KERNBASE), %o4
+	flush		%o4
+	retl
+	 wrpr		%g7, 0x0, %pstate
+	nop
+	nop
+	nop
+	nop
+
+	.align		32
 	.globl		__flush_tlb_pending
 __flush_tlb_pending:	/* 26 insns */
 	/* %o0 = context, %o1 = nr, %o2 = vaddrs[] */
@@ -255,6 +282,31 @@ __cheetah_flush_tlb_page:	/* 22 insns */
 	retl
 	 wrpr		%g7, 0x0, %pstate
 
+__cheetah_flush_tlb_page:	/* 22 insns */
+	/* %o0 = context, %o1 = vaddr */
+	rdpr		%pstate, %g7
+	andn		%g7, PSTATE_IE, %g2
+	wrpr		%g2, 0x0, %pstate
+	wrpr		%g0, 1, %tl
+	mov		PRIMARY_CONTEXT, %o4
+	ldxa		[%o4] ASI_DMMU, %g2
+	srlx		%g2, CTX_PGSZ1_NUC_SHIFT, %o3
+	sllx		%o3, CTX_PGSZ1_NUC_SHIFT, %o3
+	or		%o0, %o3, %o0	/* Preserve nucleus page size fields */
+	stxa		%o0, [%o4] ASI_DMMU
+	andcc		%o1, 1, %g0
+	be,pn		%icc, 1f
+	 andn		%o1, 1, %o3
+	stxa		%g0, [%o3] ASI_IMMU_DEMAP
+1:	stxa		%g0, [%o3] ASI_DMMU_DEMAP	
+	membar		#Sync
+	stxa		%g2, [%o4] ASI_DMMU
+	sethi		%hi(KERNBASE), %o4
+	flush		%o4
+	wrpr		%g0, 0, %tl
+	retl
+	 wrpr		%g7, 0x0, %pstate
+
 __cheetah_flush_tlb_pending:	/* 27 insns */
 	/* %o0 = context, %o1 = nr, %o2 = vaddrs[] */
 	rdpr		%pstate, %g7
@@ -318,6 +370,20 @@ __hypervisor_flush_tlb_mm: /* 10 insns */
 	ta		HV_FAST_TRAP
 	brnz,pn		%o0, __hypervisor_tlb_tl0_error
 	 mov		HV_FAST_MMU_DEMAP_CTX, %o1
+	retl
+	 nop
+
+__hypervisor_flush_tlb_page: /* 11 insns */
+	/* %o0 = context, %o1 = vaddr */
+	mov		%o0, %g2
+	mov		%o1, %o0              /* ARG0: vaddr + IMMU-bit */
+	mov		%g2, %o1	      /* ARG1: mmu context */
+	mov		HV_MMU_ALL, %o2	      /* ARG2: flags */
+	srlx		%o0, PAGE_SHIFT, %o0
+	sllx		%o0, PAGE_SHIFT, %o0
+	ta		HV_MMU_UNMAP_ADDR_TRAP
+	brnz,pn		%o0, __hypervisor_tlb_tl0_error
+	 mov		HV_MMU_UNMAP_ADDR_TRAP, %o1
 	retl
 	 nop
 
@@ -404,6 +470,13 @@ cheetah_patch_cachetlbops:
 	or		%o1, %lo(__cheetah_flush_tlb_mm), %o1
 	call		tlb_patch_one
 	 mov		19, %o2
+
+	sethi		%hi(__flush_tlb_page), %o0
+	or		%o0, %lo(__flush_tlb_page), %o0
+	sethi		%hi(__cheetah_flush_tlb_page), %o1
+	or		%o1, %lo(__cheetah_flush_tlb_page), %o1
+	call		tlb_patch_one
+	 mov		22, %o2
 
 	sethi		%hi(__flush_tlb_page), %o0
 	or		%o0, %lo(__flush_tlb_page), %o0
@@ -549,8 +622,8 @@ xcall_sync_tick:
 
 	.globl		xcall_fetch_glob_regs
 xcall_fetch_glob_regs:
-	sethi		%hi(global_reg_snapshot), %g1
-	or		%g1, %lo(global_reg_snapshot), %g1
+	sethi		%hi(global_cpu_snapshot), %g1
+	or		%g1, %lo(global_cpu_snapshot), %g1
 	__GET_CPUID(%g2)
 	sllx		%g2, 6, %g3
 	add		%g1, %g3, %g1
@@ -575,6 +648,66 @@ xcall_fetch_glob_regs:
 	add		%g7, %g2, %g7
 	ldx		[%g7 + TRAP_PER_CPU_THREAD], %g3
 	stx		%g3, [%g1 + GR_SNAP_THREAD]
+	retry
+
+	.globl		xcall_fetch_glob_pmu
+xcall_fetch_glob_pmu:
+	sethi		%hi(global_cpu_snapshot), %g1
+	or		%g1, %lo(global_cpu_snapshot), %g1
+	__GET_CPUID(%g2)
+	sllx		%g2, 6, %g3
+	add		%g1, %g3, %g1
+	rd		%pic, %g7
+	stx		%g7, [%g1 + (4 * 8)]
+	rd		%pcr, %g7
+	stx		%g7, [%g1 + (0 * 8)]
+	retry
+
+	.globl		xcall_fetch_glob_pmu_n4
+xcall_fetch_glob_pmu_n4:
+	sethi		%hi(global_cpu_snapshot), %g1
+	or		%g1, %lo(global_cpu_snapshot), %g1
+	__GET_CPUID(%g2)
+	sllx		%g2, 6, %g3
+	add		%g1, %g3, %g1
+
+	ldxa		[%g0] ASI_PIC, %g7
+	stx		%g7, [%g1 + (4 * 8)]
+	mov		0x08, %g3
+	ldxa		[%g3] ASI_PIC, %g7
+	stx		%g7, [%g1 + (5 * 8)]
+	mov		0x10, %g3
+	ldxa		[%g3] ASI_PIC, %g7
+	stx		%g7, [%g1 + (6 * 8)]
+	mov		0x18, %g3
+	ldxa		[%g3] ASI_PIC, %g7
+	stx		%g7, [%g1 + (7 * 8)]
+
+	mov		%o0, %g2
+	mov		%o1, %g3
+	mov		%o5, %g7
+
+	mov		HV_FAST_VT_GET_PERFREG, %o5
+	mov		3, %o0
+	ta		HV_FAST_TRAP
+	stx		%o1, [%g1 + (3 * 8)]
+	mov		HV_FAST_VT_GET_PERFREG, %o5
+	mov		2, %o0
+	ta		HV_FAST_TRAP
+	stx		%o1, [%g1 + (2 * 8)]
+	mov		HV_FAST_VT_GET_PERFREG, %o5
+	mov		1, %o0
+	ta		HV_FAST_TRAP
+	stx		%o1, [%g1 + (1 * 8)]
+	mov		HV_FAST_VT_GET_PERFREG, %o5
+	mov		0, %o0
+	ta		HV_FAST_TRAP
+	stx		%o1, [%g1 + (0 * 8)]
+
+	mov		%g2, %o0
+	mov		%g3, %o1
+	mov		%g7, %o5
+
 	retry
 
 #ifdef DCACHE_ALIASING_POSSIBLE
@@ -760,6 +893,13 @@ hypervisor_patch_cachetlbops:
 	or		%o1, %lo(__hypervisor_flush_tlb_mm), %o1
 	call		tlb_patch_one
 	 mov		10, %o2
+
+	sethi		%hi(__flush_tlb_page), %o0
+	or		%o0, %lo(__flush_tlb_page), %o0
+	sethi		%hi(__hypervisor_flush_tlb_page), %o1
+	or		%o1, %lo(__hypervisor_flush_tlb_page), %o1
+	call		tlb_patch_one
+	 mov		11, %o2
 
 	sethi		%hi(__flush_tlb_page), %o0
 	or		%o0, %lo(__flush_tlb_page), %o0

@@ -1,0 +1,16 @@
+--- drivers/mmc/host/sdhci-s3c.c
++++ drivers/mmc/host/sdhci-s3c.c
+@@ -742,13 +679,7 @@
+ #ifndef CONFIG_PM_RUNTIME
+ 	clk_disable_unprepare(sc->clk_bus[sc->cur_clk]);
+ #endif
+-	for (ptr = 0; ptr < MAX_BUS_CLK; ptr++) {
+-		if (sc->clk_bus[ptr]) {
+-			clk_put(sc->clk_bus[ptr]);
+-		}
+-	}
+ 	clk_disable_unprepare(sc->clk_io);
+-	clk_put(sc->clk_io);
+ 
+ 	sdhci_free_host(host);
+ 	platform_set_drvdata(pdev, NULL);

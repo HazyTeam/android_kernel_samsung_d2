@@ -1,0 +1,10 @@
+--- arch/arm/mach-rpc/irq.c
++++ arch/arm/mach-rpc/irq.c
+@@ -163,6 +163,6 @@
+ 		}
+ 	}
+ 
+-	init_FIQ();
++	init_FIQ(FIQ_START);
+ }
+ 

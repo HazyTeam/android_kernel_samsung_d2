@@ -170,7 +170,7 @@ static bool __sub_expired(struct ceph_mon_client *monc)
  */
 static void __schedule_delayed(struct ceph_mon_client *monc)
 {
-	unsigned delay;
+	unsigned int delay;
 
 	if (monc->cur_mon < 0 || __sub_expired(monc))
 		delay = 10 * HZ;
@@ -186,7 +186,7 @@ static void __schedule_delayed(struct ceph_mon_client *monc)
 static void __send_subscribe(struct ceph_mon_client *monc)
 {
 	dout("__send_subscribe sub_sent=%u exp=%u want_osd=%d\n",
-	     (unsigned)monc->sub_sent, __sub_expired(monc),
+	     (unsigned int)monc->sub_sent, __sub_expired(monc),
 	     monc->want_next_osdmap);
 	if ((__sub_expired(monc) && !monc->sub_sent) ||
 	    monc->want_next_osdmap == 1) {
@@ -203,7 +203,7 @@ static void __send_subscribe(struct ceph_mon_client *monc)
 
 		if (monc->want_next_osdmap) {
 			dout("__send_subscribe to 'osdmap' %u\n",
-			     (unsigned)monc->have_osdmap);
+			     (unsigned int)monc->have_osdmap);
 			ceph_encode_string(&p, end, "osdmap", 6);
 			i = p;
 			i->have = cpu_to_le64(monc->have_osdmap);
@@ -213,7 +213,7 @@ static void __send_subscribe(struct ceph_mon_client *monc)
 		}
 		if (monc->want_mdsmap) {
 			dout("__send_subscribe to 'mdsmap' %u+\n",
-			     (unsigned)monc->have_mdsmap);
+			     (unsigned int)monc->have_mdsmap);
 			ceph_encode_string(&p, end, "mdsmap", 6);
 			i = p;
 			i->have = cpu_to_le64(monc->have_mdsmap);
@@ -238,7 +238,7 @@ static void __send_subscribe(struct ceph_mon_client *monc)
 static void handle_subscribe_ack(struct ceph_mon_client *monc,
 				 struct ceph_msg *msg)
 {
-	unsigned seconds;
+	unsigned int seconds;
 	struct ceph_mon_subscribe_ack *h = msg->front.iov_base;
 
 	if (msg->front.iov_len < sizeof(*h))
@@ -637,7 +637,7 @@ bad:
 /*
  * Do a synchronous pool op.
  */
-int ceph_monc_do_poolop(struct ceph_mon_client *monc, u32 op,
+static int do_poolop(struct ceph_mon_client *monc, u32 op,
 			u32 pool, u64 snapid,
 			char *buf, int len)
 {
@@ -687,7 +687,7 @@ out:
 int ceph_monc_create_snapid(struct ceph_mon_client *monc,
 			    u32 pool, u64 *snapid)
 {
-	return ceph_monc_do_poolop(monc,  POOL_OP_CREATE_UNMANAGED_SNAP,
+	return do_poolop(monc,  POOL_OP_CREATE_UNMANAGED_SNAP,
 				   pool, 0, (char *)snapid, sizeof(*snapid));
 
 }
@@ -696,8 +696,8 @@ EXPORT_SYMBOL(ceph_monc_create_snapid);
 int ceph_monc_delete_snapid(struct ceph_mon_client *monc,
 			    u32 pool, u64 snapid)
 {
-	return ceph_monc_do_poolop(monc,  POOL_OP_CREATE_UNMANAGED_SNAP,
-				   pool, snapid, 0, 0);
+	return do_poolop(monc,  POOL_OP_CREATE_UNMANAGED_SNAP,
+				   pool, snapid, NULL, 0);
 
 }
 
@@ -769,7 +769,6 @@ static int build_initial_monmap(struct ceph_mon_client *monc)
 		monc->monmap->mon_inst[i].name.num = cpu_to_le64(i);
 	}
 	monc->monmap->num_mon = num_mon;
-	monc->have_fsid = false;
 	return 0;
 }
 
@@ -864,6 +863,14 @@ void ceph_monc_stop(struct ceph_mon_client *monc)
 	__close_session(monc);
 
 	mutex_unlock(&monc->mutex);
+
+	/*
+	 * flush msgr queue before we destroy ourselves to ensure that:
+	 *  - any work that references our embedded con is finished.
+	 *  - any osd_client or other work that may reference an authorizer
+	 *    finishes before we shut down the auth subsystem.
+	 */
+	ceph_msgr_flush();
 
 	/*
 	 * flush msgr queue before we destroy ourselves to ensure that:

@@ -1,0 +1,159 @@
+--- net/wireless/scan.c
++++ net/wireless/scan.c
+@@ -19,55 +19,142 @@
+ #include "wext-compat.h"
+ #include "rdev-ops.h"
+ 
++/**
++ * DOC: BSS tree/list structure
++ *
++ * At the top level, the BSS list is kept in both a list in each
++ * registered device (@bss_list) as well as an RB-tree for faster
++ * lookup. In the RB-tree, entries can be looked up using their
++ * channel, MESHID, MESHCONF (for MBSSes) or channel, BSSID, SSID
++ * for other BSSes.
++ *
++ * Due to the possibility of hidden SSIDs, there's a second level
++ * structure, the "hidden_list" and "hidden_beacon_bss" pointer.
++ * The hidden_list connects all BSSes belonging to a single AP
++ * that has a hidden SSID, and connects beacon and probe response
++ * entries. For a probe response entry for a hidden SSID, the
++ * hidden_beacon_bss pointer points to the BSS struct holding the
++ * beacon's information.
++ *
++ * Reference counting is done for all these references except for
++ * the hidden_list, so that a beacon BSS struct that is otherwise
++ * not referenced has one reference for being on the bss_list and
++ * one for each probe response entry that points to it using the
++ * hidden_beacon_bss pointer. When a BSS struct that has such a
++ * pointer is get/put, the refcount update is also propagated to
++ * the referenced struct, this ensure that it cannot get removed
++ * while somebody is using the probe response version.
++ *
++ * Note that the hidden_beacon_bss pointer never changes, due to
++ * the reference counting. Therefore, no locking is needed for
++ * it.
++ *
++ * Also note that the hidden_beacon_bss pointer is only relevant
++ * if the driver uses something other than the IEs, e.g. private
++ * data stored stored in the BSS struct, since the beacon IEs are
++ * also linked into the probe response struct.
++ */
++
+ #define IEEE80211_SCAN_RESULT_EXPIRE	(30 * HZ)
+ 
+-static void bss_release(struct kref *ref)
++static void bss_free(struct cfg80211_internal_bss *bss)
+ {
+ 	struct cfg80211_bss_ies *ies;
+-	struct cfg80211_internal_bss *bss;
+-
+-	bss = container_of(ref, struct cfg80211_internal_bss, ref);
+ 
+ 	if (WARN_ON(atomic_read(&bss->hold)))
+ 		return;
+ 
+-	if (bss->pub.free_priv)
+-		bss->pub.free_priv(&bss->pub);
+-
+ 	ies = (void *)rcu_access_pointer(bss->pub.beacon_ies);
+-	if (ies)
++	if (ies && !bss->pub.hidden_beacon_bss)
+ 		kfree_rcu(ies, rcu_head);
+ 	ies = (void *)rcu_access_pointer(bss->pub.proberesp_ies);
+ 	if (ies)
+ 		kfree_rcu(ies, rcu_head);
+ 
++	/*
++	 * This happens when the module is removed, it doesn't
++	 * really matter any more save for completeness
++	 */
++	if (!list_empty(&bss->hidden_list))
++		list_del(&bss->hidden_list);
++
+ 	kfree(bss);
+ }
+ 
+-/* must hold dev->bss_lock! */
+-static void __cfg80211_unlink_bss(struct cfg80211_registered_device *dev,
++static inline void bss_ref_get(struct cfg80211_registered_device *dev,
++			       struct cfg80211_internal_bss *bss)
++{
++	lockdep_assert_held(&dev->bss_lock);
++
++	bss->refcount++;
++	if (bss->pub.hidden_beacon_bss) {
++		bss = container_of(bss->pub.hidden_beacon_bss,
++				   struct cfg80211_internal_bss,
++				   pub);
++		bss->refcount++;
++	}
++}
++
++static inline void bss_ref_put(struct cfg80211_registered_device *dev,
++			       struct cfg80211_internal_bss *bss)
++{
++	lockdep_assert_held(&dev->bss_lock);
++
++	if (bss->pub.hidden_beacon_bss) {
++		struct cfg80211_internal_bss *hbss;
++		hbss = container_of(bss->pub.hidden_beacon_bss,
++				    struct cfg80211_internal_bss,
++				    pub);
++		hbss->refcount--;
++		if (hbss->refcount == 0)
++			bss_free(hbss);
++	}
++	bss->refcount--;
++	if (bss->refcount == 0)
++		bss_free(bss);
++}
++
++static bool __cfg80211_unlink_bss(struct cfg80211_registered_device *dev,
+ 				  struct cfg80211_internal_bss *bss)
+ {
++	lockdep_assert_held(&dev->bss_lock);
++
++	if (!list_empty(&bss->hidden_list)) {
++		/*
++		 * don't remove the beacon entry if it has
++		 * probe responses associated with it
++		 */
++		if (!bss->pub.hidden_beacon_bss)
++			return false;
++		/*
++		 * if it's a probe response entry break its
++		 * link to the other entries in the group
++		 */
++		list_del_init(&bss->hidden_list);
++	}
++
+ 	list_del_init(&bss->list);
+ 	rb_erase(&bss->rbn, &dev->bss_tree);
+-	kref_put(&bss->ref, bss_release);
++	bss_ref_put(dev, bss);
++	return true;
+ }
+ 
+-/* must hold dev->bss_lock! */
+ static void __cfg80211_bss_expire(struct cfg80211_registered_device *dev,
+ 				  unsigned long expire_time)
+ {
+ 	struct cfg80211_internal_bss *bss, *tmp;
+ 	bool expired = false;
+ 
++	lockdep_assert_held(&dev->bss_lock);
++
+ 	list_for_each_entry_safe(bss, tmp, &dev->bss_list, list) {
+ 		if (atomic_read(&bss->hold))
+ 			continue;
+ 		if (!time_after(expire_time, bss->ts))
+ 			continue;
+ 
+-		__cfg80211_unlink_bss(dev, bss);
+-		expired = true;
++		if (__cfg80211_unlink_bss(dev, bss))
++			expired = true;
+ 	}
+ 
+ 	if (expired)

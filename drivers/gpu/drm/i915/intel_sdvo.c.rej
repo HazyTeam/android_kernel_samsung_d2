@@ -1,0 +1,57 @@
+--- drivers/gpu/drm/i915/intel_sdvo.c
++++ drivers/gpu/drm/i915/intel_sdvo.c
+@@ -1776,11 +1784,14 @@
+ 	 * Assume that the preferred modes are
+ 	 * arranged in priority order.
+ 	 */
+-	intel_ddc_get_modes(connector, intel_sdvo->i2c);
+-	if (list_empty(&connector->probed_modes) == false)
+-		goto end;
++	intel_ddc_get_modes(connector, &intel_sdvo->ddc);
+ 
+-	/* Fetch modes from VBT */
++	/*
++	 * Fetch modes from VBT. For SDVO prefer the VBT mode since some
++	 * SDVO->LVDS transcoders can't cope with the EDID mode. Since
++	 * drm_mode_probed_add adds the mode at the head of the list we add it
++	 * last.
++	 */
+ 	if (dev_priv->sdvo_lvds_vbt_mode != NULL) {
+ 		newmode = drm_mode_duplicate(connector->dev,
+ 					     dev_priv->sdvo_lvds_vbt_mode);
+@@ -1792,7 +1803,6 @@
+ 		}
+ 	}
+ 
+-end:
+ 	list_for_each_entry(newmode, &connector->probed_modes, head) {
+ 		if (newmode->type & DRM_MODE_TYPE_PREFERRED) {
+ 			intel_sdvo->sdvo_lvds_fixed_mode =
+@@ -2808,6 +2821,14 @@
+ 		goto err_output;
+ 	}
+ 
++	/* Only enable the hotplug irq if we need it, to work around noisy
++	 * hotplug lines.
++	 */
++	if (intel_sdvo->hotplug_active) {
++		intel_encoder->hpd_pin =
++			intel_sdvo->is_sdvob ?  HPD_SDVO_B : HPD_SDVO_C;
++	}
++
+ 	/*
+ 	 * Cloning SDVO with anything is often impossible, since the SDVO
+ 	 * encoder can request a special input timing mode. And even if that's
+@@ -2818,12 +2839,6 @@
+ 	 */
+ 	intel_sdvo->base.cloneable = false;
+ 
+-	/* Only enable the hotplug irq if we need it, to work around noisy
+-	 * hotplug lines.
+-	 */
+-	if (intel_sdvo->hotplug_active)
+-		dev_priv->hotplug_supported_mask |= hotplug_mask;
+-
+ 	intel_sdvo_select_ddc_bus(dev_priv, intel_sdvo, sdvo_reg);
+ 
+ 	/* Set the input timing to the screen. Assume always input 0. */

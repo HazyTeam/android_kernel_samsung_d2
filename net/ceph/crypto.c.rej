@@ -1,0 +1,10 @@
+--- net/ceph/crypto.c
++++ net/ceph/crypto.c
+@@ -466,6 +466,7 @@
+ 	struct ceph_crypto_key *ckey = key->payload.data;
+ 
+ 	ceph_crypto_key_destroy(ckey);
++	kfree(ckey);
+ }
+ 
+ struct key_type key_type_ceph = {

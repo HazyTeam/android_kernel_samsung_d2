@@ -1,0 +1,10 @@
+--- drivers/char/ttyprintk.c
++++ drivers/char/ttyprintk.c
+@@ -189,6 +188,7 @@
+ 		return PTR_ERR(ttyprintk_driver);
+ 
+ 	tty_port_init(&tpk_port.port);
++	tpk_port.port.ops = &null_ops;
+ 
+ 	ttyprintk_driver->driver_name = "ttyprintk";
+ 	ttyprintk_driver->name = "ttyprintk";

@@ -1,0 +1,19 @@
+--- fs/statfs.c
++++ fs/statfs.c
+@@ -87,12 +87,11 @@
+ 
+ int fd_statfs(int fd, struct kstatfs *st)
+ {
+-	int fput_needed;
+-	struct file *file = fget_light(fd, &fput_needed);
++	struct fd f = fdget(fd);
+ 	int error = -EBADF;
+-	if (file) {
+-		error = vfs_statfs(&file->f_path, st);
+-		fput_light(file, fput_needed);
++	if (f.file) {
++		error = vfs_statfs(&f.file->f_path, st);
++		fdput(f);
+ 	}
+ 	return error;
+ }

@@ -1,0 +1,20 @@
+--- arch/x86/kernel/hpet.c
++++ arch/x86/kernel/hpet.c
+@@ -434,7 +434,7 @@
+ 
+ 	/* unmask it */
+ 	cfg = hpet_readl(HPET_Tn_CFG(hdev->num));
+-	cfg |= HPET_TN_FSB;
++	cfg |= HPET_TN_ENABLE | HPET_TN_FSB;
+ 	hpet_writel(cfg, HPET_Tn_CFG(hdev->num));
+ }
+ 
+@@ -445,7 +445,7 @@
+ 
+ 	/* mask it */
+ 	cfg = hpet_readl(HPET_Tn_CFG(hdev->num));
+-	cfg &= ~HPET_TN_FSB;
++	cfg &= ~(HPET_TN_ENABLE | HPET_TN_FSB);
+ 	hpet_writel(cfg, HPET_Tn_CFG(hdev->num));
+ }
+ 

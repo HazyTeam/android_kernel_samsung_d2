@@ -1,0 +1,12 @@
+--- net/sunrpc/svc.c
++++ net/sunrpc/svc.c
+@@ -1054,8 +1059,7 @@
+ 	vaf.fmt = fmt;
+ 	vaf.va = &args;
+ 
+-	net_warn_ratelimited("svc: %s: %pV",
+-			     svc_print_addr(rqstp, buf, sizeof(buf)), &vaf);
++	dprintk("svc: %s: %pV", svc_print_addr(rqstp, buf, sizeof(buf)), &vaf);
+ 
+ 	va_end(args);
+ }

@@ -1,0 +1,24 @@
+--- drivers/tty/tty_io.c
++++ drivers/tty/tty_io.c
+@@ -985,8 +993,10 @@
+ 	else
+ 		i = -EIO;
+ 	tty_ldisc_deref(ld);
++
+ 	if (i > 0)
+-		inode->i_atime = current_fs_time(inode->i_sb);
++		tty_update_time(&inode->i_atime);
++
+ 	return i;
+ }
+ 
+@@ -1088,8 +1098,7 @@
+ 		cond_resched();
+ 	}
+ 	if (written) {
+-		struct inode *inode = file->f_path.dentry->d_inode;
+-		inode->i_mtime = current_fs_time(inode->i_sb);
++		tty_update_time(&file_inode(file)->i_mtime);
+ 		ret = written;
+ 	}
+ out:

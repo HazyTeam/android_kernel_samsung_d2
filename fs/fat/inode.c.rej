@@ -1,0 +1,11 @@
+--- fs/fat/inode.c
++++ fs/fat/inode.c
+@@ -1447,7 +1467,7 @@
+ 		sbi->dirty = b->fat16.state & FAT_STATE_DIRTY;
+ 
+ 	/* check that FAT table does not overflow */
+-	fat_clusters = sbi->fat_length * sb->s_blocksize * 8 / sbi->fat_bits;
++	fat_clusters = calc_fat_clusters(sb);
+ 	total_clusters = min(total_clusters, fat_clusters - FAT_START_ENT);
+ 	if (total_clusters > MAX_FAT(sb)) {
+ 		if (!silent)

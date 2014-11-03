@@ -1,0 +1,25 @@
+--- drivers/gpu/drm/radeon/r100.c
++++ drivers/gpu/drm/radeon/r100.c
+@@ -3869,6 +3898,12 @@
+ 	}
+ 
+ 	/* Enable IRQ */
++	if (!rdev->irq.installed) {
++		r = radeon_irq_kms_init(rdev);
++		if (r)
++			return r;
++	}
++
+ 	r100_irq_set(rdev);
+ 	rdev->config.r100.hdp_cntl = RREG32(RADEON_HOST_PATH_CNTL);
+ 	/* 1M ring buffer */
+@@ -4024,9 +4059,6 @@
+ 	r = radeon_fence_driver_init(rdev);
+ 	if (r)
+ 		return r;
+-	r = radeon_irq_kms_init(rdev);
+-	if (r)
+-		return r;
+ 	/* Memory manager */
+ 	r = radeon_bo_init(rdev);
+ 	if (r)

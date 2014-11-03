@@ -1,0 +1,12 @@
+--- arch/x86/include/asm/xen/page.h
++++ arch/x86/include/asm/xen/page.h
+@@ -51,7 +51,8 @@
+ 
+ extern int m2p_add_override(unsigned long mfn, struct page *page,
+ 			    struct gnttab_map_grant_ref *kmap_op);
+-extern int m2p_remove_override(struct page *page, bool clear_pte);
++extern int m2p_remove_override(struct page *page,
++				struct gnttab_map_grant_ref *kmap_op);
+ extern struct page *m2p_find_override(unsigned long mfn);
+ extern unsigned long m2p_find_override_pfn(unsigned long mfn, unsigned long pfn);
+ 

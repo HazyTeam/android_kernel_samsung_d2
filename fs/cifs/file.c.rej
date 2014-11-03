@@ -1,0 +1,11 @@
+--- fs/cifs/file.c
++++ fs/cifs/file.c
+@@ -307,7 +306,7 @@
+ 	 */
+ 	if (oplock == server->vals->oplock_read &&
+ 						cifs_has_mand_locks(cinode)) {
+-		cFYI(1, "Reset oplock val from read to None due to mand locks");
++		cifs_dbg(FYI, "Reset oplock val from read to None due to mand locks\n");
+ 		oplock = 0;
+ 	}
+ 

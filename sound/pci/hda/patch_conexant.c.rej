@@ -1,0 +1,37 @@
+--- sound/pci/hda/patch_conexant.c
++++ sound/pci/hda/patch_conexant.c
+@@ -3156,7 +3160,7 @@
+ 	 * thus it might control over all pins.
+ 	 */
+ 	if (spec->num_eapds > 2)
+-		spec->gen.own_eapd_ctl = 1;
++		spec->dynamic_eapd = 1;
+ }
+ 
+ static void cx_auto_turn_eapd(struct hda_codec *codec, int num_pins,
+@@ -3195,17 +3199,20 @@
+ 	return 0;
+ }
+ 
+-static void cx_auto_free(struct hda_codec *codec)
++static int cx_auto_init(struct hda_codec *codec)
+ {
+-	snd_hda_detach_beep_device(codec);
+-	snd_hda_gen_free(codec);
++	struct conexant_spec *spec = codec->spec;
++	snd_hda_gen_init(codec);
++	if (!spec->dynamic_eapd)
++		cx_auto_turn_eapd(codec, spec->num_eapds, spec->eapds, true);
++	return 0;
+ }
+ 
+ static const struct hda_codec_ops cx_auto_patch_ops = {
+ 	.build_controls = cx_auto_build_controls,
+ 	.build_pcms = snd_hda_gen_build_pcms,
+-	.init = snd_hda_gen_init,
+-	.free = cx_auto_free,
++	.init = cx_auto_init,
++	.free = snd_hda_gen_free,
+ 	.unsol_event = snd_hda_jack_unsol_event,
+ #ifdef CONFIG_PM
+ 	.check_power_status = snd_hda_gen_check_power_status,

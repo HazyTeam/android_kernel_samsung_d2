@@ -1,0 +1,11 @@
+--- include/linux/i2c/atmel_mxt_ts.h
++++ include/linux/i2c/atmel_mxt_ts.h
+@@ -42,6 +45,8 @@
+ 	unsigned int voltage;
+ 	unsigned char orient;
+ 	unsigned long irqflags;
++	bool is_tp;
++	const unsigned int key_map[MXT_NUM_GPIO];
+ };
+ 
+ #endif /* __LINUX_ATMEL_MXT_TS_H */

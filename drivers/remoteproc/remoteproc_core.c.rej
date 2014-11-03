@@ -1,0 +1,56 @@
+--- drivers/remoteproc/remoteproc_core.c
++++ drivers/remoteproc/remoteproc_core.c
+@@ -573,17 +601,10 @@
+ 	dev_dbg(dev, "carveout rsc: da %x, pa %x, len %x, flags %x\n",
+ 			rsc->da, rsc->pa, rsc->len, rsc->flags);
+ 
+-	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
+-	if (!mapping) {
+-		dev_err(dev, "kzalloc mapping failed\n");
+-		return -ENOMEM;
+-	}
+-
+ 	carveout = kzalloc(sizeof(*carveout), GFP_KERNEL);
+ 	if (!carveout) {
+ 		dev_err(dev, "kzalloc carveout failed\n");
+-		ret = -ENOMEM;
+-		goto free_mapping;
++		return -ENOMEM;
+ 	}
+ 
+ 	va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
+@@ -614,11 +636,18 @@
+ 	 * physical address in this case.
+ 	 */
+ 	if (rproc->domain) {
++		mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
++		if (!mapping) {
++			dev_err(dev, "kzalloc mapping failed\n");
++			ret = -ENOMEM;
++			goto dma_free;
++		}
++
+ 		ret = iommu_map(rproc->domain, rsc->da, dma, rsc->len,
+ 								rsc->flags);
+ 		if (ret) {
+ 			dev_err(dev, "iommu_map failed: %d\n", ret);
+-			goto dma_free;
++			goto free_mapping;
+ 		}
+ 
+ 		/*
+@@ -664,12 +694,12 @@
+ 
+ 	return 0;
+ 
++free_mapping:
++	kfree(mapping);
+ dma_free:
+ 	dma_free_coherent(dev->parent, rsc->len, va, dma);
+ free_carv:
+ 	kfree(carveout);
+-free_mapping:
+-	kfree(mapping);
+ 	return ret;
+ }
+ 

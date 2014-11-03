@@ -1,0 +1,16 @@
+--- lib/vsprintf.c
++++ lib/vsprintf.c
+@@ -23,12 +23,12 @@
+ #include <linux/ctype.h>
+ #include <linux/kernel.h>
+ #include <linux/kallsyms.h>
++#include <linux/math64.h>
+ #include <linux/uaccess.h>
+ #include <linux/ioport.h>
+ #include <net/addrconf.h>
+ 
+ #include <asm/page.h>		/* for PAGE_SIZE */
+-#include <asm/div64.h>
+ #include <asm/sections.h>	/* for dereference_function_descriptor() */
+ 
+ #include "kstrtox.h"

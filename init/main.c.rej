@@ -1,0 +1,14 @@
+--- init/main.c
++++ init/main.c
+@@ -495,10 +496,9 @@
+  * Interrupts are still disabled. Do necessary setups, then
+  * enable them
+  */
+-	tick_init();
+ 	boot_cpu_init();
+ 	page_address_init();
+-	printk(KERN_NOTICE "%s", linux_banner);
++	pr_notice("%s", linux_banner);
+ 	setup_arch(&command_line);
+ 	mm_init_owner(&init_mm, &init_task);
+ 	mm_init_cpumask(&init_mm);

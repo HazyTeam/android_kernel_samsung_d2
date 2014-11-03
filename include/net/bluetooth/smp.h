@@ -84,7 +84,7 @@ struct smp_cmd_encrypt_info {
 
 #define SMP_CMD_MASTER_IDENT	0x07
 struct smp_cmd_master_ident {
-	__u16	ediv;
+	__le16	ediv;
 	__u8	rand[8];
 } __packed;
 
@@ -115,15 +115,15 @@ struct smp_cmd_security_req {
 #define SMP_CONFIRM_FAILED		0x04
 #define SMP_PAIRING_NOTSUPP		0x05
 #define SMP_ENC_KEY_SIZE		0x06
-#define SMP_CMD_NOTSUPP		0x07
-#define SMP_UNSPECIFIED		0x08
+#define SMP_CMD_NOTSUPP			0x07
+#define SMP_UNSPECIFIED			0x08
 #define SMP_REPEATED_ATTEMPTS		0x09
 
 #define SMP_MIN_ENC_KEY_SIZE		7
 #define SMP_MAX_ENC_KEY_SIZE		16
 
 /* SMP Commands */
-int smp_conn_security(struct l2cap_conn *conn, __u8 sec_level);
+int smp_conn_security(struct hci_conn *hcon, __u8 sec_level);
 int smp_sig_channel(struct l2cap_conn *conn, struct sk_buff *skb);
 int smp_link_encrypt_cmplt(struct l2cap_conn *conn, __u8 status, __u8 encrypt);
 void smp_conn_security_fail(struct l2cap_conn *conn, __u8 code, __u8 reason);

@@ -1,0 +1,60 @@
+--- arch/powerpc/kernel/traps.c
++++ arch/powerpc/kernel/traps.c
+@@ -1015,7 +1060,10 @@
+ 
+ #ifdef CONFIG_PPC64
+ 	/* Emulate the mfspr rD, DSCR. */
+-	if (((instword & PPC_INST_MFSPR_DSCR_MASK) == PPC_INST_MFSPR_DSCR) &&
++	if ((((instword & PPC_INST_MFSPR_DSCR_USER_MASK) ==
++		PPC_INST_MFSPR_DSCR_USER) ||
++	     ((instword & PPC_INST_MFSPR_DSCR_MASK) ==
++		PPC_INST_MFSPR_DSCR)) &&
+ 			cpu_has_feature(CPU_FTR_DSCR)) {
+ 		PPC_WARN_EMULATED(mfdscr, regs);
+ 		rd = (instword >> 21) & 0x1f;
+@@ -1023,7 +1071,10 @@
+ 		return 0;
+ 	}
+ 	/* Emulate the mtspr DSCR, rD. */
+-	if (((instword & PPC_INST_MTSPR_DSCR_MASK) == PPC_INST_MTSPR_DSCR) &&
++	if ((((instword & PPC_INST_MTSPR_DSCR_USER_MASK) ==
++		PPC_INST_MTSPR_DSCR_USER) ||
++	     ((instword & PPC_INST_MTSPR_DSCR_MASK) ==
++		PPC_INST_MTSPR_DSCR)) &&
+ 			cpu_has_feature(CPU_FTR_DSCR)) {
+ 		PPC_WARN_EMULATED(mtdscr, regs);
+ 		rd = (instword >> 21) & 0x1f;
+@@ -1154,16 +1206,33 @@
+ 		_exception(SIGILL, regs, ILL_PRVOPC, regs->nip);
+ 	else
+ 		_exception(SIGILL, regs, ILL_ILLOPC, regs->nip);
++
++bail:
++	exception_exit(prev_state);
++}
++
++/*
++ * This occurs when running in hypervisor mode on POWER6 or later
++ * and an illegal instruction is encountered.
++ */
++void __kprobes emulation_assist_interrupt(struct pt_regs *regs)
++{
++	regs->msr |= REASON_ILLEGAL;
++	program_check_exception(regs);
+ }
+ 
+ void alignment_exception(struct pt_regs *regs)
+ {
++	enum ctx_state prev_state = exception_enter();
+ 	int sig, code, fixed = 0;
+ 
+ 	/* We restore the interrupt state now */
+ 	if (!arch_irq_disabled_regs(regs))
+ 		local_irq_enable();
+ 
++	if (tm_abort_check(regs, TM_CAUSE_ALIGNMENT | TM_CAUSE_PERSISTENT))
++		goto bail;
++
+ 	/* we don't implement logging of alignment exceptions */
+ 	if (!(current->thread.align_ctl & PR_UNALIGN_SIGBUS))
+ 		fixed = fix_alignment(regs);

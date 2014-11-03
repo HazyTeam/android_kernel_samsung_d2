@@ -1,0 +1,11 @@
+--- drivers/staging/comedi/drivers/comedi_test.c
++++ drivers/staging/comedi/drivers/comedi_test.c
+@@ -345,7 +318,7 @@
+ 	struct waveform_private *devpriv = dev->private;
+ 
+ 	devpriv->timer_running = 0;
+-	del_timer(&devpriv->timer);
++	del_timer_sync(&devpriv->timer);
+ 	return 0;
+ }
+ 

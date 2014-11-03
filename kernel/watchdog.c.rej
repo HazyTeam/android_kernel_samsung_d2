@@ -1,0 +1,170 @@
+--- kernel/watchdog.c
++++ kernel/watchdog.c
+@@ -116,7 +119,7 @@
+ 	return cpu_clock(this_cpu) >> 30LL;  /* 2^30 ~= 10^9 */
+ }
+ 
+-static unsigned long get_sample_period(void)
++static u64 get_sample_period(void)
+ {
+ 	/*
+ 	 * convert watchdog_thresh from seconds to ns
+@@ -125,7 +128,7 @@
+ 	 * and hard thresholds) to increment before the
+ 	 * hardlockup detector generates a warning
+ 	 */
+-	return get_softlockup_thresh() * (NSEC_PER_SEC / 5);
++	return get_softlockup_thresh() * ((u64)NSEC_PER_SEC / 5);
+ }
+ 
+ /* Commands for resetting the watchdog */
+@@ -251,13 +254,15 @@
+ 	__this_cpu_write(hard_watchdog_warn, false);
+ 	return;
+ }
++#endif /* CONFIG_HARDLOCKUP_DETECTOR */
++
+ static void watchdog_interrupt_count(void)
+ {
+ 	__this_cpu_inc(hrtimer_interrupts);
+ }
+-#else
+-static inline void watchdog_interrupt_count(void) { return; }
+-#endif /* CONFIG_HARDLOCKUP_DETECTOR */
++
++static int watchdog_nmi_enable(unsigned int cpu);
++static void watchdog_nmi_disable(unsigned int cpu);
+ 
+ /* watchdog kicker functions */
+ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
+@@ -404,7 +431,7 @@
+  */
+ static unsigned long cpu0_err;
+ 
+-static int watchdog_nmi_enable(int cpu)
++static int watchdog_nmi_enable(unsigned int cpu)
+ {
+ 	struct perf_event_attr *wd_attr;
+ 	struct perf_event *event = per_cpu(watchdog_ev, cpu);
+@@ -472,107 +499,35 @@
+ 	return;
+ }
+ #else
+-static int watchdog_nmi_enable(int cpu) { return 0; }
+-static void watchdog_nmi_disable(int cpu) { return; }
++static int watchdog_nmi_enable(unsigned int cpu) { return 0; }
++static void watchdog_nmi_disable(unsigned int cpu) { return; }
+ #endif /* CONFIG_HARDLOCKUP_DETECTOR */
+ 
+ /* prepare/enable/disable routines */
+-static void watchdog_prepare_cpu(int cpu)
+-{
+-	struct hrtimer *hrtimer = &per_cpu(watchdog_hrtimer, cpu);
+-
+-	WARN_ON(per_cpu(softlockup_watchdog, cpu));
+-	hrtimer_init(hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+-	hrtimer->function = watchdog_timer_fn;
+-}
+-
+-static int watchdog_enable(int cpu)
+-{
+-	struct task_struct *p = per_cpu(softlockup_watchdog, cpu);
+-	int err = 0;
+-
+-	/* enable the perf event */
+-	err = watchdog_nmi_enable(cpu);
+-
+-	/* Regardless of err above, fall through and start softlockup */
+-
+-	/* create the watchdog thread */
+-	if (!p) {
+-		struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
+-		p = kthread_create_on_node(watchdog, NULL, cpu_to_node(cpu), "watchdog/%d", cpu);
+-		if (IS_ERR(p)) {
+-			pr_err("softlockup watchdog for %i failed\n", cpu);
+-			if (!err) {
+-				/* if hardlockup hasn't already set this */
+-				err = PTR_ERR(p);
+-				/* and disable the perf event */
+-				watchdog_nmi_disable(cpu);
+-			}
+-			goto out;
+-		}
+-		sched_setscheduler(p, SCHED_FIFO, &param);
+-		kthread_bind(p, cpu);
+-		per_cpu(watchdog_touch_ts, cpu) = 0;
+-		per_cpu(softlockup_watchdog, cpu) = p;
+-		wake_up_process(p);
+-	}
+-
+-out:
+-	return err;
+-}
+-
+-static void watchdog_disable(int cpu)
+-{
+-	struct task_struct *p = per_cpu(softlockup_watchdog, cpu);
+-	struct hrtimer *hrtimer = &per_cpu(watchdog_hrtimer, cpu);
+-
+-	/*
+-	 * cancel the timer first to stop incrementing the stats
+-	 * and waking up the kthread
+-	 */
+-	hrtimer_cancel(hrtimer);
+-
+-	/* disable the perf event */
+-	watchdog_nmi_disable(cpu);
+-
+-	/* stop the watchdog thread */
+-	if (p) {
+-		per_cpu(softlockup_watchdog, cpu) = NULL;
+-		kthread_stop(p);
+-	}
+-}
+-
+ /* sysctl functions */
+ #ifdef CONFIG_SYSCTL
+ static void watchdog_enable_all_cpus(void)
+ {
+-	int cpu;
+-
+-	watchdog_enabled = 0;
+-
+-	for_each_online_cpu(cpu)
+-		if (!watchdog_enable(cpu))
+-			/* if any cpu succeeds, watchdog is considered
+-			   enabled for the system */
+-			watchdog_enabled = 1;
+-
+-	if (!watchdog_enabled)
+-		pr_err("failed to be enabled on some cpus\n");
++	unsigned int cpu;
+ 
++	if (watchdog_disabled) {
++		watchdog_disabled = 0;
++		for_each_online_cpu(cpu)
++			kthread_unpark(per_cpu(softlockup_watchdog, cpu));
++	}
+ }
+ 
+ static void watchdog_disable_all_cpus(void)
+ {
+-	int cpu;
++	unsigned int cpu;
+ 
+-	for_each_online_cpu(cpu)
+-		watchdog_disable(cpu);
+-
+-	/* if all watchdogs are disabled, then they are disabled for the system */
+-	watchdog_enabled = 0;
++	if (!watchdog_disabled) {
++		watchdog_disabled = 1;
++		for_each_online_cpu(cpu)
++			kthread_park(per_cpu(softlockup_watchdog, cpu));
++	}
+ }
+ 
+-
+ /*
+  * proc handler for /proc/sys/kernel/nmi_watchdog,watchdog_thresh
+  */

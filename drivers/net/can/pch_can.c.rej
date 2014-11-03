@@ -1,0 +1,38 @@
+--- drivers/net/can/pch_can.c
++++ drivers/net/can/pch_can.c
+@@ -560,7 +560,7 @@
+ 		stats->rx_errors++;
+ 		break;
+ 	case PCH_CRC_ERR:
+-		cf->data[2] |= CAN_ERR_PROT_LOC_CRC_SEQ |
++		cf->data[3] |= CAN_ERR_PROT_LOC_CRC_SEQ |
+ 			       CAN_ERR_PROT_LOC_CRC_DEL;
+ 		priv->can.can_stats.bus_error++;
+ 		stats->rx_errors++;
+@@ -954,7 +954,7 @@
+ 	.ndo_start_xmit		= pch_xmit,
+ };
+ 
+-static void __devexit pch_can_remove(struct pci_dev *pdev)
++static void pch_can_remove(struct pci_dev *pdev)
+ {
+ 	struct net_device *ndev = pci_get_drvdata(pdev);
+ 	struct pch_can_priv *priv = netdev_priv(ndev);
+@@ -1178,7 +1178,7 @@
+ 	return 0;
+ }
+ 
+-static int __devinit pch_can_probe(struct pci_dev *pdev,
++static int pch_can_probe(struct pci_dev *pdev,
+ 				   const struct pci_device_id *id)
+ {
+ 	struct net_device *ndev;
+@@ -1269,7 +1269,7 @@
+ 	.name = "pch_can",
+ 	.id_table = pch_pci_tbl,
+ 	.probe = pch_can_probe,
+-	.remove = __devexit_p(pch_can_remove),
++	.remove = pch_can_remove,
+ 	.suspend = pch_can_suspend,
+ 	.resume = pch_can_resume,
+ };

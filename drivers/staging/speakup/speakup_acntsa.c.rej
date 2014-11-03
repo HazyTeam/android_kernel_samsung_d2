@@ -1,0 +1,11 @@
+--- drivers/staging/speakup/speakup_acntsa.c
++++ drivers/staging/speakup/speakup_acntsa.c
+@@ -128,7 +128,7 @@
+ {
+ 	int failed;
+ 
+-	failed = serial_synth_probe(synth);
++	failed = spk_serial_synth_probe(synth);
+ 	if (failed == 0) {
+ 		spk_synth_immediate(synth, "\033=R\r");
+ 		mdelay(100);

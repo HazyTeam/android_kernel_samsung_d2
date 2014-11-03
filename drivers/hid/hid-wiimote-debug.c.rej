@@ -1,0 +1,11 @@
+--- drivers/hid/hid-wiimote-debug.c
++++ drivers/hid/hid-wiimote-debug.c
+@@ -31,7 +31,7 @@
+ 	unsigned long flags;
+ 	ssize_t ret;
+ 	char buf[16];
+-	__u16 size;
++	__u16 size = 0;
+ 
+ 	if (s == 0)
+ 		return -EINVAL;

@@ -1,0 +1,21 @@
+--- fs/block_dev.c
++++ fs/block_dev.c
+@@ -995,6 +996,7 @@
+ 
+ 	mutex_lock(&bdev->bd_mutex);
+ 	check_disk_size_change(disk, bdev);
++	bdev->bd_invalidated = 0;
+ 	mutex_unlock(&bdev->bd_mutex);
+ 	bdput(bdev);
+ 	return ret;
+@@ -1033,7 +1035,9 @@
+ {
+ 	unsigned bsize = bdev_logical_block_size(bdev);
+ 
+-	bdev->bd_inode->i_size = size;
++	mutex_lock(&bdev->bd_inode->i_mutex);
++	i_size_write(bdev->bd_inode, size);
++	mutex_unlock(&bdev->bd_inode->i_mutex);
+ 	while (bsize < PAGE_CACHE_SIZE) {
+ 		if (size & bsize)
+ 			break;

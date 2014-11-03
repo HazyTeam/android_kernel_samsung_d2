@@ -1,0 +1,31 @@
+--- mm/memory_hotplug.c
++++ mm/memory_hotplug.c
+@@ -1625,7 +1637,7 @@
+ /**
+  * walk_memory_range - walks through all mem sections in [start_pfn, end_pfn)
+  * @start_pfn: start pfn of the memory range
+- * @end_pfn: end pft of the memory range
++ * @end_pfn: end pfn of the memory range
+  * @arg: argument passed to func
+  * @func: callback for each memory section walked
+  *
+@@ -1693,11 +1705,15 @@
+ {
+ 	int ret = !is_memblock_offlined(mem);
+ 
+-	if (unlikely(ret))
++	if (unlikely(ret)) {
++		phys_addr_t beginpa, endpa;
++
++		beginpa = PFN_PHYS(section_nr_to_pfn(mem->start_section_nr));
++		endpa = PFN_PHYS(section_nr_to_pfn(mem->end_section_nr + 1))-1;
+ 		pr_warn("removing memory fails, because memory "
+-			"[%#010llx-%#010llx] is onlined\n",
+-			PFN_PHYS(section_nr_to_pfn(mem->start_section_nr)),
+-			PFN_PHYS(section_nr_to_pfn(mem->end_section_nr + 1))-1);
++			"[%pa-%pa] is onlined\n",
++			&beginpa, &endpa);
++	}
+ 
+ 	return ret;
+ }

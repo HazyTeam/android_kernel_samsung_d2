@@ -1,0 +1,13 @@
+--- drivers/pci/hotplug/acpiphp_glue.c
++++ drivers/pci/hotplug/acpiphp_glue.c
+@@ -153,10 +162,6 @@
+ 		}
+ 	}
+ 
+-	acpi_evaluate_integer(handle, "_ADR", NULL, &adr);
+-	device = (adr >> 16) & 0xffff;
+-	function = adr & 0xffff;
+-
+ 	newfunc = kzalloc(sizeof(struct acpiphp_func), GFP_KERNEL);
+ 	if (!newfunc)
+ 		return AE_NO_MEMORY;

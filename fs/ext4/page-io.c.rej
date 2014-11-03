@@ -1,0 +1,117 @@
+--- fs/ext4/page-io.c
++++ fs/ext4/page-io.c
+@@ -112,14 +121,13 @@
+ 			 "(inode %lu, offset %llu, size %zd, error %d)",
+ 			 inode->i_ino, offset, size, ret);
+ 	}
+-	if (io->iocb)
+-		aio_complete(io->iocb, io->result, 0);
+-
+-	if (io->flag & EXT4_IO_END_DIRECT)
+-		inode_dio_done(inode);
+ 	/* Wake up anyone waiting on unwritten extent conversion */
+ 	if (atomic_dec_and_test(&EXT4_I(inode)->i_unwritten))
+ 		wake_up_all(ext4_ioend_wq(inode));
++	if (io->flag & EXT4_IO_END_DIRECT)
++		inode_dio_done(inode);
++	if (io->iocb)
++		aio_complete(io->iocb, io->result, 0);
+ 	return ret;
+ }
+ 
+@@ -128,7 +136,6 @@
+ #ifdef	EXT4FS_DEBUG
+ 	struct list_head *cur, *before, *after;
+ 	ext4_io_end_t *io, *io0, *io1;
+-	unsigned long flags;
+ 
+ 	if (list_empty(&EXT4_I(inode)->i_completed_io_list)) {
+ 		ext4_debug("inode %lu completed_io list is empty\n",
+@@ -161,26 +168,20 @@
+ 	wq = EXT4_SB(io_end->inode->i_sb)->dio_unwritten_wq;
+ 
+ 	spin_lock_irqsave(&ei->i_completed_io_lock, flags);
+-	if (list_empty(&ei->i_completed_io_list)) {
+-		io_end->flag |= EXT4_IO_END_QUEUED;
+-		queue_work(wq, &io_end->work);
+-	}
++	if (list_empty(&ei->i_completed_io_list))
++		queue_work(wq, &ei->i_unwritten_work);
+ 	list_add_tail(&io_end->list, &ei->i_completed_io_list);
+ 	spin_unlock_irqrestore(&ei->i_completed_io_lock, flags);
+ }
+ 
+-static int ext4_do_flush_completed_IO(struct inode *inode,
+-				      ext4_io_end_t *work_io)
++static int ext4_do_flush_completed_IO(struct inode *inode)
+ {
+ 	ext4_io_end_t *io;
+-	struct list_head unwritten, complete, to_free;
++	struct list_head unwritten;
+ 	unsigned long flags;
+ 	struct ext4_inode_info *ei = EXT4_I(inode);
+ 	int err, ret = 0;
+ 
+-	INIT_LIST_HEAD(&complete);
+-	INIT_LIST_HEAD(&to_free);
+-
+ 	spin_lock_irqsave(&ei->i_completed_io_lock, flags);
+ 	dump_completed_IO(inode);
+ 	list_replace_init(&ei->i_completed_io_list, &unwritten);
+@@ -194,32 +195,7 @@
+ 		err = ext4_end_io(io);
+ 		if (unlikely(!ret && err))
+ 			ret = err;
+-
+-		list_add_tail(&io->list, &complete);
+-	}
+-	spin_lock_irqsave(&ei->i_completed_io_lock, flags);
+-	while (!list_empty(&complete)) {
+-		io = list_entry(complete.next, ext4_io_end_t, list);
+ 		io->flag &= ~EXT4_IO_END_UNWRITTEN;
+-		/* end_io context can not be destroyed now because it still
+-		 * used by queued worker. Worker thread will destroy it later */
+-		if (io->flag & EXT4_IO_END_QUEUED)
+-			list_del_init(&io->list);
+-		else
+-			list_move(&io->list, &to_free);
+-	}
+-	/* If we are called from worker context, it is time to clear queued
+-	 * flag, and destroy it's end_io if it was converted already */
+-	if (work_io) {
+-		work_io->flag &= ~EXT4_IO_END_QUEUED;
+-		if (!(work_io->flag & EXT4_IO_END_UNWRITTEN))
+-			list_add_tail(&work_io->list, &to_free);
+-	}
+-	spin_unlock_irqrestore(&ei->i_completed_io_lock, flags);
+-
+-	while (!list_empty(&to_free)) {
+-		io = list_entry(to_free.next, ext4_io_end_t, list);
+-		list_del_init(&io->list);
+ 		ext4_free_io_end(io);
+ 	}
+ 	return ret;
+@@ -228,10 +204,11 @@
+ /*
+  * work on completed aio dio IO, to convert unwritten extents to extents
+  */
+-static void ext4_end_io_work(struct work_struct *work)
++void ext4_end_io_work(struct work_struct *work)
+ {
+-	ext4_io_end_t *io = container_of(work, ext4_io_end_t, work);
+-	ext4_do_flush_completed_IO(io->inode, io);
++	struct ext4_inode_info *ei = container_of(work, struct ext4_inode_info,
++						  i_unwritten_work);
++	ext4_do_flush_completed_IO(&ei->vfs_inode);
+ }
+ 
+ int ext4_flush_unwritten_io(struct inode *inode)
+@@ -239,7 +216,7 @@
+ 	int ret;
+ 	WARN_ON_ONCE(!mutex_is_locked(&inode->i_mutex) &&
+ 		     !(inode->i_state & I_FREEING));
+-	ret = ext4_do_flush_completed_IO(inode, NULL);
++	ret = ext4_do_flush_completed_IO(inode);
+ 	ext4_unwritten_wait(inode);
+ 	return ret;
+ }

@@ -1,0 +1,23 @@
+--- drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c
++++ drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c
+@@ -978,16 +966,15 @@
+ static s32
+ brcmf_cfg80211_scan(struct wiphy *wiphy, struct cfg80211_scan_request *request)
+ {
+-	struct net_device *ndev = request->wdev->netdev;
++	struct brcmf_cfg80211_vif *vif;
+ 	s32 err = 0;
+ 
+ 	brcmf_dbg(TRACE, "Enter\n");
+-
+-	if (!check_vif_up(container_of(request->wdev,
+-				       struct brcmf_cfg80211_vif, wdev)))
++	vif = container_of(request->wdev, struct brcmf_cfg80211_vif, wdev);
++	if (!check_vif_up(vif))
+ 		return -EIO;
+ 
+-	err = brcmf_cfg80211_escan(wiphy, ndev, request, NULL);
++	err = brcmf_cfg80211_escan(wiphy, vif, request, NULL);
+ 
+ 	if (err)
+ 		brcmf_err("scan error (%d)\n", err);

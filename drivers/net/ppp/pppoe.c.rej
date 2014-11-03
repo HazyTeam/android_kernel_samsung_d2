@@ -1,0 +1,11 @@
+--- drivers/net/ppp/pppoe.c
++++ drivers/net/ppp/pppoe.c
+@@ -570,7 +570,7 @@
+ 
+ 	po = pppox_sk(sk);
+ 
+-	if (sk->sk_state & (PPPOX_CONNECTED | PPPOX_BOUND)) {
++	if (sk->sk_state & (PPPOX_CONNECTED | PPPOX_BOUND | PPPOX_ZOMBIE)) {
+ 		dev_put(po->pppoe_dev);
+ 		po->pppoe_dev = NULL;
+ 	}

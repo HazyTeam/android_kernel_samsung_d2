@@ -1,0 +1,11 @@
+--- drivers/iommu/dmar.c
++++ drivers/iommu/dmar.c
+@@ -646,7 +647,7 @@
+ int alloc_iommu(struct dmar_drhd_unit *drhd)
+ {
+ 	struct intel_iommu *iommu;
+-	u32 ver;
++	u32 ver, sts;
+ 	static int iommu_allocated = 0;
+ 	int agaw = 0;
+ 	int msagaw = 0;

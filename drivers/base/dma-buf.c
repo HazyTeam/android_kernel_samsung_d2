@@ -27,8 +27,17 @@
 #include <linux/dma-buf.h>
 #include <linux/anon_inodes.h>
 #include <linux/export.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
 
 static inline int is_dma_buf_file(struct file *);
+
+struct dma_buf_list {
+	struct list_head head;
+	struct mutex lock;
+};
+
+static struct dma_buf_list db_list;
 
 static int dma_buf_release(struct inode *inode, struct file *file)
 {
@@ -39,7 +48,14 @@ static int dma_buf_release(struct inode *inode, struct file *file)
 
 	dmabuf = file->private_data;
 
+	BUG_ON(dmabuf->vmapping_counter);
+
 	dmabuf->ops->release(dmabuf);
+
+	mutex_lock(&db_list.lock);
+	list_del(&dmabuf->list_node);
+	mutex_unlock(&db_list.lock);
+
 	kfree(dmabuf);
 	return 0;
 }
@@ -75,22 +91,24 @@ static inline int is_dma_buf_file(struct file *file)
 }
 
 /**
- * dma_buf_export - Creates a new dma_buf, and associates an anon file
+ * dma_buf_export_named - Creates a new dma_buf, and associates an anon file
  * with this buffer, so it can be exported.
  * Also connect the allocator specific data and ops to the buffer.
+ * Additionally, provide a name string for exporter; useful in debugging.
  *
  * @priv:	[in]	Attach private data of allocator to this buffer
  * @ops:	[in]	Attach allocator-defined dma buf ops to the new buffer.
  * @size:	[in]	Size of the buffer
  * @flags:	[in]	mode flags for the file.
+ * @exp_name:	[in]	name of the exporting module - useful for debugging.
  *
  * Returns, on success, a newly created dma_buf object, which wraps the
  * supplied private data and operations for dma_buf_ops. On either missing
  * ops, or error in allocating struct dma_buf, will return negative error.
  *
  */
-struct dma_buf *dma_buf_export(void *priv, const struct dma_buf_ops *ops,
-				size_t size, int flags)
+struct dma_buf *dma_buf_export_named(void *priv, const struct dma_buf_ops *ops,
+				size_t size, int flags, const char *exp_name)
 {
 	struct dma_buf *dmabuf;
 	struct file *file;
@@ -112,6 +130,7 @@ struct dma_buf *dma_buf_export(void *priv, const struct dma_buf_ops *ops,
 	dmabuf->priv = priv;
 	dmabuf->ops = ops;
 	dmabuf->size = size;
+	dmabuf->exp_name = exp_name;
 
 	file = anon_inode_getfile("dmabuf", &dma_buf_fops, dmabuf, flags);
 
@@ -120,9 +139,13 @@ struct dma_buf *dma_buf_export(void *priv, const struct dma_buf_ops *ops,
 	mutex_init(&dmabuf->lock);
 	INIT_LIST_HEAD(&dmabuf->attachments);
 
+	mutex_lock(&db_list.lock);
+	list_add(&dmabuf->list_node, &db_list.head);
+	mutex_unlock(&db_list.lock);
+
 	return dmabuf;
 }
-EXPORT_SYMBOL_GPL(dma_buf_export);
+EXPORT_SYMBOL_GPL(dma_buf_export_named);
 
 
 /**
@@ -134,15 +157,14 @@ EXPORT_SYMBOL_GPL(dma_buf_export);
  */
 int dma_buf_fd(struct dma_buf *dmabuf, int flags)
 {
-	int error, fd;
+	int fd;
 
 	if (!dmabuf || !dmabuf->file)
 		return -EINVAL;
 
-	error = get_unused_fd_flags(flags);
-	if (error < 0)
-		return error;
-	fd = error;
+	fd = get_unused_fd_flags(flags);
+	if (fd < 0)
+		return fd;
 
 	fd_install(fd, dmabuf->file);
 
@@ -298,6 +320,8 @@ void dma_buf_unmap_attachment(struct dma_buf_attachment *attach,
 				struct sg_table *sg_table,
 				enum dma_data_direction direction)
 {
+	might_sleep();
+
 	if (WARN_ON(!attach || !attach->dmabuf || !sg_table))
 		return;
 
@@ -312,7 +336,7 @@ EXPORT_SYMBOL_GPL(dma_buf_unmap_attachment);
  * cpu in the kernel context. Calls begin_cpu_access to allow exporter-specific
  * preparations. Coherency is only guaranteed in the specified range for the
  * specified access direction.
- * @dma_buf:	[in]	buffer to prepare cpu access for.
+ * @dmabuf:	[in]	buffer to prepare cpu access for.
  * @start:	[in]	start of range for cpu access.
  * @len:	[in]	length of range for cpu access.
  * @direction:	[in]	length of range for cpu access.
@@ -339,7 +363,7 @@ EXPORT_SYMBOL_GPL(dma_buf_begin_cpu_access);
  * cpu in the kernel context. Calls end_cpu_access to allow exporter-specific
  * actions. Coherency is only guaranteed in the specified range for the
  * specified access direction.
- * @dma_buf:	[in]	buffer to complete cpu access for.
+ * @dmabuf:	[in]	buffer to complete cpu access for.
  * @start:	[in]	start of range for cpu access.
  * @len:	[in]	length of range for cpu access.
  * @direction:	[in]	length of range for cpu access.
@@ -359,7 +383,7 @@ EXPORT_SYMBOL_GPL(dma_buf_end_cpu_access);
 /**
  * dma_buf_kmap_atomic - Map a page of the buffer object into kernel address
  * space. The same restrictions as for kmap_atomic and friends apply.
- * @dma_buf:	[in]	buffer to map page from.
+ * @dmabuf:	[in]	buffer to map page from.
  * @page_num:	[in]	page in PAGE_SIZE units to map.
  *
  * This call must always succeed, any necessary preparations that might fail
@@ -375,7 +399,7 @@ EXPORT_SYMBOL_GPL(dma_buf_kmap_atomic);
 
 /**
  * dma_buf_kunmap_atomic - Unmap a page obtained by dma_buf_kmap_atomic.
- * @dma_buf:	[in]	buffer to unmap page from.
+ * @dmabuf:	[in]	buffer to unmap page from.
  * @page_num:	[in]	page in PAGE_SIZE units to unmap.
  * @vaddr:	[in]	kernel space pointer obtained from dma_buf_kmap_atomic.
  *
@@ -394,7 +418,7 @@ EXPORT_SYMBOL_GPL(dma_buf_kunmap_atomic);
 /**
  * dma_buf_kmap - Map a page of the buffer object into kernel address space. The
  * same restrictions as for kmap and friends apply.
- * @dma_buf:	[in]	buffer to map page from.
+ * @dmabuf:	[in]	buffer to map page from.
  * @page_num:	[in]	page in PAGE_SIZE units to map.
  *
  * This call must always succeed, any necessary preparations that might fail
@@ -410,7 +434,7 @@ EXPORT_SYMBOL_GPL(dma_buf_kmap);
 
 /**
  * dma_buf_kunmap - Unmap a page obtained by dma_buf_kmap.
- * @dma_buf:	[in]	buffer to unmap page from.
+ * @dmabuf:	[in]	buffer to unmap page from.
  * @page_num:	[in]	page in PAGE_SIZE units to unmap.
  * @vaddr:	[in]	kernel space pointer obtained from dma_buf_kmap.
  *
@@ -444,6 +468,9 @@ EXPORT_SYMBOL_GPL(dma_buf_kunmap);
 int dma_buf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma,
 		 unsigned long pgoff)
 {
+	struct file *oldfile;
+	int ret;
+
 	if (WARN_ON(!dmabuf || !vma))
 		return -EINVAL;
 
@@ -457,14 +484,21 @@ int dma_buf_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma,
 		return -EINVAL;
 
 	/* readjust the vma */
-	if (vma->vm_file)
-		fput(vma->vm_file);
-
+	get_file(dmabuf->file);
+	oldfile = vma->vm_file;
 	vma->vm_file = dmabuf->file;
-	get_file(vma->vm_file);
-
 	vma->vm_pgoff = pgoff;
 
-	return dmabuf->ops->mmap(dmabuf, vma);
+	ret = dmabuf->ops->mmap(dmabuf, vma);
+	if (ret) {
+		/* restore old parameters on failure */
+		vma->vm_file = oldfile;
+		fput(dmabuf->file);
+	} else {
+		if (oldfile)
+			fput(oldfile);
+	}
+	return ret;
+
 }
 EXPORT_SYMBOL_GPL(dma_buf_mmap);

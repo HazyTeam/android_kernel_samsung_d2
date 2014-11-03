@@ -1,0 +1,98 @@
+--- drivers/target/iscsi/iscsi_target.c
++++ drivers/target/iscsi/iscsi_target.c
+@@ -466,20 +465,47 @@
+ 		send_sig(SIGINT, np->np_thread, 1);
+ 		kthread_stop(np->np_thread);
+ 	}
+-	iscsit_del_np_comm(np);
++
++	np->np_transport->iscsit_free_np(np);
+ 
+ 	spin_lock_bh(&np_lock);
+ 	list_del(&np->np_list);
+ 	spin_unlock_bh(&np_lock);
+ 
+ 	pr_debug("CORE[0] - Removed Network Portal: %s:%hu on %s\n",
+-		np->np_ip, np->np_port, (np->np_network_transport == ISCSI_TCP) ?
+-		"TCP" : "SCTP");
++		np->np_ip, np->np_port, np->np_transport->name);
+ 
++	iscsit_put_transport(np->np_transport);
+ 	kfree(np);
+ 	return 0;
+ }
+ 
++static int iscsit_immediate_queue(struct iscsi_conn *, struct iscsi_cmd *, int);
++static int iscsit_response_queue(struct iscsi_conn *, struct iscsi_cmd *, int);
++
++static int iscsit_queue_rsp(struct iscsi_conn *conn, struct iscsi_cmd *cmd)
++{
++	iscsit_add_cmd_to_response_queue(cmd, cmd->conn, cmd->i_state);
++	return 0;
++}
++
++static struct iscsit_transport iscsi_target_transport = {
++	.name			= "iSCSI/TCP",
++	.transport_type		= ISCSI_TCP,
++	.owner			= NULL,
++	.iscsit_setup_np	= iscsit_setup_np,
++	.iscsit_accept_np	= iscsit_accept_np,
++	.iscsit_free_np		= iscsit_free_np,
++	.iscsit_alloc_cmd	= iscsit_alloc_cmd,
++	.iscsit_get_login_rx	= iscsit_get_login_rx,
++	.iscsit_put_login_tx	= iscsit_put_login_tx,
++	.iscsit_get_dataout	= iscsit_build_r2ts_for_cmd,
++	.iscsit_immediate_queue	= iscsit_immediate_queue,
++	.iscsit_response_queue	= iscsit_response_queue,
++	.iscsit_queue_data_in	= iscsit_queue_rsp,
++	.iscsit_queue_status	= iscsit_queue_rsp,
++};
++
+ static int __init iscsi_target_init_module(void)
+ {
+ 	int ret = 0;
+@@ -3501,26 +3644,33 @@
+ 	return 0;
+ }
+ 
+-static int iscsit_send_reject(
+-	struct iscsi_cmd *cmd,
+-	struct iscsi_conn *conn)
++void
++iscsit_build_reject(struct iscsi_cmd *cmd, struct iscsi_conn *conn,
++		    struct iscsi_reject *hdr)
+ {
+-	u32 iov_count = 0, tx_size = 0;
+-	struct iscsi_reject *hdr;
+-	struct kvec *iov;
+-
+-	hdr			= (struct iscsi_reject *) cmd->pdu;
+ 	hdr->opcode		= ISCSI_OP_REJECT;
+ 	hdr->flags		|= ISCSI_FLAG_CMD_FINAL;
+ 	hton24(hdr->dlength, ISCSI_HDR_LEN);
+ 	hdr->ffffffff		= cpu_to_be32(0xffffffff);
+ 	cmd->stat_sn		= conn->stat_sn++;
+ 	hdr->statsn		= cpu_to_be32(cmd->stat_sn);
+-	hdr->exp_cmdsn	= cpu_to_be32(conn->sess->exp_cmd_sn);
+-	hdr->max_cmdsn	= cpu_to_be32(conn->sess->max_cmd_sn);
++	hdr->exp_cmdsn		= cpu_to_be32(conn->sess->exp_cmd_sn);
++	hdr->max_cmdsn		= cpu_to_be32(conn->sess->max_cmd_sn);
+ 
+-	iov = &cmd->iov_misc[0];
++}
++EXPORT_SYMBOL(iscsit_build_reject);
++
++static int iscsit_send_reject(
++	struct iscsi_cmd *cmd,
++	struct iscsi_conn *conn)
++{
++	struct iscsi_reject *hdr = (struct iscsi_reject *)&cmd->pdu[0];
++	struct kvec *iov;
++	u32 iov_count = 0, tx_size;
++
++	iscsit_build_reject(cmd, conn, hdr);
+ 
++	iov = &cmd->iov_misc[0];
+ 	iov[iov_count].iov_base = cmd->pdu;
+ 	iov[iov_count++].iov_len = ISCSI_HDR_LEN;
+ 	iov[iov_count].iov_base = cmd->buf_ptr;

@@ -1,0 +1,59 @@
+--- drivers/block/xen-blkback/blkback.c
++++ drivers/block/xen-blkback/blkback.c
+@@ -801,17 +804,30 @@
+ 
+ 		/* Apply all sanity checks to /private copy/ of request. */
+ 		barrier();
+-		if (unlikely(req.operation == BLKIF_OP_DISCARD)) {
++
++		switch (req.operation) {
++		case BLKIF_OP_READ:
++		case BLKIF_OP_WRITE:
++		case BLKIF_OP_WRITE_BARRIER:
++		case BLKIF_OP_FLUSH_DISKCACHE:
++			if (dispatch_rw_block_io(blkif, &req, pending_req))
++				goto done;
++			break;
++		case BLKIF_OP_DISCARD:
+ 			free_req(pending_req);
+ 			if (dispatch_discard_io(blkif, &req))
+-				break;
+-		} else if (dispatch_rw_block_io(blkif, &req, pending_req))
++				goto done;
+ 			break;
++		default:
++			if (dispatch_other_io(blkif, &req, pending_req))
++				goto done;
++			break;
++		}
+ 
+ 		/* Yield point for this unbounded loop. */
+ 		cond_resched();
+ 	}
+-
++done:
+ 	return more_to_do;
+ }
+ 
+@@ -979,13 +995,7 @@
+ 		bio->bi_end_io  = end_block_io_op;
+ 	}
+ 
+-	/*
+-	 * We set it one so that the last submit_bio does not have to call
+-	 * atomic_inc.
+-	 */
+ 	atomic_set(&pending_req->pendcnt, nbio);
+-
+-	/* Get a reference count for the disk queue and start sending I/O */
+ 	blk_start_plug(&plug);
+ 
+ 	for (i = 0; i < nbio; i++)
+@@ -1013,6 +1023,7 @@
+  fail_put_bio:
+ 	for (i = 0; i < nbio; i++)
+ 		bio_put(biolist[i]);
++	atomic_set(&pending_req->pendcnt, 1);
+ 	__end_block_io_op(pending_req, -EINVAL);
+ 	msleep(1); /* back off a bit */
+ 	return -EIO;

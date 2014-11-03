@@ -1,0 +1,19 @@
+--- arch/arm/mach-omap2/opp.c
++++ arch/arm/mach-omap2/opp.c
+@@ -53,7 +53,7 @@
+ 	omap_table_init = 1;
+ 
+ 	/* Lets now register with OPP library */
+-	for (i = 0; i < opp_def_size; i++) {
++	for (i = 0; i < opp_def_size; i++, opp_def++) {
+ 		struct omap_hwmod *oh;
+ 		struct device *dev;
+ 
+@@ -86,7 +86,6 @@
+ 					__func__, opp_def->freq,
+ 					opp_def->hwmod_name, i, r);
+ 		}
+-		opp_def++;
+ 	}
+ 
+ 	return 0;

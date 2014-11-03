@@ -1,0 +1,16 @@
+--- arch/tile/include/asm/bitops.h
++++ arch/tile/include/asm/bitops.h
+@@ -95,12 +100,7 @@
+  */
+ static inline int fls(int x)
+ {
+-	return (sizeof(int) * 8) - __builtin_clz(x);
+-}
+-
+-static inline int fls64(__u64 w)
+-{
+-	return (sizeof(__u64) * 8) - __builtin_clzll(w);
++	return fls64((unsigned int) x);
+ }
+ 
+ static inline unsigned int __arch_hweight32(unsigned int w)

@@ -1,0 +1,11 @@
+--- drivers/net/usb/sierra_net.c
++++ drivers/net/usb/sierra_net.c
+@@ -656,7 +634,7 @@
+ 		return -EIO;
+ 	}
+ 
+-	*datap = *attrdata;
++	*datap = le16_to_cpu(*attrdata);
+ 
+ 	kfree(attrdata);
+ 	return result;

@@ -1,0 +1,11 @@
+--- drivers/net/wireless/ipw2x00/ipw2200.c
++++ drivers/net/wireless/ipw2x00/ipw2200.c
+@@ -10472,7 +10465,7 @@
+ 		} else
+ 			len = src->len;
+ 
+-		dst = alloc_skb(len + sizeof(*rt_hdr), GFP_ATOMIC);
++		dst = alloc_skb(len + sizeof(*rt_hdr) + sizeof(u16)*2, GFP_ATOMIC);
+ 		if (!dst)
+ 			continue;
+ 

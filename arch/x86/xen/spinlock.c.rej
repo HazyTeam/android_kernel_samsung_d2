@@ -1,0 +1,10 @@
+--- arch/x86/xen/spinlock.c
++++ arch/x86/xen/spinlock.c
+@@ -328,7 +328,6 @@
+ 		if (per_cpu(lock_spinners, cpu) == xl) {
+ 			ADD_STATS(released_slow_kicked, 1);
+ 			xen_send_IPI_one(cpu, XEN_SPIN_UNLOCK_VECTOR);
+-			break;
+ 		}
+ 	}
+ }

@@ -1,0 +1,15 @@
+--- net/netfilter/nf_conntrack_sip.c
++++ net/netfilter/nf_conntrack_sip.c
+@@ -1594,10 +1641,11 @@
+ 
+ 		msglen = origlen = end - dptr;
+ 		if (msglen > datalen)
+-			return NF_DROP;
++			return NF_ACCEPT;
+ 
+ 		ret = process_sip_msg(skb, ct, protoff, dataoff,
+ 				      &dptr, &msglen);
++		/* process_sip_* functions report why this packet is dropped */
+ 		if (ret != NF_ACCEPT)
+ 			break;
+ 		diff     = msglen - origlen;

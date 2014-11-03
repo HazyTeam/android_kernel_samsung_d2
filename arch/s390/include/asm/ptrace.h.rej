@@ -1,0 +1,13 @@
+--- arch/s390/include/asm/ptrace.h
++++ arch/s390/include/asm/ptrace.h
+@@ -9,9 +9,7 @@
+ #include <uapi/asm/ptrace.h>
+ 
+ #ifndef __ASSEMBLY__
+-#ifndef __s390x__
+-#else /* __s390x__ */
+-#endif /* __s390x__ */
++
+ extern long psw_kernel_bits;
+ extern long psw_user_bits;
+ 

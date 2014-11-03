@@ -1,0 +1,22 @@
+--- drivers/md/dm-delay.c
++++ drivers/md/dm-delay.c
+@@ -293,8 +293,8 @@
+ 	return delay_bio(dc, dc->read_delay, bio);
+ }
+ 
+-static int delay_status(struct dm_target *ti, status_type_t type,
+-			unsigned status_flags, char *result, unsigned maxlen)
++static void delay_status(struct dm_target *ti, status_type_t type,
++			 unsigned status_flags, char *result, unsigned maxlen)
+ {
+ 	struct delay_c *dc = ti->private;
+ 	int sz = 0;
+@@ -314,8 +314,6 @@
+ 			       dc->write_delay);
+ 		break;
+ 	}
+-
+-	return 0;
+ }
+ 
+ static int delay_iterate_devices(struct dm_target *ti,

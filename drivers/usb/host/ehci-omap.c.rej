@@ -1,0 +1,40 @@
+--- drivers/usb/host/ehci-omap.c
++++ drivers/usb/host/ehci-omap.c
+@@ -210,16 +158,34 @@
+ 		goto err_pm_runtime;
+ 	}
+ 
++	/*
++	 * Bring PHYs out of reset.
++	 * Even though HSIC mode is a PHY-less mode, the reset
++	 * line exists between the chips and can be modelled
++	 * as a PHY device for reset control.
++	 */
++	for (i = 0; i < omap->nports; i++) {
++		if (!omap->phy[i])
++			continue;
++
++		usb_phy_init(omap->phy[i]);
++		/* bring PHY out of suspend */
++		usb_phy_set_suspend(omap->phy[i], 0);
++	}
+ 
+ 	return 0;
+ 
+ err_pm_runtime:
+-	disable_put_regulator(pdata);
+ 	pm_runtime_put_sync(dev);
++
++err_phy:
++	for (i = 0; i < omap->nports; i++) {
++		if (omap->phy[i])
++			usb_phy_shutdown(omap->phy[i]);
++	}
++
+ 	usb_put_hcd(hcd);
+ 
+-err_io:
+-	iounmap(regs);
+ 	return ret;
+ }
+ 

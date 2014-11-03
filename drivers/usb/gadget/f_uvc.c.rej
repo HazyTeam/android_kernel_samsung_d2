@@ -1,0 +1,69 @@
+--- drivers/usb/gadget/f_uvc.c
++++ drivers/usb/gadget/f_uvc.c
+@@ -573,7 +565,7 @@
+ 	uvc->control_ep->driver_data = NULL;
+ 	uvc->video.ep->driver_data = NULL;
+ 
+-	uvc_en_us_strings[UVC_STRING_ASSOCIATION_IDX].id = 0;
++	uvc_en_us_strings[UVC_STRING_CONTROL_IDX].id = 0;
+ 	usb_ep_free_request(cdev->gadget->ep0, uvc->control_req);
+ 	kfree(uvc->control_buf);
+ 
+@@ -672,37 +696,6 @@
+ 	uvc_streaming_intf_alt1.bInterfaceNumber = ret;
+ 	uvc->streaming_intf = ret;
+ 
+-	/* sanity check the streaming endpoint module parameters */
+-	if (streaming_maxpacket > 1024)
+-		streaming_maxpacket = 1024;
+-	/*
+-	 * Fill in the HS descriptors from the module parameters for the Video
+-	 * Streaming endpoint.
+-	 * NOTE: We assume that the user knows what they are doing and won't
+-	 * give parameters that their UDC doesn't support.
+-	 */
+-	uvc_hs_streaming_ep.wMaxPacketSize = streaming_maxpacket;
+-	uvc_hs_streaming_ep.wMaxPacketSize |= streaming_mult << 11;
+-	uvc_hs_streaming_ep.bInterval = streaming_interval;
+-	uvc_hs_streaming_ep.bEndpointAddress =
+-		uvc_fs_streaming_ep.bEndpointAddress;
+-
+-	/*
+-	 * Fill in the SS descriptors from the module parameters for the Video
+-	 * Streaming endpoint.
+-	 * NOTE: We assume that the user knows what they are doing and won't
+-	 * give parameters that their UDC doesn't support.
+-	 */
+-	uvc_ss_streaming_ep.wMaxPacketSize = streaming_maxpacket;
+-	uvc_ss_streaming_ep.bInterval = streaming_interval;
+-	uvc_ss_streaming_comp.bmAttributes = streaming_mult;
+-	uvc_ss_streaming_comp.bMaxBurst = streaming_maxburst;
+-	uvc_ss_streaming_comp.wBytesPerInterval =
+-		streaming_maxpacket * (streaming_mult + 1) *
+-		(streaming_maxburst + 1);
+-	uvc_ss_streaming_ep.bEndpointAddress =
+-		uvc_fs_streaming_ep.bEndpointAddress;
+-
+ 	/* Copy descriptors */
+ 	f->fs_descriptors = uvc_copy_descriptors(uvc, USB_SPEED_FULL);
+ 	if (gadget_is_dualspeed(cdev->gadget))
+@@ -824,13 +817,16 @@
+ 	uvc->desc.hs_streaming = hs_streaming;
+ 	uvc->desc.ss_streaming = ss_streaming;
+ 
+-	/* Allocate string descriptor numbers. */
+-	if (uvc_en_us_strings[UVC_STRING_ASSOCIATION_IDX].id == 0) {
++	/* String descriptors are global, we only need to allocate string IDs
++	 * for the first UVC function. UVC functions beyond the first (if any)
++	 * will reuse the same IDs.
++	 */
++	if (uvc_en_us_strings[UVC_STRING_CONTROL_IDX].id == 0) {
+ 		ret = usb_string_ids_tab(c->cdev, uvc_en_us_strings);
+ 		if (ret)
+ 			goto error;
+ 		uvc_iad.iFunction =
+-			uvc_en_us_strings[UVC_STRING_ASSOCIATION_IDX].id;
++			uvc_en_us_strings[UVC_STRING_CONTROL_IDX].id;
+ 		uvc_control_intf.iInterface =
+ 			uvc_en_us_strings[UVC_STRING_CONTROL_IDX].id;
+ 		ret = uvc_en_us_strings[UVC_STRING_STREAMING_IDX].id;

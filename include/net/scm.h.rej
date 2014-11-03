@@ -1,0 +1,29 @@
+--- include/net/scm.h
++++ include/net/scm.h
+@@ -50,23 +49,18 @@
+ #endif /* CONFIG_SECURITY_NETWORK */
+ 
+ static __inline__ void scm_set_cred(struct scm_cookie *scm,
+-				    struct pid *pid, const struct cred *cred)
++				    struct pid *pid, kuid_t uid, kgid_t gid)
+ {
+ 	scm->pid  = get_pid(pid);
+-	scm->cred = cred ? get_cred(cred) : NULL;
+ 	scm->creds.pid = pid_vnr(pid);
+-	scm->creds.uid = cred ? cred->uid : INVALID_UID;
+-	scm->creds.gid = cred ? cred->gid : INVALID_GID;
++	scm->creds.uid = uid;
++	scm->creds.gid = gid;
+ }
+ 
+ static __inline__ void scm_destroy_cred(struct scm_cookie *scm)
+ {
+ 	put_pid(scm->pid);
+ 	scm->pid  = NULL;
+-
+-	if (scm->cred)
+-		put_cred(scm->cred);
+-	scm->cred = NULL;
+ }
+ 
+ static __inline__ void scm_destroy(struct scm_cookie *scm)

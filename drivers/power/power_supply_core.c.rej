@@ -1,0 +1,19 @@
+--- drivers/power/power_supply_core.c
++++ drivers/power/power_supply_core.c
+@@ -361,6 +454,8 @@
+ 	goto success;
+ 
+ create_triggers_failed:
++	psy_unregister_cooler(psy);
++register_cooler_failed:
+ 	psy_unregister_thermal(psy);
+ register_thermal_failed:
+ 	device_del(dev);
+@@ -377,6 +472,7 @@
+ 	cancel_work_sync(&psy->changed_work);
+ 	sysfs_remove_link(&psy->dev->kobj, "powers");
+ 	power_supply_remove_triggers(psy);
++	psy_unregister_cooler(psy);
+ 	psy_unregister_thermal(psy);
+ 	device_unregister(psy->dev);
+ }

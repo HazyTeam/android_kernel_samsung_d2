@@ -1,0 +1,36 @@
+--- net/key/af_key.c
++++ net/key/af_key.c
+@@ -1710,6 +1710,7 @@
+ 	hdr->sadb_msg_version = PF_KEY_V2;
+ 	hdr->sadb_msg_errno = (uint8_t) 0;
+ 	hdr->sadb_msg_len = (sizeof(struct sadb_msg) / sizeof(uint64_t));
++	hdr->sadb_msg_reserved = 0;
+ 
+ 	pfkey_broadcast(skb, GFP_ATOMIC, BROADCAST_ALL, NULL, c->net);
+ 
+@@ -2366,6 +2367,8 @@
+ 
+ out:
+ 	xfrm_pol_put(xp);
++	if (err == 0)
++		xfrm_garbage_collect(net);
+ 	return err;
+ }
+ 
+@@ -2615,6 +2618,8 @@
+ 
+ out:
+ 	xfrm_pol_put(xp);
++	if (delete && err == 0)
++		xfrm_garbage_collect(net);
+ 	return err;
+ }
+ 
+@@ -2695,6 +2700,7 @@
+ 	hdr->sadb_msg_errno = (uint8_t) 0;
+ 	hdr->sadb_msg_satype = SADB_SATYPE_UNSPEC;
+ 	hdr->sadb_msg_len = (sizeof(struct sadb_msg) / sizeof(uint64_t));
++	hdr->sadb_msg_reserved = 0;
+ 	pfkey_broadcast(skb_out, GFP_ATOMIC, BROADCAST_ALL, NULL, c->net);
+ 	return 0;
+ 

@@ -1,0 +1,78 @@
+--- kernel/timer.c
++++ kernel/timer.c
+@@ -1396,61 +1397,6 @@
+ 
+ #endif
+ 
+-/**
+- * sys_getpid - return the thread group id of the current process
+- *
+- * Note, despite the name, this returns the tgid not the pid.  The tgid and
+- * the pid are identical unless CLONE_THREAD was specified on clone() in
+- * which case the tgid is the same in all threads of the same group.
+- *
+- * This is SMP safe as current->tgid does not change.
+- */
+-SYSCALL_DEFINE0(getpid)
+-{
+-	return task_tgid_vnr(current);
+-}
+-
+-/*
+- * Accessing ->real_parent is not SMP-safe, it could
+- * change from under us. However, we can use a stale
+- * value of ->real_parent under rcu_read_lock(), see
+- * release_task()->call_rcu(delayed_put_task_struct).
+- */
+-SYSCALL_DEFINE0(getppid)
+-{
+-	int pid;
+-
+-	rcu_read_lock();
+-	pid = task_tgid_vnr(rcu_dereference(current->real_parent));
+-	rcu_read_unlock();
+-
+-	return pid;
+-}
+-
+-SYSCALL_DEFINE0(getuid)
+-{
+-	/* Only we change this so SMP safe */
+-	return from_kuid_munged(current_user_ns(), current_uid());
+-}
+-
+-SYSCALL_DEFINE0(geteuid)
+-{
+-	/* Only we change this so SMP safe */
+-	return from_kuid_munged(current_user_ns(), current_euid());
+-}
+-
+-SYSCALL_DEFINE0(getgid)
+-{
+-	/* Only we change this so SMP safe */
+-	return from_kgid_munged(current_user_ns(), current_gid());
+-}
+-
+-SYSCALL_DEFINE0(getegid)
+-{
+-	/* Only we change this so SMP safe */
+-	return from_kgid_munged(current_user_ns(), current_egid());
+-}
+-
+ static void process_timeout(unsigned long __data)
+ {
+ 	wake_up_process((struct task_struct *)__data);
+@@ -1594,12 +1455,12 @@
+ 			boot_done = 1;
+ 			base = &boot_tvec_bases;
+ 		}
++		spin_lock_init(&base->lock);
+ 		tvec_base_done[cpu] = 1;
+ 	} else {
+ 		base = per_cpu(tvec_bases, cpu);
+ 	}
+ 
+-	spin_lock_init(&base->lock);
+ 
+ 	for (j = 0; j < TVN_SIZE; j++) {
+ 		INIT_LIST_HEAD(base->tv5.vec + j);

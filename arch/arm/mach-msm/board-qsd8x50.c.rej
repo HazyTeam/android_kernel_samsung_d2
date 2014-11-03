@@ -1,0 +1,10 @@
+--- arch/arm/mach-msm/board-qsd8x50.c
++++ arch/arm/mach-msm/board-qsd8x50.c
+@@ -89,6 +89,7 @@
+ };
+ 
+ static struct platform_device *devices[] __initdata = {
++	&msm_device_gpio_8x50,
+ 	&msm_device_uart3,
+ 	&msm_device_smd,
+ 	&msm_device_otg,

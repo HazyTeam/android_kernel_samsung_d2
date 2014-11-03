@@ -1,0 +1,11 @@
+--- drivers/md/dm-thin.c
++++ drivers/md/dm-thin.c
+@@ -2669,7 +2789,7 @@
+ 	.name = "thin-pool",
+ 	.features = DM_TARGET_SINGLETON | DM_TARGET_ALWAYS_WRITEABLE |
+ 		    DM_TARGET_IMMUTABLE,
+-	.version = {1, 7, 0},
++	.version = {1, 8, 0},
+ 	.module = THIS_MODULE,
+ 	.ctr = pool_ctr,
+ 	.dtr = pool_dtr,

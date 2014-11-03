@@ -1,0 +1,35 @@
+--- mm/compaction.c
++++ mm/compaction.c
+@@ -1122,28 +1125,26 @@
+ 		VM_BUG_ON(!list_empty(&cc->freepages));
+ 		VM_BUG_ON(!list_empty(&cc->migratepages));
+ 	}
+-
+-	return 0;
+ }
+ 
+-int compact_pgdat(pg_data_t *pgdat, int order)
++void compact_pgdat(pg_data_t *pgdat, int order)
+ {
+ 	struct compact_control cc = {
+ 		.order = order,
+ 		.sync = false,
+ 	};
+ 
+-	return __compact_pgdat(pgdat, &cc);
++	__compact_pgdat(pgdat, &cc);
+ }
+ 
+-static int compact_node(int nid)
++static void compact_node(int nid)
+ {
+ 	struct compact_control cc = {
+ 		.order = -1,
+ 		.sync = true,
+ 	};
+ 
+-	return __compact_pgdat(NODE_DATA(nid), &cc);
++	__compact_pgdat(NODE_DATA(nid), &cc);
+ }
+ 
+ /* Compact all nodes in the system */

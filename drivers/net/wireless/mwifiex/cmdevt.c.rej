@@ -1,0 +1,10 @@
+--- drivers/net/wireless/mwifiex/cmdevt.c
++++ drivers/net/wireless/mwifiex/cmdevt.c
+@@ -1191,6 +1206,7 @@
+ 	adapter->if_ops.wakeup(adapter);
+ 	adapter->hs_activated = false;
+ 	adapter->is_hs_configured = false;
++	adapter->is_suspended = false;
+ 	mwifiex_hs_activated_event(mwifiex_get_priv(adapter,
+ 						    MWIFIEX_BSS_ROLE_ANY),
+ 				   false);

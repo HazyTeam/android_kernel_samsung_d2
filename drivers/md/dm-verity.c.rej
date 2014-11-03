@@ -1,0 +1,22 @@
+--- drivers/md/dm-verity.c
++++ drivers/md/dm-verity.c
+@@ -537,8 +566,8 @@
+ /*
+  * Status: V (valid) or C (corruption found)
+  */
+-static int verity_status(struct dm_target *ti, status_type_t type,
+-			 unsigned status_flags, char *result, unsigned maxlen)
++static void verity_status(struct dm_target *ti, status_type_t type,
++			  unsigned status_flags, char *result, unsigned maxlen)
+ {
+ 	struct dm_verity *v = ti->private;
+ 	unsigned sz = 0;
+@@ -569,8 +598,6 @@
+ 				DMEMIT("%02x", v->salt[x]);
+ 		break;
+ 	}
+-
+-	return 0;
+ }
+ 
+ static int verity_ioctl(struct dm_target *ti, unsigned cmd,

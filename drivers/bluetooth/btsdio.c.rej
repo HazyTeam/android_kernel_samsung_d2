@@ -1,0 +1,10 @@
+--- drivers/bluetooth/btsdio.c
++++ drivers/bluetooth/btsdio.c
+@@ -363,7 +360,6 @@
+ 	hci_unregister_dev(hdev);
+ 
+ 	hci_free_dev(hdev);
+-	kfree(data);
+ }
+ 
+ static struct sdio_driver btsdio_driver = {

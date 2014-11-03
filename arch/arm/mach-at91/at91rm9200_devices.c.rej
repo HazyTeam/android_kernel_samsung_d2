@@ -1,0 +1,11 @@
+--- arch/arm/mach-at91/at91rm9200_devices.c
++++ arch/arm/mach-at91/at91rm9200_devices.c
+@@ -479,7 +495,7 @@
+ 
+ static struct platform_device at91rm9200_twi_device = {
+ 	.name			= "i2c-gpio",
+-	.id			= -1,
++	.id			= 0,
+ 	.dev.platform_data	= &pdata,
+ };
+ 

@@ -1,0 +1,11 @@
+--- drivers/platform/x86/ibm_rtl.c
++++ drivers/platform/x86/ibm_rtl.c
+@@ -244,7 +244,7 @@
+ 	if (force)
+ 		pr_warn("module loaded by force\n");
+ 	/* first ensure that we are running on IBM HW */
+-	else if (efi_enabled || !dmi_check_system(ibm_rtl_dmi_table))
++	else if (efi_enabled(EFI_BOOT) || !dmi_check_system(ibm_rtl_dmi_table))
+ 		return -ENODEV;
+ 
+ 	/* Get the address for the Extended BIOS Data Area */

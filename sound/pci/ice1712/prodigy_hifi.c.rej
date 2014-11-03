@@ -1,0 +1,19 @@
+--- sound/pci/ice1712/prodigy_hifi.c
++++ sound/pci/ice1712/prodigy_hifi.c
+@@ -297,6 +297,7 @@
+ }
+ 
+ static const DECLARE_TLV_DB_SCALE(db_scale_wm_dac, -12700, 100, 1);
++static const DECLARE_TLV_DB_LINEAR(ak4396_db_scale, TLV_DB_GAIN_MUTE, 0);
+ 
+ static struct snd_kcontrol_new prodigy_hd2_controls[] __devinitdata = {
+     {
+@@ -307,7 +308,7 @@
+ 	.info = ak4396_dac_vol_info,
+ 	.get = ak4396_dac_vol_get,
+ 	.put = ak4396_dac_vol_put,
+-	.tlv = { .p = db_scale_wm_dac },
++	.tlv = { .p = ak4396_db_scale },
+     },
+ };
+ 

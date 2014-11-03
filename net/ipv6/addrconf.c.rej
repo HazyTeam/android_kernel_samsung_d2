@@ -1,0 +1,39 @@
+--- net/ipv6/addrconf.c
++++ net/ipv6/addrconf.c
+@@ -1817,6 +1904,8 @@
+ 		return addrconf_ifid_gre(eui, dev);
+ 	case ARPHRD_IEEE802154:
+ 		return addrconf_ifid_eui64(eui, dev);
++	case ARPHRD_IEEE1394:
++		return addrconf_ifid_ieee1394(eui, dev);
+ 	}
+ 	return -1;
+ }
+@@ -2653,11 +2751,16 @@
+ 			if (sp_ifa->flags & (IFA_F_DADFAILED | IFA_F_TENTATIVE))
+ 				continue;
+ 
++			if (sp_ifa->rt)
++				continue;
++
+ 			sp_rt = addrconf_dst_alloc(idev, &sp_ifa->addr, 0);
+ 
+ 			/* Failure cases are ignored */
+-			if (!IS_ERR(sp_rt))
++			if (!IS_ERR(sp_rt)) {
++				sp_ifa->rt = sp_rt;
+ 				ip6_ins_rt(sp_rt);
++			}
+ 		}
+ 		read_unlock_bh(&idev->lock);
+ 	}
+@@ -2694,7 +2797,8 @@
+ 	    (dev->type != ARPHRD_FDDI) &&
+ 	    (dev->type != ARPHRD_ARCNET) &&
+ 	    (dev->type != ARPHRD_INFINIBAND) &&
+-	    (dev->type != ARPHRD_IEEE802154)) {
++	    (dev->type != ARPHRD_IEEE802154) &&
++	    (dev->type != ARPHRD_IEEE1394)) {
+ 		/* Alas, we support only Ethernet autoconfiguration. */
+ 		return;
+ 	}

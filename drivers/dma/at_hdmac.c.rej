@@ -1,0 +1,35 @@
+--- drivers/dma/at_hdmac.c
++++ drivers/dma/at_hdmac.c
+@@ -661,7 +660,7 @@
+ 			flags);
+ 
+ 	if (unlikely(!atslave || !sg_len)) {
+-		dev_dbg(chan2dev(chan), "prep_dma_memcpy: length is zero!\n");
++		dev_dbg(chan2dev(chan), "prep_slave_sg: sg length is zero!\n");
+ 		return NULL;
+ 	}
+ 
+@@ -689,6 +688,11 @@
+ 
+ 			mem = sg_dma_address(sg);
+ 			len = sg_dma_len(sg);
++			if (unlikely(!len)) {
++				dev_dbg(chan2dev(chan),
++					"prep_slave_sg: sg(%d) data length is zero\n", i);
++				goto err;
++			}
+ 			mem_width = 2;
+ 			if (unlikely(mem & 3 || len & 3))
+ 				mem_width = 0;
+@@ -724,6 +728,11 @@
+ 
+ 			mem = sg_dma_address(sg);
+ 			len = sg_dma_len(sg);
++			if (unlikely(!len)) {
++				dev_dbg(chan2dev(chan),
++					"prep_slave_sg: sg(%d) data length is zero\n", i);
++				goto err;
++			}
+ 			mem_width = 2;
+ 			if (unlikely(mem & 3 || len & 3))
+ 				mem_width = 0;

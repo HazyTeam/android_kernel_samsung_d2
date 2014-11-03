@@ -1,0 +1,12 @@
+--- arch/x86/kernel/e820.c
++++ arch/x86/kernel/e820.c
+@@ -1077,6 +1077,9 @@
+ 		memblock_add(ei->addr, ei->size);
+ 	}
+ 
++	/* throw away partial pages */
++	memblock_trim_memory(PAGE_SIZE);
++
+ 	memblock_dump_all();
+ }
+ 

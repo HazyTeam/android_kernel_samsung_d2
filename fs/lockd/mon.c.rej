@@ -1,0 +1,19 @@
+--- fs/lockd/mon.c
++++ fs/lockd/mon.c
+@@ -154,8 +154,6 @@
+ 		.rpc_resp	= res,
+ 	};
+ 
+-	BUG_ON(clnt == NULL);
+-
+ 	memset(res, 0, sizeof(*res));
+ 
+ 	msg.rpc_proc = &clnt->cl_procinfo[proc];
+@@ -466,7 +464,6 @@
+ 	const u32 len = strlen(string);
+ 	__be32 *p;
+ 
+-	BUG_ON(len > SM_MAXSTRLEN);
+ 	p = xdr_reserve_space(xdr, 4 + len);
+ 	xdr_encode_opaque(p, string, len);
+ }

@@ -1,0 +1,11 @@
+--- arch/arm/mach-at91/at91sam9rl_devices.c
++++ arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -314,7 +314,7 @@
+ 
+ static struct platform_device at91sam9rl_twi_device = {
+ 	.name			= "i2c-gpio",
+-	.id			= -1,
++	.id			= 0,
+ 	.dev.platform_data	= &pdata,
+ };
+ 

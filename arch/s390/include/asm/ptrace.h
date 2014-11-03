@@ -1,8 +1,6 @@
 /*
- *  include/asm-s390/ptrace.h
- *
  *  S390 version
- *    Copyright (C) 1999,2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
+ *    Copyright IBM Corp. 1999, 2000
  *    Author(s): Denis Joseph Barrow (djbarrow@de.ibm.com,barrow_dj@yahoo.com)
  */
 
@@ -361,178 +359,21 @@ struct per_struct_kernel {
 	unsigned char access_id;	/* PER trap access identification */
 };
 
-#define PER_EVENT_MASK			0xE9000000UL
+#define PER_EVENT_MASK			0xEB000000UL
 
 #define PER_EVENT_BRANCH		0x80000000UL
 #define PER_EVENT_IFETCH		0x40000000UL
 #define PER_EVENT_STORE			0x20000000UL
 #define PER_EVENT_STORE_REAL		0x08000000UL
+#define PER_EVENT_TRANSACTION_END	0x02000000UL
 #define PER_EVENT_NULLIFICATION		0x01000000UL
 
-#define PER_CONTROL_MASK		0x00a00000UL
+#define PER_CONTROL_MASK		0x00e00000UL
 
 #define PER_CONTROL_BRANCH_ADDRESS	0x00800000UL
+#define PER_CONTROL_SUSPENSION		0x00400000UL
 #define PER_CONTROL_ALTERATION		0x00200000UL
 
-#endif
-
-/*
- * Now for the user space program event recording (trace) definitions.
- * The following structures are used only for the ptrace interface, don't
- * touch or even look at it if you don't want to modify the user-space
- * ptrace interface. In particular stay away from it for in-kernel PER.
- */
-typedef struct
-{
-	unsigned long cr[NUM_CR_WORDS];
-} per_cr_words;
-
-#define PER_EM_MASK 0xE8000000UL
-
-typedef	struct
-{
-#ifdef __s390x__
-	unsigned                       : 32;
-#endif /* __s390x__ */
-	unsigned em_branching          : 1;
-	unsigned em_instruction_fetch  : 1;
-	/*
-	 * Switching on storage alteration automatically fixes
-	 * the storage alteration event bit in the users std.
-	 */
-	unsigned em_storage_alteration : 1;
-	unsigned em_gpr_alt_unused     : 1;
-	unsigned em_store_real_address : 1;
-	unsigned                       : 3;
-	unsigned branch_addr_ctl       : 1;
-	unsigned                       : 1;
-	unsigned storage_alt_space_ctl : 1;
-	unsigned                       : 21;
-	unsigned long starting_addr;
-	unsigned long ending_addr;
-} per_cr_bits;
-
-typedef struct
-{
-	unsigned short perc_atmid;
-	unsigned long address;
-	unsigned char access_id;
-} per_lowcore_words;
-
-typedef struct
-{
-	unsigned perc_branching          : 1;
-	unsigned perc_instruction_fetch  : 1;
-	unsigned perc_storage_alteration : 1;
-	unsigned perc_gpr_alt_unused     : 1;
-	unsigned perc_store_real_address : 1;
-	unsigned                         : 3;
-	unsigned atmid_psw_bit_31        : 1;
-	unsigned atmid_validity_bit      : 1;
-	unsigned atmid_psw_bit_32        : 1;
-	unsigned atmid_psw_bit_5         : 1;
-	unsigned atmid_psw_bit_16        : 1;
-	unsigned atmid_psw_bit_17        : 1;
-	unsigned si                      : 2;
-	unsigned long address;
-	unsigned                         : 4;
-	unsigned access_id               : 4;
-} per_lowcore_bits;
-
-typedef struct
-{
-	union {
-		per_cr_words   words;
-		per_cr_bits    bits;
-	} control_regs;
-	/*
-	 * Use these flags instead of setting em_instruction_fetch
-	 * directly they are used so that single stepping can be
-	 * switched on & off while not affecting other tracing
-	 */
-	unsigned  single_step       : 1;
-	unsigned  instruction_fetch : 1;
-	unsigned                    : 30;
-	/*
-	 * These addresses are copied into cr10 & cr11 if single
-	 * stepping is switched off
-	 */
-	unsigned long starting_addr;
-	unsigned long ending_addr;
-	union {
-		per_lowcore_words words;
-		per_lowcore_bits  bits;
-	} lowcore; 
-} per_struct;
-
-typedef struct
-{
-	unsigned int  len;
-	unsigned long kernel_addr;
-	unsigned long process_addr;
-} ptrace_area;
-
-/*
- * S/390 specific non posix ptrace requests. I chose unusual values so
- * they are unlikely to clash with future ptrace definitions.
- */
-#define PTRACE_PEEKUSR_AREA           0x5000
-#define PTRACE_POKEUSR_AREA           0x5001
-#define PTRACE_PEEKTEXT_AREA	      0x5002
-#define PTRACE_PEEKDATA_AREA	      0x5003
-#define PTRACE_POKETEXT_AREA	      0x5004
-#define PTRACE_POKEDATA_AREA 	      0x5005
-#define PTRACE_GET_LAST_BREAK	      0x5006
-#define PTRACE_PEEK_SYSTEM_CALL       0x5007
-#define PTRACE_POKE_SYSTEM_CALL	      0x5008
-
-/*
- * PT_PROT definition is loosely based on hppa bsd definition in
- * gdb/hppab-nat.c
- */
-#define PTRACE_PROT                       21
-
-typedef enum
-{
-	ptprot_set_access_watchpoint,
-	ptprot_set_write_watchpoint,
-	ptprot_disable_watchpoint
-} ptprot_flags;
-
-typedef struct
-{
-	unsigned long lowaddr;
-	unsigned long hiaddr;
-	ptprot_flags prot;
-} ptprot_area;                     
-
-/* Sequence of bytes for breakpoint illegal instruction.  */
-#define S390_BREAKPOINT     {0x0,0x1}
-#define S390_BREAKPOINT_U16 ((__u16)0x0001)
-#define S390_SYSCALL_OPCODE ((__u16)0x0a00)
-#define S390_SYSCALL_SIZE   2
-
-/*
- * The user_regs_struct defines the way the user registers are
- * store on the stack for signal handling.
- */
-struct user_regs_struct
-{
-	psw_t psw;
-	unsigned long gprs[NUM_GPRS];
-	unsigned int  acrs[NUM_ACRS];
-	unsigned long orig_gpr2;
-	s390_fp_regs fp_regs;
-	/*
-	 * These per registers are in here so that gdb can modify them
-	 * itself as there is no "official" ptrace interface for hardware
-	 * watchpoints. This is the way intel does it.
-	 */
-	per_struct per_info;
-	unsigned long ieee_instruction_pointer;	/* obsolete, always 0 */
-};
-
-#ifdef __KERNEL__
 /*
  * These are defined as per linux/ptrace.h, which see.
  */
@@ -558,7 +399,5 @@ static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
 	return regs->gprs[15] & PSW_ADDR_INSN;
 }
 
-#endif /* __KERNEL__ */
 #endif /* __ASSEMBLY__ */
-
 #endif /* _S390_PTRACE_H */

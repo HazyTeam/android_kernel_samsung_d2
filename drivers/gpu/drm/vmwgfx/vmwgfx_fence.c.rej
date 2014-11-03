@@ -1,0 +1,11 @@
+--- drivers/gpu/drm/vmwgfx/vmwgfx_fence.c
++++ drivers/gpu/drm/vmwgfx/vmwgfx_fence.c
+@@ -1018,7 +1018,7 @@
+ 	}
+ 
+ 
+-	event = kzalloc(sizeof(event->event), GFP_KERNEL);
++	event = kzalloc(sizeof(*event), GFP_KERNEL);
+ 	if (unlikely(event == NULL)) {
+ 		DRM_ERROR("Failed to allocate an event.\n");
+ 		ret = -ENOMEM;

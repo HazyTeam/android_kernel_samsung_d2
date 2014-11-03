@@ -1,0 +1,10 @@
+--- drivers/rtc/rtc-pcf2123.c
++++ drivers/rtc/rtc-pcf2123.c
+@@ -266,6 +267,7 @@
+ 
+ 	if (!(rxbuf[0] & 0x20)) {
+ 		dev_err(&spi->dev, "chip not found\n");
++		ret = -ENODEV;
+ 		goto kfree_exit;
+ 	}
+ 

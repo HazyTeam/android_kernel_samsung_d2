@@ -1,0 +1,20 @@
+--- drivers/hwmon/applesmc.c
++++ drivers/hwmon/applesmc.c
+@@ -236,11 +253,14 @@
+ 		return -EIO;
+ 	}
+ 
+-	outb(len, APPLESMC_DATA_PORT);
++	if (send_byte(len, APPLESMC_DATA_PORT)) {
++		pr_warn("%.4s: read len fail\n", key);
++		return -EIO;
++	}
+ 
+ 	for (i = 0; i < len; i++) {
+-		if (__wait_status(0x05)) {
+-			pr_warn("%.4s: read data fail\n", key);
++		if (wait_read()) {
++			pr_warn("%.4s: read data[%d] fail\n", key, i);
+ 			return -EIO;
+ 		}
+ 		buffer[i] = inb(APPLESMC_DATA_PORT);

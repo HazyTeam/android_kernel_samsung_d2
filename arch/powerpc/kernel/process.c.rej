@@ -1,0 +1,28 @@
+--- arch/powerpc/kernel/process.c
++++ arch/powerpc/kernel/process.c
+@@ -1367,15 +1372,9 @@
+ 	} while (count++ < kstack_depth_to_print);
+ }
+ 
+-void dump_stack(void)
+-{
+-	show_stack(current, NULL);
+-}
+-EXPORT_SYMBOL(dump_stack);
+-
+ #ifdef CONFIG_PPC64
+ /* Called with hard IRQs off */
+-void __ppc64_runlatch_on(void)
++void notrace __ppc64_runlatch_on(void)
+ {
+ 	struct thread_info *ti = current_thread_info();
+ 	unsigned long ctrl;
+@@ -1388,7 +1387,7 @@
+ }
+ 
+ /* Called with hard IRQs off */
+-void __ppc64_runlatch_off(void)
++void notrace __ppc64_runlatch_off(void)
+ {
+ 	struct thread_info *ti = current_thread_info();
+ 	unsigned long ctrl;

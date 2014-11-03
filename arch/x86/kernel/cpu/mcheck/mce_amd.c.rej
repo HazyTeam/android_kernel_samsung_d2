@@ -1,0 +1,77 @@
+--- arch/x86/kernel/cpu/mcheck/mce_amd.c
++++ arch/x86/kernel/cpu/mcheck/mce_amd.c
+@@ -51,6 +51,7 @@
+ 	unsigned int		cpu;
+ 	u32			address;
+ 	u16			interrupt_enable;
++	bool			interrupt_capable;
+ 	u16			threshold_limit;
+ 	struct kobject		kobj;
+ 	struct list_head	miscj;
+@@ -119,8 +135,10 @@
+ 	return 1;
+ };
+ 
+-/* must be called with correct cpu affinity */
+-/* Called via smp_call_function_single() */
++/*
++ * Called via smp_call_function_single(), must be called with correct
++ * cpu affinity.
++ */
+ static void threshold_restart_bank(void *_tr)
+ {
+ 	struct thresh_restart *tr = _tr;
+@@ -157,9 +181,10 @@
+ 		}
+ 	}
+ 
+-	tr->b->interrupt_enable ?
+-	    (hi = (hi & ~MASK_INT_TYPE_HI) | INT_TYPE_APIC) :
+-	    (hi &= ~MASK_INT_TYPE_HI);
++	if (tr->b->interrupt_enable)
++		hi |= INT_TYPE_APIC;
++
++ done:
+ 
+ 	hi |= MASK_COUNT_EN_HI;
+ 	wrmsr(tr->b->address, lo, hi);
+@@ -223,14 +248,17 @@
+ 			if (shared_bank[bank] && c->cpu_core_id)
+ 				break;
+ 
+-			offset = setup_APIC_mce(offset,
+-						(high & MASK_LVTOFF_HI) >> 20);
+-
+ 			memset(&b, 0, sizeof(b));
+-			b.cpu		= cpu;
+-			b.bank		= bank;
+-			b.block		= block;
+-			b.address	= address;
++			b.cpu			= cpu;
++			b.bank			= bank;
++			b.block			= block;
++			b.address		= address;
++			b.interrupt_capable	= lvt_interrupt_supported(bank, high);
++
++			if (b.interrupt_capable) {
++				int new = (high & MASK_LVTOFF_HI) >> 20;
++				offset  = setup_APIC_mce(offset, new);
++			}
+ 
+ 			mce_threshold_block_init(&b, offset);
+ 			mce_threshold_vector = amd_threshold_interrupt;
+@@ -491,8 +522,14 @@
+ 	b->cpu			= cpu;
+ 	b->address		= address;
+ 	b->interrupt_enable	= 0;
++	b->interrupt_capable	= lvt_interrupt_supported(bank, high);
+ 	b->threshold_limit	= THRESHOLD_MAX;
+ 
++	if (b->interrupt_capable)
++		threshold_ktype.default_attrs[2] = &interrupt_enable.attr;
++	else
++		threshold_ktype.default_attrs[2] = NULL;
++
+ 	INIT_LIST_HEAD(&b->miscj);
+ 
+ 	if (per_cpu(threshold_banks, cpu)[bank]->blocks) {

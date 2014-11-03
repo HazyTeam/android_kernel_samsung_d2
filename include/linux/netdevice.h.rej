@@ -1,0 +1,13 @@
+--- include/linux/netdevice.h
++++ include/linux/netdevice.h
+@@ -210,9 +212,9 @@
+ #define NETDEV_HW_ADDR_T_SLAVE		3
+ #define NETDEV_HW_ADDR_T_UNICAST	4
+ #define NETDEV_HW_ADDR_T_MULTICAST	5
+-	bool			synced;
+ 	bool			global_use;
+ 	int			refcount;
++	int			synced;
+ 	struct rcu_head		rcu_head;
+ };
+ 

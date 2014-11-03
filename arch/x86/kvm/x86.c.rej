@@ -1,0 +1,28 @@
+--- arch/x86/kvm/x86.c
++++ arch/x86/kvm/x86.c
+@@ -582,22 +606,21 @@
+ 	if (index != XCR_XFEATURE_ENABLED_MASK)
+ 		return 1;
+ 	xcr0 = xcr;
+-	if (kvm_x86_ops->get_cpl(vcpu) != 0)
+-		return 1;
+ 	if (!(xcr0 & XSTATE_FP))
+ 		return 1;
+ 	if ((xcr0 & XSTATE_YMM) && !(xcr0 & XSTATE_SSE))
+ 		return 1;
+ 	if (xcr0 & ~host_xcr0)
+ 		return 1;
++	kvm_put_guest_xcr0(vcpu);
+ 	vcpu->arch.xcr0 = xcr0;
+-	vcpu->guest_xcr0_loaded = 0;
+ 	return 0;
+ }
+ 
+ int kvm_set_xcr(struct kvm_vcpu *vcpu, u32 index, u64 xcr)
+ {
+-	if (__kvm_set_xcr(vcpu, index, xcr)) {
++	if (kvm_x86_ops->get_cpl(vcpu) != 0 ||
++	    __kvm_set_xcr(vcpu, index, xcr)) {
+ 		kvm_inject_gp(vcpu, 0);
+ 		return 1;
+ 	}

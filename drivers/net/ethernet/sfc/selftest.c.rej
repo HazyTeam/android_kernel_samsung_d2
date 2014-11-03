@@ -1,0 +1,11 @@
+--- drivers/net/ethernet/sfc/selftest.c
++++ drivers/net/ethernet/sfc/selftest.c
+@@ -722,7 +722,7 @@
+ 	/* Detach the device so the kernel doesn't transmit during the
+ 	 * loopback test and the watchdog timeout doesn't fire.
+ 	 */
+-	netif_device_detach(efx->net_dev);
++	efx_device_detach_sync(efx);
+ 
+ 	if (efx->type->test_chip) {
+ 		rc_reset = efx->type->test_chip(efx, tests);

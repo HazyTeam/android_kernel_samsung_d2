@@ -1,0 +1,21 @@
+--- drivers/md/dm-stripe.c
++++ drivers/md/dm-stripe.c
+@@ -312,8 +312,8 @@
+  *
+  */
+ 
+-static int stripe_status(struct dm_target *ti, status_type_t type,
+-			 unsigned status_flags, char *result, unsigned maxlen)
++static void stripe_status(struct dm_target *ti, status_type_t type,
++			  unsigned status_flags, char *result, unsigned maxlen)
+ {
+ 	struct stripe_c *sc = (struct stripe_c *) ti->private;
+ 	char buffer[sc->stripes + 1];
+@@ -340,7 +340,6 @@
+ 			    (unsigned long long)sc->stripe[i].physical_start);
+ 		break;
+ 	}
+-	return 0;
+ }
+ 
+ static int stripe_end_io(struct dm_target *ti, struct bio *bio, int error)

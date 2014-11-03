@@ -1,0 +1,19 @@
+--- drivers/tty/vt/keyboard.c
++++ drivers/tty/vt/keyboard.c
+@@ -1050,13 +1051,13 @@
+  */
+ int vt_get_leds(int console, int flag)
+ {
+-	unsigned long flags;
+ 	struct kbd_struct * kbd = kbd_table + console;
+ 	int ret;
++	unsigned long flags;
+ 
+-	spin_lock_irqsave(&kbd_event_lock, flags);
++	spin_lock_irqsave(&led_lock, flags);
+ 	ret = vc_kbd_led(kbd, flag);
+-	spin_unlock_irqrestore(&kbd_event_lock, flags);
++	spin_unlock_irqrestore(&led_lock, flags);
+ 
+ 	return ret;
+ }

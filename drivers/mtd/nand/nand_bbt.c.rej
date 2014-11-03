@@ -1,0 +1,36 @@
+--- drivers/mtd/nand/nand_bbt.c
++++ drivers/mtd/nand/nand_bbt.c
+@@ -391,28 +393,27 @@
+ 
+ 	/* Read the mirror version, if available */
+ 	if (md && (md->options & NAND_BBT_VERSION)) {
+-		scan_read_raw(mtd, buf, (loff_t)md->pages[0] << this->page_shift,
+-			      mtd->writesize, td);
++		scan_read(mtd, buf, (loff_t)md->pages[0] << this->page_shift,
++			      mtd->writesize, md);
+ 		md->version[0] = buf[bbt_get_ver_offs(mtd, md)];
+ 		pr_info("Bad block table at page %d, version 0x%02X\n",
+ 			 md->pages[0], md->version[0]);
+ 	}
+-	return 1;
+ }
+ 
+ /* Scan a given block full */
+ static int scan_block_full(struct mtd_info *mtd, struct nand_bbt_descr *bd,
+ 			   loff_t offs, uint8_t *buf, size_t readlen,
+-			   int scanlen, int len)
++			   int scanlen, int numpages)
+ {
+ 	int ret, j;
+ 
+-	ret = scan_read_raw_oob(mtd, buf, offs, readlen);
++	ret = scan_read_oob(mtd, buf, offs, readlen);
+ 	/* Ignore ECC errors when checking for BBM */
+ 	if (ret && !mtd_is_bitflip_or_eccerr(ret))
+ 		return ret;
+ 
+-	for (j = 0; j < len; j++, buf += scanlen) {
++	for (j = 0; j < numpages; j++, buf += scanlen) {
+ 		if (check_pattern(buf, scanlen, mtd->writesize, bd))
+ 			return 1;
+ 	}

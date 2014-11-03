@@ -1,0 +1,12 @@
+--- fs/cifs/inode.c
++++ fs/cifs/inode.c
+@@ -171,7 +173,8 @@
+ 
+ 	if (fattr->cf_flags & CIFS_FATTR_DFS_REFERRAL)
+ 		inode->i_flags |= S_AUTOMOUNT;
+-	cifs_set_ops(inode);
++	if (inode->i_state & I_NEW)
++		cifs_set_ops(inode);
+ }
+ 
+ void

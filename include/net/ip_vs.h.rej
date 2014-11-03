@@ -1,0 +1,11 @@
+--- include/net/ip_vs.h
++++ include/net/ip_vs.h
+@@ -1425,7 +1494,7 @@
+ 	struct nf_conn *ct = nf_ct_get(skb, &ctinfo);
+ 
+ 	if (!ct || !nf_ct_is_untracked(ct)) {
+-		nf_reset(skb);
++		nf_conntrack_put(skb->nfct);
+ 		skb->nfct = &nf_ct_untracked_get()->ct_general;
+ 		skb->nfctinfo = IP_CT_NEW;
+ 		nf_conntrack_get(skb->nfct);

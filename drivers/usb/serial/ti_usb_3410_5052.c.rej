@@ -1,0 +1,87 @@
+--- drivers/usb/serial/ti_usb_3410_5052.c
++++ drivers/usb/serial/ti_usb_3410_5052.c
+@@ -172,7 +166,8 @@
+ 	{ USB_DEVICE(IBM_VENDOR_ID, IBM_4543_PRODUCT_ID) },
+ 	{ USB_DEVICE(IBM_VENDOR_ID, IBM_454B_PRODUCT_ID) },
+ 	{ USB_DEVICE(IBM_VENDOR_ID, IBM_454C_PRODUCT_ID) },
+-	{ USB_DEVICE(ABBOTT_VENDOR_ID, ABBOTT_PRODUCT_ID) },
++	{ USB_DEVICE(ABBOTT_VENDOR_ID, ABBOTT_STEREO_PLUG_ID) },
++	{ USB_DEVICE(ABBOTT_VENDOR_ID, ABBOTT_STRIP_PORT_ID) },
+ 	{ USB_DEVICE(TI_VENDOR_ID, FRI2_PRODUCT_ID) },
+ };
+ 
+@@ -428,7 +427,7 @@
+ 		tport->tp_uart_base_addr = TI_UART1_BASE_ADDR;
+ 	else
+ 		tport->tp_uart_base_addr = TI_UART2_BASE_ADDR;
+-	tport->tp_closing_wait = closing_wait;
++	port->port.closing_wait = msecs_to_jiffies(10 * closing_wait);
+ 	init_waitqueue_head(&tport->tp_write_wait);
+ 	if (kfifo_alloc(&tport->write_fifo, TI_WRITE_BUF_SIZE, GFP_KERNEL)) {
+ 		kfree(tport);
+@@ -1116,7 +1077,7 @@
+ 		else
+ 			ti_recv(port, urb->transfer_buffer, urb->actual_length);
+ 		spin_lock(&tport->tp_lock);
+-		tport->tp_icount.rx += urb->actual_length;
++		port->icount.rx += urb->actual_length;
+ 		spin_unlock(&tport->tp_lock);
+ 	}
+ 
+@@ -1381,56 +1349,6 @@
+ }
+ 
+ 
+-static void ti_drain(struct ti_port *tport, unsigned long timeout, int flush)
+-{
+-	struct ti_device *tdev = tport->tp_tdev;
+-	struct usb_serial_port *port = tport->tp_port;
+-	wait_queue_t wait;
+-
+-	spin_lock_irq(&tport->tp_lock);
+-
+-	/* wait for data to drain from the buffer */
+-	tdev->td_urb_error = 0;
+-	init_waitqueue_entry(&wait, current);
+-	add_wait_queue(&tport->tp_write_wait, &wait);
+-	for (;;) {
+-		set_current_state(TASK_INTERRUPTIBLE);
+-		if (kfifo_len(&tport->write_fifo) == 0
+-		|| timeout == 0 || signal_pending(current)
+-		|| tdev->td_urb_error
+-		|| port->serial->disconnected)  /* disconnect */
+-			break;
+-		spin_unlock_irq(&tport->tp_lock);
+-		timeout = schedule_timeout(timeout);
+-		spin_lock_irq(&tport->tp_lock);
+-	}
+-	set_current_state(TASK_RUNNING);
+-	remove_wait_queue(&tport->tp_write_wait, &wait);
+-
+-	/* flush any remaining data in the buffer */
+-	if (flush)
+-		kfifo_reset_out(&tport->write_fifo);
+-
+-	spin_unlock_irq(&tport->tp_lock);
+-
+-	mutex_lock(&port->serial->disc_mutex);
+-	/* wait for data to drain from the device */
+-	/* wait for empty tx register, plus 20 ms */
+-	timeout += jiffies;
+-	tport->tp_lsr &= ~TI_LSR_TX_EMPTY;
+-	while ((long)(jiffies - timeout) < 0 && !signal_pending(current)
+-	&& !(tport->tp_lsr&TI_LSR_TX_EMPTY) && !tdev->td_urb_error
+-	&& !port->serial->disconnected) {
+-		if (ti_get_lsr(tport))
+-			break;
+-		mutex_unlock(&port->serial->disc_mutex);
+-		msleep_interruptible(20);
+-		mutex_lock(&port->serial->disc_mutex);
+-	}
+-	mutex_unlock(&port->serial->disc_mutex);
+-}
+-
+-
+ static void ti_stop_read(struct ti_port *tport, struct tty_struct *tty)
+ {
+ 	unsigned long flags;

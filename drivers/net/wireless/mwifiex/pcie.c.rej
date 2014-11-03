@@ -1,0 +1,36 @@
+--- drivers/net/wireless/mwifiex/pcie.c
++++ drivers/net/wireless/mwifiex/pcie.c
+@@ -287,18 +287,13 @@
+ }
+ 
+ /*
+- * This function wakes up the card.
+- *
+- * A host power up command is written to the card configuration
+- * register to wake up the card.
++ * This function adds delay loop to ensure FW is awake before proceeding.
+  */
+-static int mwifiex_pm_wakeup_card(struct mwifiex_adapter *adapter)
++static void mwifiex_pcie_dev_wakeup_delay(struct mwifiex_adapter *adapter)
+ {
+ 	int i = 0;
+-	struct pcie_service_card *card = adapter->card;
+-	const struct mwifiex_pcie_card_reg *reg = card->pcie.reg;
+ 
+-	while (reg->sleep_cookie && mwifiex_pcie_ok_to_access_hw(adapter)) {
++	while (mwifiex_pcie_ok_to_access_hw(adapter)) {
+ 		i++;
+ 		usleep_range(10, 20);
+ 		/* 50ms max wait */
+@@ -2298,9 +2310,9 @@
+ 	if (pdev) {
+ 		pci_iounmap(pdev, card->pci_mmap);
+ 		pci_iounmap(pdev, card->pci_mmap1);
+-
+-		pci_release_regions(pdev);
+ 		pci_disable_device(pdev);
++		pci_release_region(pdev, 2);
++		pci_release_region(pdev, 0);
+ 		pci_set_drvdata(pdev, NULL);
+ 	}
+ }

@@ -1,0 +1,39 @@
+--- fs/fifo.c
++++ fs/fifo.c
+@@ -14,7 +14,7 @@
+ #include <linux/sched.h>
+ #include <linux/pipe_fs_i.h>
+ 
+-static void wait_for_partner(struct inode* inode, unsigned int *cnt)
++static int wait_for_partner(struct inode* inode, unsigned int *cnt)
+ {
+ 	int cur = *cnt;	
+ 
+@@ -23,6 +23,7 @@
+ 		if (signal_pending(current))
+ 			break;
+ 	}
++	return cur == *cnt ? -ERESTARTSYS : 0;
+ }
+ 
+ static void wake_up_partner(struct inode* inode)
+@@ -67,8 +68,7 @@
+ 				 * seen a writer */
+ 				filp->f_version = pipe->w_counter;
+ 			} else {
+-				wait_for_partner(inode, &pipe->w_counter);
+-				if(signal_pending(current))
++				if (wait_for_partner(inode, &pipe->w_counter))
+ 					goto err_rd;
+ 			}
+ 		}
+@@ -90,8 +90,7 @@
+ 			wake_up_partner(inode);
+ 
+ 		if (!pipe->readers) {
+-			wait_for_partner(inode, &pipe->r_counter);
+-			if (signal_pending(current))
++			if (wait_for_partner(inode, &pipe->r_counter))
+ 				goto err_wr;
+ 		}
+ 		break;

@@ -1,0 +1,12 @@
+--- arch/arm/include/asm/system_misc.h
++++ arch/arm/include/asm/system_misc.h
+@@ -21,9 +21,6 @@
+ 
+ extern unsigned int user_debug;
+ 
+-extern void disable_hlt(void);
+-extern void enable_hlt(void);
+-
+ #endif /* !__ASSEMBLY__ */
+ 
+ #endif /* __ASM_ARM_SYSTEM_MISC_H */

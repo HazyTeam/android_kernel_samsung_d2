@@ -1,0 +1,11 @@
+--- drivers/net/wireless/rt2x00/rt2800lib.c
++++ drivers/net/wireless/rt2x00/rt2800lib.c
+@@ -2449,7 +2503,7 @@
+ 	/*
+ 	 * Check if temperature compensation is supported.
+ 	 */
+-	if (tssi_bounds[4] == 0xff)
++	if (tssi_bounds[4] == 0xff || step == 0xff)
+ 		return 0;
+ 
+ 	/*

@@ -1,0 +1,10 @@
+--- net/bridge/br_if.c
++++ net/bridge/br_if.c
+@@ -240,6 +240,7 @@
+ 		return -ENOMEM;
+ 
+ 	dev_net_set(dev, net);
++	dev->rtnl_link_ops = &br_link_ops;
+ 
+ 	res = register_netdev(dev);
+ 	if (res)

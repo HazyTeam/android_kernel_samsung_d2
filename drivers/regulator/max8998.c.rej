@@ -1,0 +1,14 @@
+--- drivers/regulator/max8998.c
++++ drivers/regulator/max8998.c
+@@ -445,9 +445,9 @@
+ 	if (max8998->iodev->type == TYPE_MAX8998 && !(val & MAX8998_ENRAMP))
+ 		return 0;
+ 
+-	difference = (new_selector - old_selector) * desc->step;
++	difference = (new_selector - old_selector) * desc->step / 1000;
+ 	if (difference > 0)
+-		return difference / ((val & 0x0f) + 1);
++		return DIV_ROUND_UP(difference, (val & 0x0f) + 1);
+ 
+ 	return 0;
+ }

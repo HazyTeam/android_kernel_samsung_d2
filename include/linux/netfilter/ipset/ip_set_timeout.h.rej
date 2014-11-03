@@ -1,0 +1,13 @@
+--- include/linux/netfilter/ipset/ip_set_timeout.h
++++ include/linux/netfilter/ipset/ip_set_timeout.h
+@@ -30,6 +30,10 @@
+ {
+ 	unsigned int timeout = ip_set_get_h32(tb);
+ 
++	/* Normalize to fit into jiffies */
++	if (timeout > UINT_MAX/MSEC_PER_SEC)
++		timeout = UINT_MAX/MSEC_PER_SEC;
++
+ 	/* Userspace supplied TIMEOUT parameter: adjust crazy size */
+ 	return timeout == IPSET_NO_TIMEOUT ? IPSET_NO_TIMEOUT - 1 : timeout;
+ }

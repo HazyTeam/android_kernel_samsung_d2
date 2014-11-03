@@ -1,0 +1,11 @@
+--- arch/unicore32/include/asm/cmpxchg.h
++++ arch/unicore32/include/asm/cmpxchg.h
+@@ -35,7 +35,7 @@
+ 			: "memory", "cc");
+ 		break;
+ 	default:
+-		ret = __xchg_bad_pointer();
++		__xchg_bad_pointer();
+ 	}
+ 
+ 	return ret;

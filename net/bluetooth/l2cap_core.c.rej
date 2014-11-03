@@ -1,0 +1,336 @@
+--- net/bluetooth/l2cap_core.c
++++ net/bluetooth/l2cap_core.c
+@@ -571,7 +571,7 @@
+ 		chan->conn = NULL;
+ 
+ 		if (chan->chan_type != L2CAP_CHAN_CONN_FIX_A2MP)
+-			hci_conn_put(conn->hcon);
++			hci_conn_drop(conn->hcon);
+ 
+ 		if (mgr && mgr->bredr_chan == chan)
+ 			mgr->bredr_chan = NULL;
+@@ -1446,6 +1446,89 @@
+ 	l2cap_conn_start(conn);
+ }
+ 
++/*
++ * l2cap_user
++ * External modules can register l2cap_user objects on l2cap_conn. The ->probe
++ * callback is called during registration. The ->remove callback is called
++ * during unregistration.
++ * An l2cap_user object can either be explicitly unregistered or when the
++ * underlying l2cap_conn object is deleted. This guarantees that l2cap->hcon,
++ * l2cap->hchan, .. are valid as long as the remove callback hasn't been called.
++ * External modules must own a reference to the l2cap_conn object if they intend
++ * to call l2cap_unregister_user(). The l2cap_conn object might get destroyed at
++ * any time if they don't.
++ */
++
++int l2cap_register_user(struct l2cap_conn *conn, struct l2cap_user *user)
++{
++	struct hci_dev *hdev = conn->hcon->hdev;
++	int ret;
++
++	/* We need to check whether l2cap_conn is registered. If it is not, we
++	 * must not register the l2cap_user. l2cap_conn_del() is unregisters
++	 * l2cap_conn objects, but doesn't provide its own locking. Instead, it
++	 * relies on the parent hci_conn object to be locked. This itself relies
++	 * on the hci_dev object to be locked. So we must lock the hci device
++	 * here, too. */
++
++	hci_dev_lock(hdev);
++
++	if (user->list.next || user->list.prev) {
++		ret = -EINVAL;
++		goto out_unlock;
++	}
++
++	/* conn->hchan is NULL after l2cap_conn_del() was called */
++	if (!conn->hchan) {
++		ret = -ENODEV;
++		goto out_unlock;
++	}
++
++	ret = user->probe(conn, user);
++	if (ret)
++		goto out_unlock;
++
++	list_add(&user->list, &conn->users);
++	ret = 0;
++
++out_unlock:
++	hci_dev_unlock(hdev);
++	return ret;
++}
++EXPORT_SYMBOL(l2cap_register_user);
++
++void l2cap_unregister_user(struct l2cap_conn *conn, struct l2cap_user *user)
++{
++	struct hci_dev *hdev = conn->hcon->hdev;
++
++	hci_dev_lock(hdev);
++
++	if (!user->list.next || !user->list.prev)
++		goto out_unlock;
++
++	list_del(&user->list);
++	user->list.next = NULL;
++	user->list.prev = NULL;
++	user->remove(conn, user);
++
++out_unlock:
++	hci_dev_unlock(hdev);
++}
++EXPORT_SYMBOL(l2cap_unregister_user);
++
++static void l2cap_unregister_all_users(struct l2cap_conn *conn)
++{
++	struct l2cap_user *user;
++
++	while (!list_empty(&conn->users)) {
++		user = list_first_entry(&conn->users, struct l2cap_user, list);
++		list_del(&user->list);
++		user->list.next = NULL;
++		user->list.prev = NULL;
++		user->remove(conn, user);
++	}
++}
++
+ static void l2cap_conn_del(struct hci_conn *hcon, int err)
+ {
+ 	struct l2cap_conn *conn = hcon->l2cap_data;
+@@ -1458,6 +1541,8 @@
+ 
+ 	kfree_skb(conn->rx_skb);
+ 
++	l2cap_unregister_all_users(conn);
++
+ 	mutex_lock(&conn->chan_lock);
+ 
+ 	/* Kill channels */
+@@ -1486,7 +1571,8 @@
+ 	}
+ 
+ 	hcon->l2cap_data = NULL;
+-	kfree(conn);
++	conn->hchan = NULL;
++	l2cap_conn_put(conn);
+ }
+ 
+ static void security_timeout(struct work_struct *work)
+@@ -1502,12 +1588,12 @@
+ 	}
+ }
+ 
+-static struct l2cap_conn *l2cap_conn_add(struct hci_conn *hcon, u8 status)
++static struct l2cap_conn *l2cap_conn_add(struct hci_conn *hcon)
+ {
+ 	struct l2cap_conn *conn = hcon->l2cap_data;
+ 	struct hci_chan *hchan;
+ 
+-	if (conn || status)
++	if (conn)
+ 		return conn;
+ 
+ 	hchan = hci_chan_create(hcon);
+@@ -1520,8 +1606,10 @@
+ 		return NULL;
+ 	}
+ 
++	kref_init(&conn->ref);
+ 	hcon->l2cap_data = conn;
+ 	conn->hcon = hcon;
++	hci_conn_get(conn->hcon);
+ 	conn->hchan = hchan;
+ 
+ 	BT_DBG("hcon %p conn %p hchan %p", hcon, conn, hchan);
+@@ -1547,6 +1635,7 @@
+ 	mutex_init(&conn->chan_lock);
+ 
+ 	INIT_LIST_HEAD(&conn->chan_l);
++	INIT_LIST_HEAD(&conn->users);
+ 
+ 	if (hcon->type == LE_LINK)
+ 		INIT_DELAYED_WORK(&conn->security_timer, security_timeout);
+@@ -1715,9 +1824,9 @@
+ 		goto done;
+ 	}
+ 
+-	conn = l2cap_conn_add(hcon, 0);
++	conn = l2cap_conn_add(hcon);
+ 	if (!conn) {
+-		hci_conn_put(hcon);
++		hci_conn_drop(hcon);
+ 		err = -ENOMEM;
+ 		goto done;
+ 	}
+@@ -3591,10 +3703,14 @@
+ }
+ 
+ static inline int l2cap_command_rej(struct l2cap_conn *conn,
+-				    struct l2cap_cmd_hdr *cmd, u8 *data)
++				    struct l2cap_cmd_hdr *cmd, u16 cmd_len,
++				    u8 *data)
+ {
+ 	struct l2cap_cmd_rej_unk *rej = (struct l2cap_cmd_rej_unk *) data;
+ 
++	if (cmd_len < sizeof(*rej))
++		return -EPROTO;
++
+ 	if (rej->reason != L2CAP_REJ_NOT_UNDERSTOOD)
+ 		return 0;
+ 
+@@ -3743,11 +3859,14 @@
+ }
+ 
+ static int l2cap_connect_req(struct l2cap_conn *conn,
+-			     struct l2cap_cmd_hdr *cmd, u8 *data)
++			     struct l2cap_cmd_hdr *cmd, u16 cmd_len, u8 *data)
+ {
+ 	struct hci_dev *hdev = conn->hcon->hdev;
+ 	struct hci_conn *hcon = conn->hcon;
+ 
++	if (cmd_len < sizeof(struct l2cap_conn_req))
++		return -EPROTO;
++
+ 	hci_dev_lock(hdev);
+ 	if (test_bit(HCI_MGMT, &hdev->dev_flags) &&
+ 	    !test_and_set_bit(HCI_CONN_MGMT_CONNECTED, &hcon->flags))
+@@ -3761,7 +3880,8 @@
+ }
+ 
+ static int l2cap_connect_create_rsp(struct l2cap_conn *conn,
+-				    struct l2cap_cmd_hdr *cmd, u8 *data)
++				    struct l2cap_cmd_hdr *cmd, u16 cmd_len,
++				    u8 *data)
+ {
+ 	struct l2cap_conn_rsp *rsp = (struct l2cap_conn_rsp *) data;
+ 	u16 scid, dcid, result, status;
+@@ -3895,7 +4021,7 @@
+ 
+ 	/* Reject if config buffer is too small. */
+ 	len = cmd_len - sizeof(*req);
+-	if (len < 0 || chan->conf_len + len > sizeof(chan->conf_req)) {
++	if (chan->conf_len + len > sizeof(chan->conf_req)) {
+ 		l2cap_send_cmd(conn, cmd->ident, L2CAP_CONF_RSP,
+ 			       l2cap_build_conf_rsp(chan, rsp,
+ 			       L2CAP_CONF_REJECT, flags), rsp);
+@@ -3973,14 +4099,18 @@
+ }
+ 
+ static inline int l2cap_config_rsp(struct l2cap_conn *conn,
+-				   struct l2cap_cmd_hdr *cmd, u8 *data)
++				   struct l2cap_cmd_hdr *cmd, u16 cmd_len,
++				   u8 *data)
+ {
+ 	struct l2cap_conf_rsp *rsp = (struct l2cap_conf_rsp *)data;
+ 	u16 scid, flags, result;
+ 	struct l2cap_chan *chan;
+-	int len = le16_to_cpu(cmd->len) - sizeof(*rsp);
++	int len = cmd_len - sizeof(*rsp);
+ 	int err = 0;
+ 
++	if (cmd_len < sizeof(*rsp))
++		return -EPROTO;
++
+ 	scid   = __le16_to_cpu(rsp->scid);
+ 	flags  = __le16_to_cpu(rsp->flags);
+ 	result = __le16_to_cpu(rsp->result);
+@@ -4081,7 +4211,8 @@
+ }
+ 
+ static inline int l2cap_disconnect_req(struct l2cap_conn *conn,
+-				       struct l2cap_cmd_hdr *cmd, u8 *data)
++				       struct l2cap_cmd_hdr *cmd, u16 cmd_len,
++				       u8 *data)
+ {
+ 	struct l2cap_disconn_req *req = (struct l2cap_disconn_req *) data;
+ 	struct l2cap_disconn_rsp rsp;
+@@ -4131,12 +4265,16 @@
+ }
+ 
+ static inline int l2cap_disconnect_rsp(struct l2cap_conn *conn,
+-				       struct l2cap_cmd_hdr *cmd, u8 *data)
++				       struct l2cap_cmd_hdr *cmd, u16 cmd_len,
++				       u8 *data)
+ {
+ 	struct l2cap_disconn_rsp *rsp = (struct l2cap_disconn_rsp *) data;
+ 	u16 dcid, scid;
+ 	struct l2cap_chan *chan;
+ 
++	if (cmd_len != sizeof(*rsp))
++		return -EPROTO;
++
+ 	scid = __le16_to_cpu(rsp->scid);
+ 	dcid = __le16_to_cpu(rsp->dcid);
+ 
+@@ -4166,11 +4304,15 @@
+ }
+ 
+ static inline int l2cap_information_req(struct l2cap_conn *conn,
+-					struct l2cap_cmd_hdr *cmd, u8 *data)
++					struct l2cap_cmd_hdr *cmd, u16 cmd_len,
++					u8 *data)
+ {
+ 	struct l2cap_info_req *req = (struct l2cap_info_req *) data;
+ 	u16 type;
+ 
++	if (cmd_len != sizeof(*req))
++		return -EPROTO;
++
+ 	type = __le16_to_cpu(req->type);
+ 
+ 	BT_DBG("type 0x%4.4x", type);
+@@ -4217,11 +4359,15 @@
+ }
+ 
+ static inline int l2cap_information_rsp(struct l2cap_conn *conn,
+-					struct l2cap_cmd_hdr *cmd, u8 *data)
++					struct l2cap_cmd_hdr *cmd, u16 cmd_len,
++					u8 *data)
+ {
+ 	struct l2cap_info_rsp *rsp = (struct l2cap_info_rsp *) data;
+ 	u16 type, result;
+ 
++	if (cmd_len < sizeof(*rsp))
++		return -EPROTO;
++
+ 	type   = __le16_to_cpu(rsp->type);
+ 	result = __le16_to_cpu(rsp->result);
+ 
+@@ -5087,16 +5233,16 @@
+ 
+ 	switch (cmd->code) {
+ 	case L2CAP_COMMAND_REJ:
+-		l2cap_command_rej(conn, cmd, data);
++		l2cap_command_rej(conn, cmd, cmd_len, data);
+ 		break;
+ 
+ 	case L2CAP_CONN_REQ:
+-		err = l2cap_connect_req(conn, cmd, data);
++		err = l2cap_connect_req(conn, cmd, cmd_len, data);
+ 		break;
+ 
+ 	case L2CAP_CONN_RSP:
+ 	case L2CAP_CREATE_CHAN_RSP:
+-		err = l2cap_connect_create_rsp(conn, cmd, data);
++		err = l2cap_connect_create_rsp(conn, cmd, cmd_len, data);
+ 		break;
+ 
+ 	case L2CAP_CONF_REQ:
+@@ -6237,12 +6383,13 @@
+ 	kfree_skb(skb);
+ }
+ 
+-static void l2cap_att_channel(struct l2cap_conn *conn, u16 cid,
++static void l2cap_att_channel(struct l2cap_conn *conn,
+ 			      struct sk_buff *skb)
+ {
+ 	struct l2cap_chan *chan;
+ 
+-	chan = l2cap_global_chan_by_scid(0, cid, conn->src, conn->dst);
++	chan = l2cap_global_chan_by_scid(0, L2CAP_CID_LE_DATA,
++					 conn->src, conn->dst);
+ 	if (!chan)
+ 		goto drop;
+ 

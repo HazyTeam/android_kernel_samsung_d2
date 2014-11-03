@@ -1,0 +1,35 @@
+--- drivers/base/power/runtime.c
++++ drivers/base/power/runtime.c
+@@ -390,7 +392,6 @@
+ 		goto repeat;
+ 	}
+ 
+-	dev->power.deferred_resume = false;
+ 	if (dev->power.no_callbacks)
+ 		goto no_callback;	/* Assume success. */
+ 
+@@ -436,6 +431,7 @@
+ 	wake_up_all(&dev->power.wait_queue);
+ 
+ 	if (dev->power.deferred_resume) {
++		dev->power.deferred_resume = false;
+ 		rpm_resume(dev, 0);
+ 		retval = -EAGAIN;
+ 		goto out;
+@@ -580,6 +576,7 @@
+ 		    || dev->parent->power.runtime_status == RPM_ACTIVE) {
+ 			atomic_inc(&dev->parent->power.child_count);
+ 			spin_unlock(&dev->parent->power.lock);
++			retval = 1;
+ 			goto no_callback;	/* Assume success. */
+ 		}
+ 		spin_unlock(&dev->parent->power.lock);
+@@ -660,7 +657,7 @@
+ 	}
+ 	wake_up_all(&dev->power.wait_queue);
+ 
+-	if (!retval)
++	if (retval >= 0)
+ 		rpm_idle(dev, RPM_ASYNC);
+ 
+  out:

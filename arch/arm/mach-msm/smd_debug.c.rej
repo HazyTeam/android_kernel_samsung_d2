@@ -1,0 +1,19 @@
+--- arch/arm/mach-msm/smd_debug.c
++++ arch/arm/mach-msm/smd_debug.c
+@@ -216,7 +216,7 @@
+ 	debugfs_create_file(name, mode, dent, fill, &debug_ops);
+ }
+ 
+-static int smd_debugfs_init(void)
++int __init smd_debugfs_init(void)
+ {
+ 	struct dentry *dent;
+ 
+@@ -234,7 +234,6 @@
+ 	return 0;
+ }
+ 
+-late_initcall(smd_debugfs_init);
+ #endif
+ 
+ 

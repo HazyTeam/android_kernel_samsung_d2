@@ -1,0 +1,61 @@
+--- drivers/usb/storage/uas.c
++++ drivers/usb/storage/uas.c
+@@ -66,6 +66,8 @@
+ 	DATA_OUT_URB_INFLIGHT   = (1 << 10),
+ 	COMMAND_COMPLETED       = (1 << 11),
+ 	COMMAND_ABORTED         = (1 << 12),
++	UNLINK_DATA_URBS        = (1 << 13),
++	IS_IN_WORK_LIST         = (1 << 14),
+ };
+ 
+ /* Overrides scsi_pointer */
+@@ -234,7 +302,7 @@
+ 	struct uas_cmd_info *ci = (void *)&cmnd->SCp;
+ 
+ 	scmd_printk(KERN_INFO, cmnd, "%s %p tag %d, inflight:"
+-		    "%s%s%s%s%s%s%s%s%s%s%s%s\n",
++		    "%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+ 		    caller, cmnd, cmnd->request->tag,
+ 		    (ci->state & SUBMIT_STATUS_URB)     ? " s-st"  : "",
+ 		    (ci->state & ALLOC_DATA_IN_URB)     ? " a-in"  : "",
+@@ -247,7 +315,9 @@
+ 		    (ci->state & DATA_IN_URB_INFLIGHT)  ? " IN"    : "",
+ 		    (ci->state & DATA_OUT_URB_INFLIGHT) ? " OUT"   : "",
+ 		    (ci->state & COMMAND_COMPLETED)     ? " done"  : "",
+-		    (ci->state & COMMAND_ABORTED)       ? " abort" : "");
++		    (ci->state & COMMAND_ABORTED)       ? " abort" : "",
++		    (ci->state & UNLINK_DATA_URBS)      ? " unlink": "",
++		    (ci->state & IS_IN_WORK_LIST)       ? " work"  : "");
+ }
+ 
+ static int uas_try_complete(struct scsi_cmnd *cmnd, const char *caller)
+@@ -258,7 +328,8 @@
+ 	WARN_ON(!spin_is_locked(&devinfo->lock));
+ 	if (cmdinfo->state & (COMMAND_INFLIGHT |
+ 			      DATA_IN_URB_INFLIGHT |
+-			      DATA_OUT_URB_INFLIGHT))
++			      DATA_OUT_URB_INFLIGHT |
++			      UNLINK_DATA_URBS))
+ 		return -EBUSY;
+ 	BUG_ON(cmdinfo->state & COMMAND_COMPLETED);
+ 	cmdinfo->state |= COMMAND_COMPLETED;
+@@ -341,16 +413,9 @@
+ 			uas_sense(urb, cmnd);
+ 		if (cmnd->result != 0) {
+ 			/* cancel data transfers on error */
+-			if (cmdinfo->state & DATA_IN_URB_INFLIGHT) {
+-				spin_unlock_irqrestore(&devinfo->lock, flags);
+-				usb_unlink_urb(cmdinfo->data_in_urb);
+-				spin_lock_irqsave(&devinfo->lock, flags);
+-			}
+-			if (cmdinfo->state & DATA_OUT_URB_INFLIGHT) {
+-				spin_unlock_irqrestore(&devinfo->lock, flags);
+-				usb_unlink_urb(cmdinfo->data_out_urb);
+-				spin_lock_irqsave(&devinfo->lock, flags);
+-			}
++			spin_unlock_irqrestore(&devinfo->lock, flags);
++			uas_unlink_data_urbs(devinfo, cmdinfo);
++			spin_lock_irqsave(&devinfo->lock, flags);
+ 		}
+ 		cmdinfo->state &= ~COMMAND_INFLIGHT;
+ 		uas_try_complete(cmnd, __func__);

@@ -1,0 +1,176 @@
+--- drivers/gpu/drm/i915/intel_dp.c
++++ drivers/gpu/drm/i915/intel_dp.c
+@@ -699,11 +638,31 @@
+ 		      "max bw %02x pixel clock %iKHz\n",
+ 		      max_lane_count, bws[max_clock], adjusted_mode->clock);
+ 
+-	if (!intel_dp_adjust_dithering(intel_dp, adjusted_mode, true))
+-		return false;
++	/* Walk through all bpp values. Luckily they're all nicely spaced with 2
++	 * bpc in between. */
++	bpp = min_t(int, 8*3, pipe_config->pipe_bpp);
++	if (is_edp(intel_dp) && dev_priv->edp.bpp)
++		bpp = min_t(int, bpp, dev_priv->edp.bpp);
++
++	for (; bpp >= 6*3; bpp -= 2*3) {
++		mode_rate = intel_dp_link_required(target_clock, bpp);
++
++		for (clock = 0; clock <= max_clock; clock++) {
++			for (lane_count = 1; lane_count <= max_lane_count; lane_count <<= 1) {
++				link_clock = drm_dp_bw_code_to_link_rate(bws[clock]);
++				link_avail = intel_dp_max_data_rate(link_clock,
++								    lane_count);
+ 
+-	bpp = adjusted_mode->private_flags & INTEL_MODE_DP_FORCE_6BPC ? 18 : 24;
++				if (mode_rate <= link_avail) {
++					goto found;
++				}
++			}
++		}
++	}
+ 
++	return false;
++
++found:
+ 	if (intel_dp->color_range_auto) {
+ 		/*
+ 		 * See:
+@@ -717,104 +676,25 @@
+ 	}
+ 
+ 	if (intel_dp->color_range)
+-		adjusted_mode->private_flags |= INTEL_MODE_LIMITED_COLOR_RANGE;
+-
+-	mode_rate = intel_dp_link_required(adjusted_mode->clock, bpp);
+-
+-	for (clock = 0; clock <= max_clock; clock++) {
+-		for (lane_count = 1; lane_count <= max_lane_count; lane_count <<= 1) {
+-			int link_bw_clock =
+-				drm_dp_bw_code_to_link_rate(bws[clock]);
+-			int link_avail = intel_dp_max_data_rate(link_bw_clock,
+-								lane_count);
+-
+-			if (mode_rate <= link_avail) {
+-				intel_dp->link_bw = bws[clock];
+-				intel_dp->lane_count = lane_count;
+-				adjusted_mode->clock = link_bw_clock;
+-				DRM_DEBUG_KMS("DP link bw %02x lane "
+-						"count %d clock %d bpp %d\n",
+-				       intel_dp->link_bw, intel_dp->lane_count,
+-				       adjusted_mode->clock, bpp);
+-				DRM_DEBUG_KMS("DP link bw required %i available %i\n",
+-					      mode_rate, link_avail);
+-				return true;
+-			}
+-		}
+-	}
++		pipe_config->limited_color_range = true;
+ 
+-	return false;
+-}
++	intel_dp->link_bw = bws[clock];
++	intel_dp->lane_count = lane_count;
++	adjusted_mode->clock = drm_dp_bw_code_to_link_rate(intel_dp->link_bw);
++	pipe_config->pipe_bpp = bpp;
++	pipe_config->pixel_target_clock = target_clock;
+ 
+-void
+-intel_dp_set_m_n(struct drm_crtc *crtc, struct drm_display_mode *mode,
+-		 struct drm_display_mode *adjusted_mode)
+-{
+-	struct drm_device *dev = crtc->dev;
+-	struct intel_encoder *intel_encoder;
+-	struct intel_dp *intel_dp;
+-	struct drm_i915_private *dev_priv = dev->dev_private;
+-	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+-	int lane_count = 4;
+-	struct intel_link_m_n m_n;
+-	int pipe = intel_crtc->pipe;
+-	enum transcoder cpu_transcoder = intel_crtc->cpu_transcoder;
+-	int target_clock;
++	DRM_DEBUG_KMS("DP link bw %02x lane count %d clock %d bpp %d\n",
++		      intel_dp->link_bw, intel_dp->lane_count,
++		      adjusted_mode->clock, bpp);
++	DRM_DEBUG_KMS("DP link bw required %i available %i\n",
++		      mode_rate, link_avail);
+ 
+-	/*
+-	 * Find the lane count in the intel_encoder private
+-	 */
+-	for_each_encoder_on_crtc(dev, crtc, intel_encoder) {
+-		intel_dp = enc_to_intel_dp(&intel_encoder->base);
++	intel_link_compute_m_n(bpp, lane_count,
++			       target_clock, adjusted_mode->clock,
++			       &pipe_config->dp_m_n);
+ 
+-		if (intel_encoder->type == INTEL_OUTPUT_DISPLAYPORT ||
+-		    intel_encoder->type == INTEL_OUTPUT_EDP)
+-		{
+-			lane_count = intel_dp->lane_count;
+-			break;
+-		}
+-	}
+-
+-	target_clock = mode->clock;
+-	for_each_encoder_on_crtc(dev, crtc, intel_encoder) {
+-		if (intel_encoder->type == INTEL_OUTPUT_EDP) {
+-			target_clock = intel_edp_target_clock(intel_encoder,
+-							      mode);
+-			break;
+-		}
+-	}
+-
+-	/*
+-	 * Compute the GMCH and Link ratios. The '3' here is
+-	 * the number of bytes_per_pixel post-LUT, which we always
+-	 * set up for 8-bits of R/G/B, or 3 bytes total.
+-	 */
+-	intel_link_compute_m_n(intel_crtc->bpp, lane_count,
+-			       target_clock, adjusted_mode->clock, &m_n);
+-
+-	if (IS_HASWELL(dev)) {
+-		I915_WRITE(PIPE_DATA_M1(cpu_transcoder),
+-			   TU_SIZE(m_n.tu) | m_n.gmch_m);
+-		I915_WRITE(PIPE_DATA_N1(cpu_transcoder), m_n.gmch_n);
+-		I915_WRITE(PIPE_LINK_M1(cpu_transcoder), m_n.link_m);
+-		I915_WRITE(PIPE_LINK_N1(cpu_transcoder), m_n.link_n);
+-	} else if (HAS_PCH_SPLIT(dev)) {
+-		I915_WRITE(TRANSDATA_M1(pipe), TU_SIZE(m_n.tu) | m_n.gmch_m);
+-		I915_WRITE(TRANSDATA_N1(pipe), m_n.gmch_n);
+-		I915_WRITE(TRANSDPLINK_M1(pipe), m_n.link_m);
+-		I915_WRITE(TRANSDPLINK_N1(pipe), m_n.link_n);
+-	} else if (IS_VALLEYVIEW(dev)) {
+-		I915_WRITE(PIPE_DATA_M1(pipe), TU_SIZE(m_n.tu) | m_n.gmch_m);
+-		I915_WRITE(PIPE_DATA_N1(pipe), m_n.gmch_n);
+-		I915_WRITE(PIPE_LINK_M1(pipe), m_n.link_m);
+-		I915_WRITE(PIPE_LINK_N1(pipe), m_n.link_n);
+-	} else {
+-		I915_WRITE(PIPE_GMCH_DATA_M(pipe),
+-			   TU_SIZE(m_n.tu) | m_n.gmch_m);
+-		I915_WRITE(PIPE_GMCH_DATA_N(pipe), m_n.gmch_n);
+-		I915_WRITE(PIPE_DP_LINK_M(pipe), m_n.link_m);
+-		I915_WRITE(PIPE_DP_LINK_N(pipe), m_n.link_n);
+-	}
++	return true;
+ }
+ 
+ void intel_dp_init_link_config(struct intel_dp *intel_dp)
+@@ -2560,17 +2523,14 @@
+ static void
+ intel_dp_destroy(struct drm_connector *connector)
+ {
+-	struct drm_device *dev = connector->dev;
+ 	struct intel_dp *intel_dp = intel_attached_dp(connector);
+ 	struct intel_connector *intel_connector = to_intel_connector(connector);
+ 
+ 	if (!IS_ERR_OR_NULL(intel_connector->edid))
+ 		kfree(intel_connector->edid);
+ 
+-	if (is_edp(intel_dp)) {
+-		intel_panel_destroy_backlight(dev);
++	if (is_edp(intel_dp))
+ 		intel_panel_fini(&intel_connector->panel);
+-	}
+ 
+ 	drm_sysfs_connector_remove(connector);
+ 	drm_connector_cleanup(connector);

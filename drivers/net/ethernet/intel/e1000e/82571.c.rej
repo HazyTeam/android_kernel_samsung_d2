@@ -1,0 +1,17 @@
+--- drivers/net/ethernet/intel/e1000e/82571.c
++++ drivers/net/ethernet/intel/e1000e/82571.c
+@@ -1528,13 +1512,12 @@
+ 
+ 	ctrl = er32(CTRL);
+ 	status = er32(STATUS);
+-	rxcw = er32(RXCW);
++	er32(RXCW);
+ 	/* SYNCH bit and IV bit are sticky */
+ 	udelay(10);
+ 	rxcw = er32(RXCW);
+ 
+ 	if ((rxcw & E1000_RXCW_SYNCH) && !(rxcw & E1000_RXCW_IV)) {
+-
+ 		/* Receiver is synchronized with no invalid bits.  */
+ 		switch (mac->serdes_link_state) {
+ 		case e1000_serdes_link_autoneg_complete:

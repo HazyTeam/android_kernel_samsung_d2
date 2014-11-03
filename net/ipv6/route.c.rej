@@ -1,0 +1,29 @@
+--- net/ipv6/route.c
++++ net/ipv6/route.c
+@@ -885,7 +842,7 @@
+ 	dst_hold(&rt->dst);
+ 	read_unlock_bh(&table->tb6_lock);
+ 
+-	if (!rt->n && !(rt->rt6i_flags & (RTF_NONEXTHOP | RTF_LOCAL)))
++	if (!(rt->rt6i_flags & (RTF_NONEXTHOP | RTF_GATEWAY)))
+ 		nrt = rt6_alloc_cow(rt, &fl6->daddr, &fl6->saddr);
+ 	else if (!(rt->dst.flags & DST_HOST))
+ 		nrt = rt6_alloc_clone(rt, &fl6->daddr);
+@@ -1915,7 +1838,8 @@
+ restart:
+ 	read_lock_bh(&table->tb6_lock);
+ 	for (rt = table->tb6_root.leaf; rt; rt = rt->dst.rt6_next) {
+-		if (rt->rt6i_flags & (RTF_DEFAULT | RTF_ADDRCONF)) {
++		if (rt->rt6i_flags & (RTF_DEFAULT | RTF_ADDRCONF) &&
++		    (!rt->rt6i_idev || rt->rt6i_idev->cnf.accept_ra != 2)) {
+ 			dst_hold(&rt->dst);
+ 			read_unlock_bh(&table->tb6_lock);
+ 			ip6_del_rt(rt);
+@@ -2046,7 +1970,6 @@
+ {
+ 	struct net *net = dev_net(idev->dev);
+ 	struct rt6_info *rt = ip6_dst_alloc(net, net->loopback_dev, 0, NULL);
+-	int err;
+ 
+ 	if (!rt) {
+ 		net_warn_ratelimited("Maximum number of routes reached, consider increasing route/max_size\n");

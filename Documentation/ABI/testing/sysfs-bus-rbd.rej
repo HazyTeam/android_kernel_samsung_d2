@@ -1,0 +1,15 @@
+--- Documentation/ABI/testing/sysfs-bus-rbd
++++ Documentation/ABI/testing/sysfs-bus-rbd
+@@ -66,12 +75,6 @@
+ 
+ 	The current snapshot for which the device is mapped.
+ 
+-create_snap
+-
+-	Create a snapshot:
+-
+-	 $ echo <snap-name> > /sys/bus/rbd/devices/<dev-id>/snap_create
+-
+ snap_*
+ 
+ 	A directory per each snapshot

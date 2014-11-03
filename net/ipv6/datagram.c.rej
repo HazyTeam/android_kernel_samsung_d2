@@ -1,0 +1,25 @@
+--- net/ipv6/datagram.c
++++ net/ipv6/datagram.c
+@@ -377,18 +378,19 @@
+ 	if (serr->ee.ee_origin != SO_EE_ORIGIN_LOCAL) {
+ 		sin->sin6_family = AF_INET6;
+ 		sin->sin6_flowinfo = 0;
+-		sin->sin6_scope_id = 0;
+ 		if (skb->protocol == htons(ETH_P_IPV6)) {
+ 			sin->sin6_addr = ipv6_hdr(skb)->saddr;
+ 			if (np->rxopt.all)
+ 				ip6_datagram_recv_ctl(sk, msg, skb);
+-			if (ipv6_addr_type(&sin->sin6_addr) & IPV6_ADDR_LINKLOCAL)
+-				sin->sin6_scope_id = IP6CB(skb)->iif;
++			sin->sin6_scope_id =
++				ipv6_iface_scope_id(&sin->sin6_addr,
++						    IP6CB(skb)->iif);
+ 		} else {
+ 			struct inet_sock *inet = inet_sk(sk);
+ 
+ 			ipv6_addr_set_v4mapped(ip_hdr(skb)->saddr,
+ 					       &sin->sin6_addr);
++			sin->sin6_scope_id = 0;
+ 			if (inet->cmsg_flags)
+ 				ip_cmsg_recv(msg, skb);
+ 		}

@@ -29,6 +29,24 @@
 
 #ifndef __GENALLOC_H__
 #define __GENALLOC_H__
+
+struct device;
+struct device_node;
+
+/**
+ * Allocation callback function type definition
+ * @map: Pointer to bitmap
+ * @size: The bitmap size in bits
+ * @start: The bitnumber to start searching at
+ * @nr: The number of zeroed bits we're looking for
+ * @data: optional additional data used by @genpool_algo_t
+ */
+typedef unsigned long (*genpool_algo_t)(unsigned long *map,
+			unsigned long size,
+			unsigned long start,
+			unsigned int nr,
+			void *data);
+
 /*
  *  General purpose special memory pool descriptor.
  */
@@ -36,6 +54,9 @@ struct gen_pool {
 	spinlock_t lock;
 	struct list_head chunks;	/* list of chunks in this pool */
 	int min_alloc_order;		/* minimum allocation order */
+
+	genpool_algo_t algo;		/* allocation function */
+	void *data;
 };
 
 /*
@@ -96,4 +117,18 @@ gen_pool_alloc(struct gen_pool *pool, size_t size)
         return gen_pool_alloc_aligned(pool, size, 0);
 }
 
+extern struct gen_pool *devm_gen_pool_create(struct device *dev,
+		int min_alloc_order, int nid);
+extern struct gen_pool *dev_get_gen_pool(struct device *dev);
+
+#ifdef CONFIG_OF
+extern struct gen_pool *of_get_named_gen_pool(struct device_node *np,
+	const char *propname, int index);
+#else
+static inline struct gen_pool *of_get_named_gen_pool(struct device_node *np,
+	const char *propname, int index)
+{
+	return NULL;
+}
+#endif
 #endif /* __GENALLOC_H__ */

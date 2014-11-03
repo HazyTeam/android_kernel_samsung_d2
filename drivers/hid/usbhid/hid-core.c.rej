@@ -1,0 +1,121 @@
+--- drivers/hid/usbhid/hid-core.c
++++ drivers/hid/usbhid/hid-core.c
+@@ -446,7 +464,7 @@
+ 	else
+ 		usbhid->outtail = (usbhid->outtail + 1) & (HID_OUTPUT_FIFO_SIZE - 1);
+ 
+-	if (usbhid->outhead != usbhid->outtail && !hid_submit_out(hid)) {
++	if (!irq_out_pump_restart(hid)) {
+ 		/* Successfully submitted next urb in queue */
+ 		spin_unlock_irqrestore(&usbhid->lock, flags);
+ 		return;
+@@ -503,7 +530,7 @@
+ 	else
+ 		usbhid->ctrltail = (usbhid->ctrltail + 1) & (HID_CONTROL_FIFO_SIZE - 1);
+ 
+-	if (usbhid->ctrlhead != usbhid->ctrltail && !hid_submit_ctrl(hid)) {
++	if (!ctrl_pump_restart(hid)) {
+ 		/* Successfully submitted next urb in queue */
+ 		spin_unlock(&usbhid->lock);
+ 		return;
+@@ -562,11 +589,27 @@
+ 			 * the queue is known to run
+ 			 * but an earlier request may be stuck
+ 			 * we may need to time out
+-			 * no race because this is called under
++			 * no race because the URB is blocked under
+ 			 * spinlock
+ 			 */
+-			if (time_after(jiffies, usbhid->last_out + HZ * 5))
++			if (time_after(jiffies, usbhid->last_out + HZ * 5)) {
++				usb_block_urb(usbhid->urbout);
++				/* drop lock to not deadlock if the callback is called */
++				spin_unlock(&usbhid->lock);
+ 				usb_unlink_urb(usbhid->urbout);
++				spin_lock(&usbhid->lock);
++				usb_unblock_urb(usbhid->urbout);
++				/*
++				 * if the unlinking has already completed
++				 * the pump will have been stopped
++				 * it must be restarted now
++				 */
++				if (!test_bit(HID_OUT_RUNNING, &usbhid->iofl))
++					if (!irq_out_pump_restart(hid))
++						set_bit(HID_OUT_RUNNING, &usbhid->iofl);
++
++
++			}
+ 		}
+ 		return;
+ 	}
+@@ -610,11 +653,25 @@
+ 		 * the queue is known to run
+ 		 * but an earlier request may be stuck
+ 		 * we may need to time out
+-		 * no race because this is called under
++		 * no race because the URB is blocked under
+ 		 * spinlock
+ 		 */
+-		if (time_after(jiffies, usbhid->last_ctrl + HZ * 5))
++		if (time_after(jiffies, usbhid->last_ctrl + HZ * 5)) {
++			usb_block_urb(usbhid->urbctrl);
++			/* drop lock to not deadlock if the callback is called */
++			spin_unlock(&usbhid->lock);
+ 			usb_unlink_urb(usbhid->urbctrl);
++			spin_lock(&usbhid->lock);
++			usb_unblock_urb(usbhid->urbctrl);
++			/*
++			 * if the unlinking has already completed
++			 * the pump will have been stopped
++			 * it must be restarted now
++			 */
++			if (!test_bit(HID_CTRL_RUNNING, &usbhid->iofl))
++				if (!ctrl_pump_restart(hid))
++					set_bit(HID_CTRL_RUNNING, &usbhid->iofl);
++		}
+ 	}
+ }
+ 
+@@ -727,7 +784,7 @@
+ int usbhid_open(struct hid_device *hid)
+ {
+ 	struct usbhid_device *usbhid = hid->driver_data;
+-	int res;
++	int res = 0;
+ 
+ 	mutex_lock(&hid_open_mut);
+ 	if (!hid->open++) {
+@@ -735,17 +792,27 @@
+ 		/* the device must be awake to reliably request remote wakeup */
+ 		if (res < 0) {
+ 			hid->open--;
+-			mutex_unlock(&hid_open_mut);
+-			return -EIO;
++			res = -EIO;
++			goto done;
+ 		}
+ 		usbhid->intf->needs_remote_wakeup = 1;
+-		if (hid_start_in(hid))
+-			hid_io_error(hid);
+- 
++		res = hid_start_in(hid);
++		if (res) {
++			if (res != -ENOSPC) {
++				hid_io_error(hid);
++				res = 0;
++			} else {
++				/* no use opening if resources are insufficient */
++				hid->open--;
++				res = -EBUSY;
++				usbhid->intf->needs_remote_wakeup = 0;
++			}
++		}
+ 		usb_autopm_put_interface(usbhid->intf);
+ 	}
++done:
+ 	mutex_unlock(&hid_open_mut);
+-	return 0;
++	return res;
+ }
+ 
+ void usbhid_close(struct hid_device *hid)

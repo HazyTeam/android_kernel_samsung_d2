@@ -1,0 +1,11 @@
+--- scripts/kconfig/streamline_config.pl
++++ scripts/kconfig/streamline_config.pl
+@@ -601,6 +597,8 @@
+ 	if (defined($configs{$1})) {
+ 	    if ($localyesconfig) {
+ 	        $setconfigs{$1} = 'y';
++		print "$1=y\n";
++		next;
+ 	    } else {
+ 	        $setconfigs{$1} = $2;
+ 	    }

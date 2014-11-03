@@ -1,0 +1,151 @@
+--- arch/arm/Kconfig
++++ arch/arm/Kconfig
+@@ -15,6 +15,7 @@
+ 	select GENERIC_IRQ_SHOW
+ 	select GENERIC_PCI_IOMAP
+ 	select GENERIC_SMP_IDLE_THREAD
++	select GENERIC_IDLE_POLL_SETUP
+ 	select GENERIC_STRNCPY_FROM_USER
+ 	select GENERIC_STRNLEN_USER
+ 	select HARDIRQS_SW_RESEND
+@@ -37,6 +38,7 @@
+ 	select HAVE_GENERIC_HARDIRQS
+ 	select HAVE_HW_BREAKPOINT if (PERF_EVENTS && (CPU_V6 || CPU_V6K || CPU_V7))
+ 	select HAVE_IDE if PCI || ISA || PCMCIA
++	select HAVE_IRQ_TIME_ACCOUNTING
+ 	select HAVE_KERNEL_GZIP
+ 	select HAVE_KERNEL_LZMA
+ 	select HAVE_KERNEL_LZO
+@@ -58,6 +60,7 @@
+ 	select CLONE_BACKWARDS
+ 	select OLD_SIGSUSPEND3
+ 	select OLD_SIGACTION
++	select HAVE_CONTEXT_TRACKING
+ 	help
+ 	  The ARM series is a line of low-power-consumption RISC chip designs
+ 	  licensed by ARM Ltd and targeted at embedded applications and
+@@ -478,19 +410,22 @@
+ 	select GENERIC_CLOCKEVENTS
+ 	select MIGHT_HAVE_PCI
+ 	select NEED_MACH_IO_H
++	select USB_EHCI_BIG_ENDIAN_MMIO
++	select USB_EHCI_BIG_ENDIAN_DESC
+ 	help
+ 	  Support for Intel's IXP4XX (XScale) family of processors.
+ 
+ config ARCH_DOVE
+ 	bool "Marvell Dove"
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select CPU_V7
++	select CPU_PJ4
+ 	select GENERIC_CLOCKEVENTS
+ 	select MIGHT_HAVE_PCI
+ 	select PINCTRL
+ 	select PINCTRL_DOVE
+ 	select PLAT_ORION_LEGACY
+ 	select USB_ARCH_HAS_EHCI
++	select MVEBU_MBUS
+ 	help
+ 	  Support for the Marvell Dove SoC 88AP510
+ 
+@@ -516,6 +452,7 @@
+ 	select GENERIC_CLOCKEVENTS
+ 	select PCI
+ 	select PLAT_ORION_LEGACY
++	select MVEBU_MBUS
+ 	help
+ 	  Support for the following Marvell MV78xx0 series SoCs:
+ 	  MV781x0, MV782x0.
+@@ -592,24 +530,6 @@
+ 	help
+ 	  Support for the NXP LPC32XX family of processors
+ 
+-config ARCH_TEGRA
+-	bool "NVIDIA Tegra"
+-	select ARCH_HAS_CPUFREQ
+-	select ARCH_REQUIRE_GPIOLIB
+-	select CLKDEV_LOOKUP
+-	select CLKSRC_MMIO
+-	select CLKSRC_OF
+-	select COMMON_CLK
+-	select GENERIC_CLOCKEVENTS
+-	select HAVE_CLK
+-	select HAVE_SMP
+-	select MIGHT_HAVE_CACHE_L2X0
+-	select SPARSE_IRQ
+-	select USE_OF
+-	help
+-	  This enables support for NVIDIA Tegra based systems (Tegra APX,
+-	  Tegra 6xx and Tegra 2 series).
+-
+ config ARCH_PXA
+ 	bool "PXA2xx/PXA3xx-based"
+ 	depends on MMU
+@@ -841,51 +770,6 @@
+ 	help
+ 	  Support for ST-Ericsson U300 series mobile platforms.
+ 
+-config ARCH_U8500
+-	bool "ST-Ericsson U8500 Series"
+-	depends on MMU
+-	select ARCH_HAS_CPUFREQ
+-	select ARCH_REQUIRE_GPIOLIB
+-	select ARM_AMBA
+-	select CLKDEV_LOOKUP
+-	select CPU_V7
+-	select GENERIC_CLOCKEVENTS
+-	select HAVE_SMP
+-	select MIGHT_HAVE_CACHE_L2X0
+-	select SPARSE_IRQ
+-	help
+-	  Support for ST-Ericsson's Ux500 architecture
+-
+-config ARCH_NOMADIK
+-	bool "STMicroelectronics Nomadik"
+-	select ARCH_REQUIRE_GPIOLIB
+-	select ARM_AMBA
+-	select ARM_VIC
+-	select CLKSRC_NOMADIK_MTU
+-	select COMMON_CLK
+-	select CPU_ARM926T
+-	select GENERIC_CLOCKEVENTS
+-	select MIGHT_HAVE_CACHE_L2X0
+-	select USE_OF
+-	select PINCTRL
+-	select PINCTRL_STN8815
+-	select SPARSE_IRQ
+-	help
+-	  Support for the Nomadik platform by ST-Ericsson
+-
+-config PLAT_SPEAR
+-	bool "ST SPEAr"
+-	select ARCH_HAS_CPUFREQ
+-	select ARCH_REQUIRE_GPIOLIB
+-	select ARM_AMBA
+-	select CLKDEV_LOOKUP
+-	select CLKSRC_MMIO
+-	select COMMON_CLK
+-	select GENERIC_CLOCKEVENTS
+-	select HAVE_CLK
+-	help
+-	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
+-
+ config ARCH_DAVINCI
+ 	bool "TI DaVinci"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+@@ -1495,7 +1402,6 @@
+ 	depends on GENERIC_CLOCKEVENTS
+ 	depends on HAVE_SMP
+ 	depends on MMU
+-	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+ 	select USE_GENERIC_SMP_HELPERS
+ 	help
+ 	  This enables support for systems with more than one CPU. If you have
+@@ -1628,7 +1543,6 @@
+ 	bool "Use local timer interrupts"
+ 	depends on SMP
+ 	default y
+-	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+ 	  legacy IPI broadcast method.  Local timers allows the system

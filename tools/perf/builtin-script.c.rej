@@ -1,0 +1,24 @@
+--- tools/perf/builtin-script.c
++++ tools/perf/builtin-script.c
+@@ -299,20 +291,7 @@
+ 	}
+ 
+ 	if (PRINT_FIELD(EVNAME)) {
+-		if (attr->type == PERF_TYPE_TRACEPOINT) {
+-			/*
+-			 * XXX Do we really need this here?
+-			 * perf_evlist__set_tracepoint_names should have done
+-			 * this already
+-			 */
+-			type = trace_parse_common_type(pevent,
+-						       sample->raw_data);
+-			event = pevent_find_event(pevent, type);
+-			if (event)
+-				evname = event->name;
+-		} else
+-			evname = perf_evsel__name(evsel);
+-
++		evname = perf_evsel__name(evsel);
+ 		printf("%s: ", evname ? evname : "[unknown]");
+ 	}
+ }

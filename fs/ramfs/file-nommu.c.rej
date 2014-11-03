@@ -1,0 +1,10 @@
+--- fs/ramfs/file-nommu.c
++++ fs/ramfs/file-nommu.c
+@@ -110,6 +110,7 @@
+ 
+ 		/* prevent the page from being discarded on memory pressure */
+ 		SetPageDirty(page);
++		SetPageUptodate(page);
+ 
+ 		unlock_page(page);
+ 		put_page(page);

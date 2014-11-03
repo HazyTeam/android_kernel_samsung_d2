@@ -1,0 +1,40 @@
+--- drivers/scsi/isci/host.h
++++ drivers/scsi/isci/host.h
+@@ -305,32 +301,16 @@
+ 	return pci_get_drvdata(pdev);
+ }
+ 
++static inline struct Scsi_Host *to_shost(struct isci_host *ihost)
++{
++	return ihost->sas_ha.core.shost;
++}
++
+ #define for_each_isci_host(id, ihost, pdev) \
+ 	for (id = 0, ihost = to_pci_info(pdev)->hosts[id]; \
+ 	     id < ARRAY_SIZE(to_pci_info(pdev)->hosts) && ihost; \
+ 	     ihost = to_pci_info(pdev)->hosts[++id])
+ 
+-static inline enum isci_status isci_host_get_state(struct isci_host *isci_host)
+-{
+-	return isci_host->status;
+-}
+-
+-static inline void isci_host_change_state(struct isci_host *isci_host,
+-					  enum isci_status status)
+-{
+-	unsigned long flags;
+-
+-	dev_dbg(&isci_host->pdev->dev,
+-		"%s: isci_host = %p, state = 0x%x",
+-		__func__,
+-		isci_host,
+-		status);
+-	spin_lock_irqsave(&isci_host->state_lock, flags);
+-	isci_host->status = status;
+-	spin_unlock_irqrestore(&isci_host->state_lock, flags);
+-
+-}
+-
+ static inline void wait_for_start(struct isci_host *ihost)
+ {
+ 	wait_event(ihost->eventq, !test_bit(IHOST_START_PENDING, &ihost->flags));

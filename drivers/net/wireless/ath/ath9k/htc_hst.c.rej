@@ -1,0 +1,11 @@
+--- drivers/net/wireless/ath/ath9k/htc_hst.c
++++ drivers/net/wireless/ath/ath9k/htc_hst.c
+@@ -344,6 +344,8 @@
+ 			endpoint->ep_callbacks.tx(endpoint->ep_callbacks.priv,
+ 						  skb, htc_hdr->endpoint_id,
+ 						  txok);
++		} else {
++			kfree_skb(skb);
+ 		}
+ 	}
+ 

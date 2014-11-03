@@ -1,0 +1,17 @@
+--- arch/s390/kernel/smp.c
++++ arch/s390/kernel/smp.c
+@@ -957,14 +930,11 @@
+ 	unsigned int cpu = (unsigned int)(long)hcpu;
+ 	struct cpu *c = &pcpu_devices[cpu].cpu;
+ 	struct device *s = &c->dev;
+-	struct s390_idle_data *idle;
+ 	int err = 0;
+ 
+ 	switch (action) {
+ 	case CPU_ONLINE:
+ 	case CPU_ONLINE_FROZEN:
+-		idle = &per_cpu(s390_idle, cpu);
+-		memset(idle, 0, sizeof(struct s390_idle_data));
+ 		err = sysfs_create_group(&s->kobj, &cpu_online_attr_group);
+ 		break;
+ 	case CPU_DEAD:

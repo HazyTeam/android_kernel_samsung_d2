@@ -1,0 +1,40 @@
+--- drivers/video/Kconfig
++++ drivers/video/Kconfig
+@@ -33,26 +35,8 @@
+ 	  This framework adds support for low-level control of the video 
+ 	  output switch.
+ 
+-config DISPLAY_TIMING
+-       bool
+-
+-config VIDEOMODE
+-       bool
+-
+-config OF_DISPLAY_TIMING
+-	bool "Enable device tree display timing support"
+-	depends on OF
+-	select DISPLAY_TIMING
+-	help
+-	  helper to parse display timings from the devicetree
+-
+-config OF_VIDEOMODE
+-	bool "Enable device tree videomode support"
+-	depends on OF
+-	select VIDEOMODE
+-	select OF_DISPLAY_TIMING
+-	help
+-	  helper to get videomodes from the devicetree
++config VIDEOMODE_HELPERS
++	bool
+ 
+ config HDMI
+ 	bool
+@@ -2217,7 +2208,7 @@
+ 
+ config FB_GOLDFISH
+ 	tristate "Goldfish Framebuffer"
+-	depends on FB
++	depends on FB && HAS_DMA
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
+ 	select FB_CFB_IMAGEBLIT

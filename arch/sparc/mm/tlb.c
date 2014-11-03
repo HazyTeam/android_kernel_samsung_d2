@@ -67,16 +67,37 @@ void arch_leave_lazy_mmu_mode(void)
 	tb->active = 0;
 }
 
-void tlb_batch_add(struct mm_struct *mm, unsigned long vaddr,
-		   pte_t *ptep, pte_t orig, int fullmm)
+static void tlb_batch_add_one(struct mm_struct *mm, unsigned long vaddr,
+			      bool exec)
 {
 	struct tlb_batch *tb = &get_cpu_var(tlb_batch);
 	unsigned long nr;
 
 	vaddr &= PAGE_MASK;
-	if (pte_exec(orig))
+	if (exec)
 		vaddr |= 0x1UL;
 
+	nr = tb->tlb_nr;
+
+	if (unlikely(nr != 0 && mm != tb->mm)) {
+		flush_tlb_pending();
+		nr = 0;
+	}
+
+	if (nr == 0)
+		tb->mm = mm;
+
+	tb->vaddrs[nr] = vaddr;
+	tb->tlb_nr = ++nr;
+	if (nr >= TLB_BATCH_NR)
+		flush_tlb_pending();
+
+	put_cpu_var(tlb_batch);
+}
+
+void tlb_batch_add(struct mm_struct *mm, unsigned long vaddr,
+		   pte_t *ptep, pte_t orig, int fullmm)
+{
 	if (tlb_type != hypervisor &&
 	    pte_dirty(orig)) {
 		unsigned long paddr, pfn = pte_pfn(orig);

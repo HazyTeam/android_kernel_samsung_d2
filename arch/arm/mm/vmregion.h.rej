@@ -1,0 +1,11 @@
+--- arch/arm/mm/vmregion.h
++++ arch/arm/mm/vmregion.h
+@@ -17,7 +17,7 @@
+ 	struct list_head	vm_list;
+ 	unsigned long		vm_start;
+ 	unsigned long		vm_end;
+-	struct page		*vm_pages;
++	void			*priv;
+ 	int			vm_active;
+ 	const void		*caller;
+ };

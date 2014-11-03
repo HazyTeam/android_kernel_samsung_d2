@@ -1,0 +1,15 @@
+--- net/irda/af_irda.c
++++ net/irda/af_irda.c
+@@ -2585,8 +2586,10 @@
+ 				    NULL, NULL, NULL);
+ 
+ 		/* Check if the we got some results */
+-		if (!self->cachedaddr)
+-			return -EAGAIN;		/* Didn't find any devices */
++		if (!self->cachedaddr) {
++			err = -EAGAIN;		/* Didn't find any devices */
++			goto out;
++		}
+ 		daddr = self->cachedaddr;
+ 		/* Cleanup */
+ 		self->cachedaddr = 0;

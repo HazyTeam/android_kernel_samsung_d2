@@ -1,0 +1,11 @@
+--- drivers/acpi/video_detect.c
++++ drivers/acpi/video_detect.c
+@@ -191,6 +218,8 @@
+ 		 *		ACPI_VIDEO_BACKLIGHT_DMI_VENDOR;
+ 		 *}
+ 		 */
++
++		dmi_check_system(video_detect_dmi_table);
+ 	} else {
+ 		status = acpi_bus_get_device(graphics_handle, &tmp_dev);
+ 		if (ACPI_FAILURE(status)) {

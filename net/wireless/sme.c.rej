@@ -1,0 +1,19 @@
+--- net/wireless/sme.c
++++ net/wireless/sme.c
+@@ -231,12 +235,15 @@
+ 	mutex_lock(&rdev->sched_scan_mtx);
+ 
+ 	list_for_each_entry(wdev, &rdev->wdev_list, list) {
++		if (!wdev->netdev)
++			continue;
++
+ 		wdev_lock(wdev);
+ 		if (!netif_running(wdev->netdev)) {
+ 			wdev_unlock(wdev);
+ 			continue;
+ 		}
+-		if (wdev->sme_state != CFG80211_SME_CONNECTING) {
++		if (wdev->sme_state != CFG80211_SME_CONNECTING || !wdev->conn) {
+ 			wdev_unlock(wdev);
+ 			continue;
+ 		}

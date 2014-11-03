@@ -1,0 +1,11 @@
+--- fs/eventpoll.c
++++ fs/eventpoll.c
+@@ -1313,7 +1341,7 @@
+ 	 * otherwise we might miss an event that happens between the
+ 	 * f_op->poll() call and the new event set registering.
+ 	 */
+-	epi->event.events = event->events;
++	epi->event.events = event->events; /* need barrier below */
+ 	pt._key = event->events;
+ 	epi->event.data = event->data; /* protected by mtx */
+ 	if (epi->event.events & EPOLLWAKEUP) {

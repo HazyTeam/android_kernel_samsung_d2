@@ -1,0 +1,13 @@
+--- drivers/acpi/processor_driver.c
++++ drivers/acpi/processor_driver.c
+@@ -434,8 +438,8 @@
+ 		 * Initialize missing things
+ 		 */
+ 		if (pr->flags.need_hotplug_init) {
+-			printk(KERN_INFO "Will online and init hotplugged "
+-			       "CPU: %d\n", pr->id);
++			pr_info("Will online and init hotplugged CPU: %d\n",
++				pr->id);
+ 			WARN(acpi_processor_start(pr), "Failed to start CPU:"
+ 				" %d\n", pr->id);
+ 			pr->flags.need_hotplug_init = 0;

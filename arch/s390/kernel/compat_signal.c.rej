@@ -1,0 +1,37 @@
+--- arch/s390/kernel/compat_signal.c
++++ arch/s390/kernel/compat_signal.c
+@@ -309,6 +309,10 @@
+ 	regs->psw.mask = (regs->psw.mask & ~PSW_MASK_USER) |
+ 		(__u64)(regs32.psw.mask & PSW32_MASK_USER) << 32 |
+ 		(__u64)(regs32.psw.addr & PSW32_ADDR_AMODE);
++	/* Check for invalid user address space control. */
++	if ((regs->psw.mask & PSW_MASK_ASC) >= (psw_kernel_bits & PSW_MASK_ASC))
++		regs->psw.mask = (psw_user_bits & PSW_MASK_ASC) |
++			(regs->psw.mask & ~PSW_MASK_ASC);
+ 	regs->psw.addr = (__u64)(regs32.psw.addr & PSW32_ADDR_INSN);
+ 	for (i = 0; i < NUM_GPRS; i++)
+ 		regs->gprs[i] = (__u64) regs32.gprs[i];
+@@ -481,7 +485,10 @@
+ 
+ 	/* Set up registers for signal handler */
+ 	regs->gprs[15] = (__force __u64) frame;
+-	regs->psw.mask |= PSW_MASK_BA;		/* force amode 31 */
++	/* Force 31 bit amode and default user address space control. */
++	regs->psw.mask = PSW_MASK_BA |
++		(psw_user_bits & PSW_MASK_ASC) |
++		(regs->psw.mask & ~PSW_MASK_ASC);
+ 	regs->psw.addr = (__force __u64) ka->sa.sa_handler;
+ 
+ 	regs->gprs[2] = map_signal(sig);
+@@ -549,7 +556,10 @@
+ 
+ 	/* Set up registers for signal handler */
+ 	regs->gprs[15] = (__force __u64) frame;
+-	regs->psw.mask |= PSW_MASK_BA;		/* force amode 31 */
++	/* Force 31 bit amode and default user address space control. */
++	regs->psw.mask = PSW_MASK_BA |
++		(psw_user_bits & PSW_MASK_ASC) |
++		(regs->psw.mask & ~PSW_MASK_ASC);
+ 	regs->psw.addr = (__u64) ka->sa.sa_handler;
+ 
+ 	regs->gprs[2] = map_signal(sig);

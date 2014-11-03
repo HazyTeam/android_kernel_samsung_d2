@@ -1,0 +1,66 @@
+--- drivers/gpu/drm/radeon/si.c
++++ drivers/gpu/drm/radeon/si.c
+@@ -2753,9 +3741,15 @@
+ 
+ 	WREG32(GB_ADDR_CONFIG, gb_addr_config);
+ 	WREG32(DMIF_ADDR_CONFIG, gb_addr_config);
++	WREG32(DMIF_ADDR_CALC, gb_addr_config);
+ 	WREG32(HDP_ADDR_CONFIG, gb_addr_config);
+ 	WREG32(DMA_TILING_CONFIG + DMA0_REGISTER_OFFSET, gb_addr_config);
+ 	WREG32(DMA_TILING_CONFIG + DMA1_REGISTER_OFFSET, gb_addr_config);
++	if (rdev->has_uvd) {
++		WREG32(UVD_UDEC_ADDR_CONFIG, gb_addr_config);
++		WREG32(UVD_UDEC_DB_ADDR_CONFIG, gb_addr_config);
++		WREG32(UVD_UDEC_DBW_ADDR_CONFIG, gb_addr_config);
++	}
+ 
+ 	si_tiling_mode_table_init(rdev);
+ 
+@@ -3594,8 +4551,8 @@
+ 	rdev->mc.aper_base = pci_resource_start(rdev->pdev, 0);
+ 	rdev->mc.aper_size = pci_resource_len(rdev->pdev, 0);
+ 	/* size in MB on si */
+-	rdev->mc.mc_vram_size = RREG32(CONFIG_MEMSIZE) * 1024 * 1024;
+-	rdev->mc.real_vram_size = RREG32(CONFIG_MEMSIZE) * 1024 * 1024;
++	rdev->mc.mc_vram_size = RREG32(CONFIG_MEMSIZE) * 1024ULL * 1024ULL;
++	rdev->mc.real_vram_size = RREG32(CONFIG_MEMSIZE) * 1024ULL * 1024ULL;
+ 	rdev->mc.visible_vram_size = rdev->mc.aper_size;
+ 	si_vram_gtt_location(rdev, &rdev->mc);
+ 	radeon_update_bandwidth_info(rdev);
+@@ -5331,7 +6296,25 @@
+ 		return r;
+ 	}
+ 
++	if (rdev->has_uvd) {
++		r = rv770_uvd_resume(rdev);
++		if (!r) {
++			r = radeon_fence_driver_start_ring(rdev,
++							   R600_RING_TYPE_UVD_INDEX);
++			if (r)
++				dev_err(rdev->dev, "UVD fences init error (%d).\n", r);
++		}
++		if (r)
++			rdev->ring[R600_RING_TYPE_UVD_INDEX].ring_size = 0;
++	}
++
+ 	/* Enable IRQ */
++	if (!rdev->irq.installed) {
++		r = radeon_irq_kms_init(rdev);
++		if (r)
++			return r;
++	}
++
+ 	r = si_irq_init(rdev);
+ 	if (r) {
+ 		DRM_ERROR("radeon: IH init failed (%d).\n", r);
+@@ -5515,10 +6521,6 @@
+ 	if (r)
+ 		return r;
+ 
+-	r = radeon_irq_kms_init(rdev);
+-	if (r)
+-		return r;
+-
+ 	ring = &rdev->ring[RADEON_RING_TYPE_GFX_INDEX];
+ 	ring->ring_obj = NULL;
+ 	r600_ring_init(rdev, ring, 1024 * 1024);

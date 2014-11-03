@@ -1,0 +1,33 @@
+--- drivers/bluetooth/btusb.c
++++ drivers/bluetooth/btusb.c
+@@ -150,6 +152,7 @@
+ 	{ USB_DEVICE(0x13d3, 0x3393), .driver_info = BTUSB_ATH3012 },
+ 	{ USB_DEVICE(0x0489, 0xe04e), .driver_info = BTUSB_ATH3012 },
+ 	{ USB_DEVICE(0x0489, 0xe056), .driver_info = BTUSB_ATH3012 },
++	{ USB_DEVICE(0x0489, 0xe04d), .driver_info = BTUSB_ATH3012 },
+ 
+ 	/* Atheros AR5BBU12 with sflash firmware */
+ 	{ USB_DEVICE(0x0489, 0xe02c), .driver_info = BTUSB_IGNORE },
+@@ -1412,11 +1803,17 @@
+ 
+ 	SET_HCIDEV_DEV(hdev, &intf->dev);
+ 
+-	hdev->open     = btusb_open;
+-	hdev->close    = btusb_close;
+-	hdev->flush    = btusb_flush;
+-	hdev->send     = btusb_send_frame;
+-	hdev->notify   = btusb_notify;
++	hdev->open   = btusb_open;
++	hdev->close  = btusb_close;
++	hdev->flush  = btusb_flush;
++	hdev->send   = btusb_send_frame;
++	hdev->notify = btusb_notify;
++
++	if (id->driver_info & BTUSB_BCM92035)
++		hdev->setup = btusb_setup_bcm92035;
++
++	if (id->driver_info & BTUSB_INTEL)
++		hdev->setup = btusb_setup_intel;
+ 
+ 	/* Interface numbers are hardcoded in the specification */
+ 	data->isoc = usb_ifnum_to_if(data->udev, 1);

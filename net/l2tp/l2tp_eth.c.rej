@@ -1,0 +1,10 @@
+--- net/l2tp/l2tp_eth.c
++++ net/l2tp/l2tp_eth.c
+@@ -291,6 +292,7 @@
+ 
+ out_del_dev:
+ 	free_netdev(dev);
++	spriv->dev = NULL;
+ out_del_session:
+ 	l2tp_session_delete(session);
+ out:

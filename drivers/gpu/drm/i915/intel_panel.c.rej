@@ -1,0 +1,48 @@
+--- drivers/gpu/drm/i915/intel_panel.c
++++ drivers/gpu/drm/i915/intel_panel.c
+@@ -428,33 +434,38 @@
+ 
+ 	intel_panel_init_backlight(dev);
+ 
++	if (WARN_ON(dev_priv->backlight.device))
++		return -ENODEV;
++
+ 	memset(&props, 0, sizeof(props));
+ 	props.type = BACKLIGHT_RAW;
++	props.brightness = dev_priv->backlight.level;
+ 	props.max_brightness = _intel_panel_get_max_backlight(dev);
+ 	if (props.max_brightness == 0) {
+ 		DRM_DEBUG_DRIVER("Failed to get maximum backlight value\n");
+ 		return -ENODEV;
+ 	}
+-	dev_priv->backlight =
++	dev_priv->backlight.device =
+ 		backlight_device_register("intel_backlight",
+ 					  &connector->kdev, dev,
+ 					  &intel_panel_bl_ops, &props);
+ 
+-	if (IS_ERR(dev_priv->backlight)) {
++	if (IS_ERR(dev_priv->backlight.device)) {
+ 		DRM_ERROR("Failed to register backlight: %ld\n",
+-			  PTR_ERR(dev_priv->backlight));
+-		dev_priv->backlight = NULL;
++			  PTR_ERR(dev_priv->backlight.device));
++		dev_priv->backlight.device = NULL;
+ 		return -ENODEV;
+ 	}
+-	dev_priv->backlight->props.brightness = intel_panel_get_backlight(dev);
+ 	return 0;
+ }
+ 
+ void intel_panel_destroy_backlight(struct drm_device *dev)
+ {
+ 	struct drm_i915_private *dev_priv = dev->dev_private;
+-	if (dev_priv->backlight)
+-		backlight_device_unregister(dev_priv->backlight);
++	if (dev_priv->backlight.device) {
++		backlight_device_unregister(dev_priv->backlight.device);
++		dev_priv->backlight.device = NULL;
++	}
+ }
+ #else
+ int intel_panel_setup_backlight(struct drm_connector *connector)

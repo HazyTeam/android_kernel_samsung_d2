@@ -1,0 +1,11 @@
+--- drivers/gpu/drm/i915/intel_drv.h
++++ drivers/gpu/drm/i915/intel_drv.h
+@@ -379,7 +411,7 @@
+ } __attribute__((packed));
+ 
+ struct intel_hdmi {
+-	u32 sdvox_reg;
++	u32 hdmi_reg;
+ 	int ddc_bus;
+ 	uint32_t color_range;
+ 	bool color_range_auto;

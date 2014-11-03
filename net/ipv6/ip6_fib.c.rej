@@ -1,0 +1,13 @@
+--- net/ipv6/ip6_fib.c
++++ net/ipv6/ip6_fib.c
+@@ -819,6 +820,10 @@
+ 					offsetof(struct rt6_info, rt6i_src),
+ 					allow_create, replace_required);
+ 
++			if (IS_ERR(sn)) {
++				err = PTR_ERR(sn);
++				sn = NULL;
++			}
+ 			if (!sn) {
+ 				/* If it is failed, discard just allocated
+ 				   root, and then (in st_failure) stale node

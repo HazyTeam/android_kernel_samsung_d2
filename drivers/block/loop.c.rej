@@ -1,0 +1,78 @@
+--- drivers/block/loop.c
++++ drivers/block/loop.c
+@@ -1036,8 +1046,10 @@
+ 	memset(lo->lo_encrypt_key, 0, LO_KEY_SIZE);
+ 	memset(lo->lo_crypt_name, 0, LO_NAME_SIZE);
+ 	memset(lo->lo_file_name, 0, LO_NAME_SIZE);
+-	if (bdev)
++	if (bdev) {
++		bdput(bdev);
+ 		invalidate_bdev(bdev);
++	}
+ 	set_capacity(lo->lo_disk, 0);
+ 	loop_sysfs_exit(lo);
+ 	if (bdev) {
+@@ -1281,28 +1293,10 @@
+ 
+ static int loop_set_capacity(struct loop_device *lo, struct block_device *bdev)
+ {
+-	int err;
+-	sector_t sec;
+-	loff_t sz;
+-
+-	err = -ENXIO;
+ 	if (unlikely(lo->lo_state != Lo_bound))
+-		goto out;
+-	err = figure_loop_size(lo, lo->lo_offset, lo->lo_sizelimit);
+-	if (unlikely(err))
+-		goto out;
+-	sec = get_capacity(lo->lo_disk);
+-	/* the width of sector_t may be narrow for bit-shift */
+-	sz = sec;
+-	sz <<= 9;
+-	mutex_lock(&bdev->bd_mutex);
+-	bd_set_size(bdev, sz);
+-	/* let user-space know about the new size */
+-	kobject_uevent(&disk_to_dev(bdev->bd_disk)->kobj, KOBJ_CHANGE);
+-	mutex_unlock(&bdev->bd_mutex);
++		return -ENXIO;
+ 
+- out:
+-	return err;
++	return figure_loop_size(lo, lo->lo_offset, lo->lo_sizelimit);
+ }
+ 
+ static int lo_ioctl(struct block_device *bdev, fmode_t mode,
+@@ -1856,11 +1838,15 @@
+ 		max_part = (1UL << part_shift) - 1;
+ 	}
+ 
+-	if ((1UL << part_shift) > DISK_MAX_PARTS)
+-		return -EINVAL;
++	if ((1UL << part_shift) > DISK_MAX_PARTS) {
++		err = -EINVAL;
++		goto misc_out;
++	}
+ 
+-	if (max_loop > 1UL << (MINORBITS - part_shift))
+-		return -EINVAL;
++	if (max_loop > 1UL << (MINORBITS - part_shift)) {
++		err = -EINVAL;
++		goto misc_out;
++	}
+ 
+ 	/*
+ 	 * If max_loop is specified, create that many devices upfront.
+@@ -1878,8 +1864,10 @@
+ 		range = 1UL << MINORBITS;
+ 	}
+ 
+-	if (register_blkdev(LOOP_MAJOR, "loop"))
+-		return -EIO;
++	if (register_blkdev(LOOP_MAJOR, "loop")) {
++		err = -EIO;
++		goto misc_out;
++	}
+ 
+ 	blk_register_region(MKDEV(LOOP_MAJOR, 0), range,
+ 				  THIS_MODULE, loop_probe, NULL, NULL);

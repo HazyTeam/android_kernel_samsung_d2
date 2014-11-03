@@ -1,0 +1,26 @@
+--- arch/cris/kernel/process.c
++++ arch/cris/kernel/process.c
+@@ -25,6 +25,7 @@
+ #include <linux/elfcore.h>
+ #include <linux/mqueue.h>
+ #include <linux/reboot.h>
++#include <linux/rcupdate.h>
+ 
+ //#define DEBUG
+ 
+@@ -74,6 +75,7 @@
+ {
+ 	/* endless idle loop with no priority at all */
+ 	while (1) {
++		rcu_idle_enter();
+ 		while (!need_resched()) {
+ 			void (*idle)(void);
+ 			/*
+@@ -86,6 +88,7 @@
+ 				idle = default_idle;
+ 			idle();
+ 		}
++		rcu_idle_exit();
+ 		schedule_preempt_disabled();
+ 	}
+ }

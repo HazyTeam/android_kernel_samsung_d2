@@ -1,0 +1,20 @@
+--- net/dccp/ccid.h
++++ net/dccp/ccid.h
+@@ -246,7 +246,7 @@
+ 					u32 __user *optval, int __user *optlen)
+ {
+ 	int rc = -ENOPROTOOPT;
+-	if (ccid->ccid_ops->ccid_hc_rx_getsockopt != NULL)
++	if (ccid != NULL && ccid->ccid_ops->ccid_hc_rx_getsockopt != NULL)
+ 		rc = ccid->ccid_ops->ccid_hc_rx_getsockopt(sk, optname, len,
+ 						 optval, optlen);
+ 	return rc;
+@@ -257,7 +257,7 @@
+ 					u32 __user *optval, int __user *optlen)
+ {
+ 	int rc = -ENOPROTOOPT;
+-	if (ccid->ccid_ops->ccid_hc_tx_getsockopt != NULL)
++	if (ccid != NULL && ccid->ccid_ops->ccid_hc_tx_getsockopt != NULL)
+ 		rc = ccid->ccid_ops->ccid_hc_tx_getsockopt(sk, optname, len,
+ 						 optval, optlen);
+ 	return rc;

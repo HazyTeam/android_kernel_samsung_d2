@@ -1,0 +1,11 @@
+--- arch/parisc/mm/init.c
++++ arch/parisc/mm/init.c
+@@ -687,6 +677,8 @@
+ 
+ 	printk(KERN_INFO "Mem-info:\n");
+ 	show_free_areas(filter);
++	if (filter & SHOW_MEM_FILTER_PAGE_COUNT)
++		return;
+ #ifndef CONFIG_DISCONTIGMEM
+ 	i = max_mapnr;
+ 	while (i-- > 0) {

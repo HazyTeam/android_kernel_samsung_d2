@@ -1,0 +1,10 @@
+--- mm/truncate.c
++++ mm/truncate.c
+@@ -396,7 +394,6 @@
+ 	if (PageDirty(page))
+ 		goto failed;
+ 
+-	clear_page_mlock(page);
+ 	BUG_ON(page_has_private(page));
+ 	__delete_from_page_cache(page);
+ 	spin_unlock_irq(&mapping->tree_lock);

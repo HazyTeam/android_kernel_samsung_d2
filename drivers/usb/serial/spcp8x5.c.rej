@@ -1,0 +1,270 @@
+--- drivers/usb/serial/spcp8x5.c
++++ drivers/usb/serial/spcp8x5.c
+@@ -141,49 +144,33 @@
+ #define UART_OVERRUN_ERROR		0x40
+ #define UART_CTS			0x80
+ 
+-enum spcp8x5_type {
+-	SPCP825_007_TYPE,
+-	SPCP825_008_TYPE,
+-	SPCP825_PHILIP_TYPE,
+-	SPCP825_INTERMATIC_TYPE,
+-	SPCP835_TYPE,
+-};
+-
+ struct spcp8x5_private {
+-	spinlock_t 	lock;
+-	enum spcp8x5_type	type;
+-	u8 			line_control;
+-	u8 			line_status;
++	unsigned		quirks;
++	spinlock_t		lock;
++	u8			line_control;
+ };
+ 
++static int spcp8x5_probe(struct usb_serial *serial,
++						const struct usb_device_id *id)
++{
++	usb_set_serial_data(serial, (void *)id);
++
++	return 0;
++}
++
+ static int spcp8x5_port_probe(struct usb_serial_port *port)
+ {
+-	struct usb_serial *serial = port->serial;
++	const struct usb_device_id *id = usb_get_serial_data(port->serial);
+ 	struct spcp8x5_private *priv;
+-	enum spcp8x5_type type = SPCP825_007_TYPE;
+-	u16 product = le16_to_cpu(serial->dev->descriptor.idProduct);
+-
+-	if (product == 0x0201)
+-		type = SPCP825_007_TYPE;
+-	else if (product == 0x0231)
+-		type = SPCP835_TYPE;
+-	else if (product == 0x0235)
+-		type = SPCP825_008_TYPE;
+-	else if (product == 0x0204)
+-		type = SPCP825_INTERMATIC_TYPE;
+-	else if (product == 0x0471 &&
+-		 serial->dev->descriptor.idVendor == cpu_to_le16(0x081e))
+-		type = SPCP825_PHILIP_TYPE;
+-	dev_dbg(&serial->dev->dev, "device type = %d\n", (int)type);
+ 
+ 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+ 	if (!priv)
+ 		return -ENOMEM;
+ 
+ 	spin_lock_init(&priv->lock);
+-	priv->type = type;
++	priv->quirks = id->driver_info;
+ 
+-	usb_set_serial_port_data(port , priv);
++	usb_set_serial_port_data(port, priv);
+ 
+ 	return 0;
+ }
+@@ -307,30 +284,28 @@
+ 	struct spcp8x5_private *priv = usb_get_serial_port_data(port);
+ 	unsigned long flags;
+ 	unsigned int cflag = tty->termios.c_cflag;
+-	unsigned int old_cflag = old_termios->c_cflag;
+ 	unsigned short uartdata;
+ 	unsigned char buf[2] = {0, 0};
+ 	int baud;
+ 	int i;
+ 	u8 control;
+ 
+-
+ 	/* check that they really want us to change something */
+-	if (!tty_termios_hw_change(&tty->termios, old_termios))
++	if (old_termios && !tty_termios_hw_change(&tty->termios, old_termios))
+ 		return;
+ 
+ 	/* set DTR/RTS active */
+ 	spin_lock_irqsave(&priv->lock, flags);
+ 	control = priv->line_control;
+-	if ((old_cflag & CBAUD) == B0) {
++	if (old_termios && (old_termios->c_cflag & CBAUD) == B0) {
+ 		priv->line_control |= MCR_DTR;
+-		if (!(old_cflag & CRTSCTS))
++		if (!(old_termios->c_cflag & CRTSCTS))
+ 			priv->line_control |= MCR_RTS;
+ 	}
+ 	if (control != priv->line_control) {
+ 		control = priv->line_control;
+ 		spin_unlock_irqrestore(&priv->lock, flags);
+-		spcp8x5_set_ctrlLine(serial->dev, control , priv->type);
++		spcp8x5_set_ctrl_line(port, control);
+ 	} else {
+ 		spin_unlock_irqrestore(&priv->lock, flags);
+ 	}
+@@ -405,22 +380,15 @@
+ 
+ 	if (cflag & CRTSCTS) {
+ 		/* enable hardware flow control */
+-		spcp8x5_set_workMode(serial->dev, 0x000a,
+-				     SET_WORKING_MODE_U2C, priv->type);
++		spcp8x5_set_work_mode(port, 0x000a, SET_WORKING_MODE_U2C);
+ 	}
+ }
+ 
+-/* open the serial port. do some usb system call. set termios and get the line
+- * status of the device. */
+ static int spcp8x5_open(struct tty_struct *tty, struct usb_serial_port *port)
+ {
+-	struct ktermios tmp_termios;
+ 	struct usb_serial *serial = port->serial;
+ 	struct spcp8x5_private *priv = usb_get_serial_port_data(port);
+ 	int ret;
+-	unsigned long flags;
+-	u8 status = 0x30;
+-	/* status 0x30 means DSR and CTS = 1 other CDC RI and delta = 0 */
+ 
+ 	usb_clear_halt(serial->dev, port->write_urb->pipe);
+ 	usb_clear_halt(serial->dev, port->read_urb->pipe);
+@@ -431,142 +399,16 @@
+ 	if (ret)
+ 		return ret;
+ 
+-	spcp8x5_set_ctrlLine(serial->dev, priv->line_control , priv->type);
++	spcp8x5_set_ctrl_line(port, priv->line_control);
+ 
+-	/* Setup termios */
+ 	if (tty)
+-		spcp8x5_set_termios(tty, port, &tmp_termios);
+-
+-	spcp8x5_get_msr(serial->dev, &status, priv->type);
+-
+-	/* may be we should update uart status here but now we did not do */
+-	spin_lock_irqsave(&priv->lock, flags);
+-	priv->line_status = status & 0xf0 ;
+-	spin_unlock_irqrestore(&priv->lock, flags);
++		spcp8x5_set_termios(tty, port, NULL);
+ 
+ 	port->port.drain_delay = 256;
+ 
+ 	return usb_serial_generic_open(tty, port);
+ }
+ 
+-static void spcp8x5_process_read_urb(struct urb *urb)
+-{
+-	struct usb_serial_port *port = urb->context;
+-	struct spcp8x5_private *priv = usb_get_serial_port_data(port);
+-	unsigned char *data = urb->transfer_buffer;
+-	unsigned long flags;
+-	u8 status;
+-	char tty_flag;
+-
+-	/* get tty_flag from status */
+-	tty_flag = TTY_NORMAL;
+-
+-	spin_lock_irqsave(&priv->lock, flags);
+-	status = priv->line_status;
+-	priv->line_status &= ~UART_STATE_TRANSIENT_MASK;
+-	spin_unlock_irqrestore(&priv->lock, flags);
+-	/* wake up the wait for termios */
+-	wake_up_interruptible(&port->delta_msr_wait);
+-
+-	if (!urb->actual_length)
+-		return;
+-
+-
+-	if (status & UART_STATE_TRANSIENT_MASK) {
+-		/* break takes precedence over parity, which takes precedence
+-		 * over framing errors */
+-		if (status & UART_BREAK_ERROR)
+-			tty_flag = TTY_BREAK;
+-		else if (status & UART_PARITY_ERROR)
+-			tty_flag = TTY_PARITY;
+-		else if (status & UART_FRAME_ERROR)
+-			tty_flag = TTY_FRAME;
+-		dev_dbg(&port->dev, "tty_flag = %d\n", tty_flag);
+-
+-		/* overrun is special, not associated with a char */
+-		if (status & UART_OVERRUN_ERROR)
+-			tty_insert_flip_char(&port->port, 0, TTY_OVERRUN);
+-
+-		if (status & UART_DCD) {
+-			struct tty_struct *tty = tty_port_tty_get(&port->port);
+-			if (tty) {
+-				usb_serial_handle_dcd_change(port, tty,
+-				       priv->line_status & MSR_STATUS_LINE_DCD);
+-				tty_kref_put(tty);
+-			}
+-		}
+-	}
+-
+-	tty_insert_flip_string_fixed_flag(&port->port, data, tty_flag,
+-							urb->actual_length);
+-	tty_flip_buffer_push(&port->port);
+-}
+-
+-static int spcp8x5_wait_modem_info(struct usb_serial_port *port,
+-				   unsigned int arg)
+-{
+-	struct spcp8x5_private *priv = usb_get_serial_port_data(port);
+-	unsigned long flags;
+-	unsigned int prevstatus;
+-	unsigned int status;
+-	unsigned int changed;
+-
+-	spin_lock_irqsave(&priv->lock, flags);
+-	prevstatus = priv->line_status;
+-	spin_unlock_irqrestore(&priv->lock, flags);
+-
+-	while (1) {
+-		/* wake up in bulk read */
+-		interruptible_sleep_on(&port->delta_msr_wait);
+-
+-		/* see if a signal did it */
+-		if (signal_pending(current))
+-			return -ERESTARTSYS;
+-
+-		if (port->serial->disconnected)
+-			return -EIO;
+-
+-		spin_lock_irqsave(&priv->lock, flags);
+-		status = priv->line_status;
+-		spin_unlock_irqrestore(&priv->lock, flags);
+-
+-		changed = prevstatus^status;
+-
+-		if (((arg & TIOCM_RNG) && (changed & MSR_STATUS_LINE_RI)) ||
+-		    ((arg & TIOCM_DSR) && (changed & MSR_STATUS_LINE_DSR)) ||
+-		    ((arg & TIOCM_CD)  && (changed & MSR_STATUS_LINE_DCD)) ||
+-		    ((arg & TIOCM_CTS) && (changed & MSR_STATUS_LINE_CTS)))
+-			return 0;
+-
+-		prevstatus = status;
+-	}
+-	/* NOTREACHED */
+-	return 0;
+-}
+-
+-static int spcp8x5_ioctl(struct tty_struct *tty,
+-			 unsigned int cmd, unsigned long arg)
+-{
+-	struct usb_serial_port *port = tty->driver_data;
+-
+-	dev_dbg(&port->dev, "%s (%d) cmd = 0x%04x\n", __func__,
+-		port->number, cmd);
+-
+-	switch (cmd) {
+-	case TIOCMIWAIT:
+-		dev_dbg(&port->dev, "%s (%d) TIOCMIWAIT\n", __func__,
+-			port->number);
+-		return spcp8x5_wait_modem_info(port, arg);
+-
+-	default:
+-		dev_dbg(&port->dev, "%s not supported = 0x%04x", __func__,
+-			cmd);
+-		break;
+-	}
+-
+-	return -ENOIOCTLCMD;
+-}
+-
+ static int spcp8x5_tiocmset(struct tty_struct *tty,
+ 			    unsigned int set, unsigned int clear)
+ {

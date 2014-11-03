@@ -77,6 +77,13 @@ static inline void apei_unmap_generic_address(struct acpi_generic_address *reg)
 	acpi_os_unmap_generic_address(reg);
 }
 
+int apei_map_generic_address(struct acpi_generic_address *reg);
+
+static inline void apei_unmap_generic_address(struct acpi_generic_address *reg)
+{
+	acpi_os_unmap_generic_address(reg);
+}
+
 int apei_read(u64 *val, struct acpi_generic_address *reg);
 int apei_write(u64 val, struct acpi_generic_address *reg);
 

@@ -1,0 +1,32 @@
+--- drivers/pnp/pnpacpi/core.c
++++ drivers/pnp/pnpacpi/core.c
+@@ -58,7 +58,7 @@
+ 	if (!(('0' <= (c) && (c) <= '9') || ('A' <= (c) && (c) <= 'F'))) \
+ 		return 0
+ #define TEST_ALPHA(c) \
+-	if (!('@' <= (c) || (c) <= 'Z')) \
++	if (!('A' <= (c) && (c) <= 'Z')) \
+ 		return 0
+ static int __init ispnpidacpi(const char *id)
+ {
+@@ -95,6 +95,9 @@
+ 		return -ENODEV;
+ 	}
+ 
++	if (WARN_ON_ONCE(acpi_dev != dev->data))
++		dev->data = acpi_dev;
++
+ 	ret = pnpacpi_build_resource_template(dev, &buffer);
+ 	if (ret)
+ 		return ret;
+@@ -242,6 +245,10 @@
+ 	char *pnpid;
+ 	struct acpi_hardware_id *id;
+ 
++	/* Skip devices that are already bound */
++	if (device->physical_node_count)
++		return 0;
++
+ 	/*
+ 	 * If a PnPacpi device is not present , the device
+ 	 * driver should not be loaded.

@@ -1,0 +1,11 @@
+--- kernel/futex_compat.c
++++ kernel/futex_compat.c
+@@ -143,8 +144,6 @@
+ 	if (!futex_cmpxchg_enabled)
+ 		return -ENOSYS;
+ 
+-	WARN_ONCE(1, "deprecated: get_robust_list will be deleted in 2013.\n");
+-
+ 	rcu_read_lock();
+ 
+ 	ret = -ESRCH;

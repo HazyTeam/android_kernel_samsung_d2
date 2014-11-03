@@ -1,0 +1,22 @@
+--- arch/arm/mach-mv78xx0/common.c
++++ arch/arm/mach-mv78xx0/common.c
+@@ -213,7 +213,8 @@
+ {
+ 	orion_ge00_init(eth_data,
+ 			GE00_PHYS_BASE, IRQ_MV78XX0_GE00_SUM,
+-			IRQ_MV78XX0_GE_ERR);
++			IRQ_MV78XX0_GE_ERR,
++			MV643XX_TX_CSUM_DEFAULT_LIMIT);
+ }
+ 
+ 
+@@ -224,7 +225,8 @@
+ {
+ 	orion_ge01_init(eth_data,
+ 			GE01_PHYS_BASE, IRQ_MV78XX0_GE01_SUM,
+-			NO_IRQ);
++			NO_IRQ,
++			MV643XX_TX_CSUM_DEFAULT_LIMIT);
+ }
+ 
+ 

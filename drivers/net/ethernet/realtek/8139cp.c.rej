@@ -1,0 +1,22 @@
+--- drivers/net/ethernet/realtek/8139cp.c
++++ drivers/net/ethernet/realtek/8139cp.c
+@@ -1228,18 +1259,16 @@
+ 	cp_clean_rings(cp);
+ 	rc = cp_init_rings(cp);
+ 	cp_start_hw(cp);
++	cp_enable_irq(cp);
+ 
+ 	netif_wake_queue(dev);
+ 
+ 	spin_unlock_irqrestore(&cp->lock, flags);
+ }
+ 
+-#ifdef BROKEN
+ static int cp_change_mtu(struct net_device *dev, int new_mtu)
+ {
+ 	struct cp_private *cp = netdev_priv(dev);
+-	int rc;
+-	unsigned long flags;
+ 
+ 	/* check for invalid MTU, according to hardware limits */
+ 	if (new_mtu < CP_MIN_MTU || new_mtu > CP_MAX_MTU)

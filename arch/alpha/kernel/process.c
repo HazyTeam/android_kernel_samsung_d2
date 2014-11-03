@@ -300,22 +300,6 @@ copy_thread(unsigned long clone_flags, unsigned long usp,
 	childstack = ((struct switch_stack *) childregs) - 1;
 	*childstack = *stack;
 	childstack->r26 = (unsigned long) ret_from_fork;
-	childti->pcb.usp = usp;
-	childti->pcb.ksp = (unsigned long) childstack;
-	childti->pcb.flags = 1;	/* set FEN, clear everything else */
-
-	/* Set a new TLS for the child thread?  Peek back into the
-	   syscall arguments that we saved on syscall entry.  Oops,
-	   except we'd have clobbered it with the parent/child set
-	   of r20.  Read the saved copy.  */
-	/* Note: if CLONE_SETTLS is not set, then we must inherit the
-	   value from the parent, which will have been set by the block
-	   copy in dup_task_struct.  This is non-intuitive, but is
-	   required for proper operation in the case of a threaded
-	   application calling fork.  */
-	if (clone_flags & CLONE_SETTLS)
-		childti->pcb.unique = settls;
-
 	return 0;
 }
 
@@ -459,3 +443,22 @@ get_wchan(struct task_struct *p)
 	}
 	return pc;
 }
+
+int kernel_execve(const char *path, const char *const argv[], const char *const envp[])
+{
+	/* Avoid the HAE being gratuitously wrong, which would cause us
+	   to do the whole turn off interrupts thing and restore it.  */
+	struct pt_regs regs = {.hae = alpha_mv.hae_cache};
+	int err = do_execve(path, argv, envp, &regs);
+	if (!err) {
+		struct pt_regs *p = current_pt_regs();
+		/* copy regs to normal position and off to userland we go... */
+		*p = regs;
+		__asm__ __volatile__ (
+			"mov	%0, $sp;"
+			"br	$31, ret_from_sys_call"
+			: : "r"(p));
+	}
+	return err;
+}
+EXPORT_SYMBOL(kernel_execve);

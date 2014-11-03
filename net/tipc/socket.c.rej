@@ -1,0 +1,10 @@
+--- net/tipc/socket.c
++++ net/tipc/socket.c
+@@ -790,6 +774,7 @@
+ 	if (addr) {
+ 		addr->family = AF_TIPC;
+ 		addr->addrtype = TIPC_ADDR_ID;
++		memset(&addr->addr, 0, sizeof(addr->addr));
+ 		addr->addr.id.ref = msg_origport(msg);
+ 		addr->addr.id.node = msg_orignode(msg);
+ 		addr->addr.name.domain = 0;	/* could leave uninitialized */

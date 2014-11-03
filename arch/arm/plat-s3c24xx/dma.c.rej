@@ -1,0 +1,11 @@
+--- arch/arm/plat-s3c24xx/dma.c
++++ arch/arm/plat-s3c24xx/dma.c
+@@ -430,7 +430,7 @@
+  * when necessary.
+ */
+ 
+-int s3c2410_dma_enqueue(unsigned int channel, void *id,
++int s3c2410_dma_enqueue(enum dma_ch channel, void *id,
+ 			dma_addr_t data, int size)
+ {
+ 	struct s3c2410_dma_chan *chan = s3c_dma_lookup_channel(channel);

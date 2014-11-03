@@ -1,0 +1,11 @@
+--- arch/s390/mm/gup.c
++++ arch/s390/mm/gup.c
+@@ -228,7 +273,7 @@
+ 	addr = start;
+ 	len = (unsigned long) nr_pages << PAGE_SHIFT;
+ 	end = start + len;
+-	if (end < start)
++	if ((end < start) || (end > TASK_SIZE))
+ 		goto slow_irqon;
+ 
+ 	/*

@@ -1,0 +1,25 @@
+--- drivers/video/omap2/dss/apply.c
++++ drivers/video/omap2/dss/apply.c
+@@ -964,20 +944,11 @@
+ 	op->extra_info_dirty = true;
+ }
+ 
+-static void dss_apply_fifo_merge(bool use_fifo_merge)
+-{
+-	if (dss_data.fifo_merge == use_fifo_merge)
+-		return;
+-
+-	dss_data.fifo_merge = use_fifo_merge;
+-	dss_data.fifo_merge_dirty = true;
+-}
+-
+-static void dss_ovl_setup_fifo(struct omap_overlay *ovl,
+-		bool use_fifo_merge)
++static void dss_ovl_setup_fifo(struct omap_overlay *ovl)
+ {
+ 	struct ovl_priv_data *op = get_ovl_priv(ovl);
+ 	u32 fifo_low, fifo_high;
++	bool use_fifo_merge = false;
+ 
+ 	if (!op->enabled && !op->enabling)
+ 		return;

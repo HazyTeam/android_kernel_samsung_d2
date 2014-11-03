@@ -1,0 +1,18 @@
+--- sound/soc/codecs/wm5100.c
++++ sound/soc/codecs/wm5100.c
+@@ -1279,15 +1279,9 @@
+ 	case SND_SOC_DAIFMT_DSP_A:
+ 		mask = 0;
+ 		break;
+-	case SND_SOC_DAIFMT_DSP_B:
+-		mask = 1;
+-		break;
+ 	case SND_SOC_DAIFMT_I2S:
+ 		mask = 2;
+ 		break;
+-	case SND_SOC_DAIFMT_LEFT_J:
+-		mask = 3;
+-		break;
+ 	default:
+ 		dev_err(codec->dev, "Unsupported DAI format %d\n",
+ 			fmt & SND_SOC_DAIFMT_FORMAT_MASK);

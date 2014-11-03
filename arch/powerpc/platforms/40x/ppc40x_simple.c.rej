@@ -1,0 +1,12 @@
+--- arch/powerpc/platforms/40x/ppc40x_simple.c
++++ arch/powerpc/platforms/40x/ppc40x_simple.c
+@@ -57,7 +57,8 @@
+ 	"amcc,makalu",
+ 	"apm,klondike",
+ 	"est,hotfoot",
+-	"plathome,obs600"
++	"plathome,obs600",
++	NULL
+ };
+ 
+ static int __init ppc40x_probe(void)

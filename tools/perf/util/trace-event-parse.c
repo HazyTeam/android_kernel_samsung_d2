@@ -1997,7 +1997,7 @@ static int __parse_common(void *data, int *size, int *offset,
 	return read_size(data + *offset, *size);
 }
 
-int trace_parse_common_type(void *data)
+int trace_parse_common_type(struct pevent *pevent, void *data)
 {
 	static int type_offset;
 	static int type_size;
@@ -2006,7 +2006,7 @@ int trace_parse_common_type(void *data)
 			      "common_type");
 }
 
-int trace_parse_common_pid(void *data)
+int trace_parse_common_pid(struct pevent *pevent, void *data)
 {
 	static int pid_offset;
 	static int pid_size;

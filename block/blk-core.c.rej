@@ -1,0 +1,11 @@
+--- block/blk-core.c
++++ block/blk-core.c
+@@ -335,7 +365,7 @@
+ 	if (unlikely(blk_queue_stopped(q)))
+ 		return;
+ 
+-	q->request_fn(q);
++	__blk_run_queue_uncond(q);
+ }
+ EXPORT_SYMBOL(__blk_run_queue);
+ 

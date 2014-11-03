@@ -1,0 +1,18 @@
+--- net/netfilter/ipvs/ip_vs_pe_sip.c
++++ net/netfilter/ipvs/ip_vs_pe_sip.c
+@@ -38,14 +39,10 @@
+ 		if (ret > 0)
+ 			break;
+ 		if (!ret)
+-			return 0;
++			return -EINVAL;
+ 		dataoff += *matchoff;
+ 	}
+ 
+-	/* Empty callid is useless */
+-	if (!*matchlen)
+-		return -EINVAL;
+-
+ 	/* Too large is useless */
+ 	if (*matchlen > IP_VS_PEDATA_MAXLEN)
+ 		return -EINVAL;

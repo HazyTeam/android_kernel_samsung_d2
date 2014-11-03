@@ -1,0 +1,19 @@
+--- drivers/net/ethernet/ti/davinci_emac.c
++++ drivers/net/ethernet/ti/davinci_emac.c
+@@ -1048,12 +1046,12 @@
+ {
+ 	struct sk_buff		*skb = token;
+ 	struct net_device	*ndev = skb->dev;
+-	struct emac_priv	*priv = netdev_priv(ndev);
+-
+-	atomic_dec(&priv->cur_tx);
+ 
++	/* Check whether the queue is stopped due to stalled tx dma, if the
++	 * queue is stopped then start the queue as we have free desc for tx
++	 */
+ 	if (unlikely(netif_queue_stopped(ndev)))
+-		netif_start_queue(ndev);
++		netif_wake_queue(ndev);
+ 	ndev->stats.tx_packets++;
+ 	ndev->stats.tx_bytes += len;
+ 	dev_kfree_skb_any(skb);

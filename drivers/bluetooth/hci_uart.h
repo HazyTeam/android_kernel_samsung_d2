@@ -65,6 +65,8 @@ struct hci_uart {
 	unsigned long		flags;
 	unsigned long		hdev_flags;
 
+	struct work_struct	init_ready;
+
 	struct hci_uart_proto	*proto;
 	struct tasklet_struct	tty_wakeup_task;
 	void			*priv;
@@ -85,6 +87,7 @@ struct hci_uart {
 int hci_uart_register_proto(struct hci_uart_proto *p);
 int hci_uart_unregister_proto(struct hci_uart_proto *p);
 int hci_uart_tx_wakeup(struct hci_uart *hu);
+int hci_uart_init_ready(struct hci_uart *hu);
 
 #ifdef CONFIG_BT_HCIUART_H4
 int h4_init(void);
@@ -109,4 +112,9 @@ int ath_deinit(void);
 #ifdef CONFIG_BT_HCIUART_IBS
 int ibs_init(void);
 int ibs_deinit(void);
+#endif
+
+#ifdef CONFIG_BT_HCIUART_3WIRE
+int h5_init(void);
+int h5_deinit(void);
 #endif

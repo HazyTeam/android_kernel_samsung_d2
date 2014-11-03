@@ -1,0 +1,20 @@
+--- arch/x86/kvm/lapic.c
++++ arch/x86/kvm/lapic.c
+@@ -807,7 +972,7 @@
+ 	ASSERT(apic != NULL);
+ 
+ 	/* if initial count is 0, current count should also be 0 */
+-	if (apic_get_reg(apic, APIC_TMICT) == 0)
++	if (kvm_apic_get_reg(apic, APIC_TMICT) == 0)
+ 		return 0;
+ 
+ 	remaining = hrtimer_get_remaining(&apic->lapic_timer.timer);
+@@ -1685,7 +1892,7 @@
+ 	if (!test_bit(KVM_APIC_CHECK_VAPIC, &vcpu->arch.apic_attention))
+ 		return;
+ 
+-	tpr = apic_get_reg(apic, APIC_TASKPRI) & 0xff;
++	tpr = kvm_apic_get_reg(apic, APIC_TASKPRI) & 0xff;
+ 	max_irr = apic_find_highest_irr(apic);
+ 	if (max_irr < 0)
+ 		max_irr = 0;

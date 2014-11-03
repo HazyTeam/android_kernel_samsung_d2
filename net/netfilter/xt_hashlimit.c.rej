@@ -1,0 +1,24 @@
+--- net/netfilter/xt_hashlimit.c
++++ net/netfilter/xt_hashlimit.c
+@@ -608,13 +623,18 @@
+ 	rcu_read_lock_bh();
+ 	dh = dsthash_find(hinfo, &dst);
+ 	if (dh == NULL) {
+-		dh = dsthash_alloc_init(hinfo, &dst);
++		dh = dsthash_alloc_init(hinfo, &dst, &race);
+ 		if (dh == NULL) {
+ 			rcu_read_unlock_bh();
+ 			goto hotdrop;
++		} else if (race) {
++			/* Already got an entry, update expiration timeout */
++			dh->expires = now + msecs_to_jiffies(hinfo->cfg.expire);
++			rateinfo_recalc(dh, now, hinfo->cfg.mode);
++		} else {
++			dh->expires = jiffies + msecs_to_jiffies(hinfo->cfg.expire);
++			rateinfo_init(dh, hinfo);
+ 		}
+-		dh->expires = jiffies + msecs_to_jiffies(hinfo->cfg.expire);
+-		rateinfo_init(dh, hinfo);
+ 	} else {
+ 		/* update expiration timeout */
+ 		dh->expires = now + msecs_to_jiffies(hinfo->cfg.expire);

@@ -1,0 +1,13 @@
+--- fs/ext3/hash.c
++++ fs/ext3/hash.c
+@@ -198,8 +198,8 @@
+ 		return -1;
+ 	}
+ 	hash = hash & ~1;
+-	if (hash == (EXT3_HTREE_EOF << 1))
+-		hash = (EXT3_HTREE_EOF-1) << 1;
++	if (hash == (EXT3_HTREE_EOF_32BIT << 1))
++		hash = (EXT3_HTREE_EOF_32BIT - 1) << 1;
+ 	hinfo->hash = hash;
+ 	hinfo->minor_hash = minor_hash;
+ 	return 0;

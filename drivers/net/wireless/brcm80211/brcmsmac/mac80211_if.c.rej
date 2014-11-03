@@ -1,0 +1,24 @@
+--- drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.c
++++ drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.c
+@@ -1418,14 +1440,16 @@
+ 
+ #ifdef DEBUG
+ 	if (t->set)
+-		wiphy_err(hw->wiphy, "%s: Already set. Name: %s, per %d\n",
+-			  __func__, t->name, periodic);
++		brcms_dbg_info(t->wl->wlc->hw->d11core,
++			       "%s: Already set. Name: %s, per %d\n",
++			       __func__, t->name, periodic);
+ #endif
+ 	t->ms = ms;
+ 	t->periodic = (bool) periodic;
+-	t->set = true;
+-
+-	atomic_inc(&t->wl->callbacks);
++	if (!t->set) {
++		t->set = true;
++		atomic_inc(&t->wl->callbacks);
++	}
+ 
+ 	ieee80211_queue_delayed_work(hw, &t->dly_wrk, msecs_to_jiffies(ms));
+ }

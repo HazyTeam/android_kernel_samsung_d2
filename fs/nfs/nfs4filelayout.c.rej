@@ -1,0 +1,10 @@
+--- fs/nfs/nfs4filelayout.c
++++ fs/nfs/nfs4filelayout.c
+@@ -179,7 +180,6 @@
+ 		break;
+ 	case -NFS4ERR_DELAY:
+ 	case -NFS4ERR_GRACE:
+-	case -EKEYEXPIRED:
+ 		rpc_delay(task, FILELAYOUT_POLL_RETRY_MAX);
+ 		break;
+ 	case -NFS4ERR_RETRY_UNCACHED_REP:

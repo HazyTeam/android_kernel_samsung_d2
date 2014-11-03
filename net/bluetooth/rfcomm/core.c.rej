@@ -1,0 +1,72 @@
+--- net/bluetooth/rfcomm/core.c
++++ net/bluetooth/rfcomm/core.c
+@@ -108,12 +108,6 @@
+ 	wake_up_process(rfcomm_thread);
+ }
+ 
+-static void rfcomm_session_put(struct rfcomm_session *s)
+-{
+-	if (atomic_dec_and_test(&s->refcnt))
+-		rfcomm_session_del(s);
+-}
+-
+ /* ---- RFCOMM FCS computation ---- */
+ 
+ /* reversed, 8-bit, poly=0x07 */
+@@ -633,15 +643,14 @@
+ 
+ 	list_del(&s->list);
+ 
+-	if (state == BT_CONNECTED)
+-		rfcomm_send_disc(s, 0);
+-
+ 	rfcomm_session_clear_timer(s);
+ 	sock_release(s->sock);
+ 	kfree(s);
+ 
+ 	if (state != BT_LISTEN)
+ 		module_put(THIS_MODULE);
++
++	return NULL;
+ }
+ 
+ static struct rfcomm_session *rfcomm_session_get(bdaddr_t *src, bdaddr_t *dst)
+@@ -730,8 +738,7 @@
+ 	if (*err == 0 || *err == -EINPROGRESS)
+ 		return s;
+ 
+-	rfcomm_session_del(s);
+-	return NULL;
++	return rfcomm_session_del(s);
+ 
+ failed:
+ 	sock_release(sock);
+@@ -1165,25 +1172,14 @@
+ 			break;
+ 
+ 		case BT_DISCONN:
+-			/* rfcomm_session_put is called later so don't do
+-			 * anything here otherwise we will mess up the session
+-			 * reference counter:
+-			 *
+-			 * (a) when we are the initiator dlc_unlink will drive
+-			 * the reference counter to 0 (there is no initial put
+-			 * after session_add)
+-			 *
+-			 * (b) when we are not the initiator rfcomm_rx_process
+-			 * will explicitly call put to balance the initial hold
+-			 * done after session add.
+-			 */
++			s = rfcomm_session_close(s, ECONNRESET);
+ 			break;
+ 		}
+ 	}
+-	return 0;
++	return s;
+ }
+ 
+-static int rfcomm_recv_dm(struct rfcomm_session *s, u8 dlci)
++static struct rfcomm_session *rfcomm_recv_dm(struct rfcomm_session *s, u8 dlci)
+ {
+ 	int err = 0;
+ 

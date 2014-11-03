@@ -2,6 +2,8 @@
 #define _SCSI_PRIV_H
 
 #include <linux/device.h>
+#include <linux/async.h>
+#include <scsi/scsi_device.h>
 
 struct request_queue;
 struct request;
@@ -162,6 +164,8 @@ static inline int scsi_autopm_get_host(struct Scsi_Host *h) { return 0; }
 static inline void scsi_autopm_put_host(struct Scsi_Host *h) {}
 #endif /* CONFIG_PM_RUNTIME */
 
+extern struct async_domain scsi_sd_probe_domain;
+
 /* 
  * internal scsi timeout functions: for use by mid-layer and transport
  * classes.
@@ -169,6 +173,7 @@ static inline void scsi_autopm_put_host(struct Scsi_Host *h) {}
 
 #define SCSI_DEVICE_BLOCK_MAX_TIMEOUT	600	/* units in seconds */
 extern int scsi_internal_device_block(struct scsi_device *sdev);
-extern int scsi_internal_device_unblock(struct scsi_device *sdev);
+extern int scsi_internal_device_unblock(struct scsi_device *sdev,
+					enum scsi_device_state new_state);
 
 #endif /* _SCSI_PRIV_H */

@@ -60,15 +60,6 @@ extern int boot_secondary(unsigned int cpu, struct task_struct *);
  */
 asmlinkage void secondary_start_kernel(void);
 
-/*
- * Perform platform specific initialisation of the specified CPU.
- */
-extern void platform_secondary_init(unsigned int cpu);
-
-/*
- * Initialize cpu_possible map, and enable coherency
- */
-extern void platform_smp_prepare_cpus(unsigned int);
 
 /*
  * Initial data for bringing up a secondary CPU.
@@ -92,6 +83,7 @@ extern void platform_cpu_enable(unsigned int cpu);
 
 extern void arch_send_call_function_single_ipi(int cpu);
 extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
 
 extern void smp_send_all_cpu_backtrace(void);
 

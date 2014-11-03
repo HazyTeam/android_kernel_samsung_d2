@@ -1,0 +1,11 @@
+--- drivers/staging/octeon/ethernet-tx.c
++++ drivers/staging/octeon/ethernet-tx.c
+@@ -345,7 +345,7 @@
+ 	}
+ 	if (unlikely
+ 	    (skb->truesize !=
+-	     sizeof(*skb) + skb_end_pointer(skb) - skb->head)) {
++	     sizeof(*skb) + skb_end_offset(skb))) {
+ 		/*
+ 		   printk("TX buffer truesize has been changed\n");
+ 		 */

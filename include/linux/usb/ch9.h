@@ -88,6 +88,8 @@
 #define USB_REQ_GET_INTERFACE		0x0A
 #define USB_REQ_SET_INTERFACE		0x0B
 #define USB_REQ_SYNCH_FRAME		0x0C
+#define USB_REQ_SET_SEL			0x30
+#define USB_REQ_SET_ISOCH_DELAY		0x31
 
 #define USB_REQ_SET_ENCRYPTION		0x0D	/* Wireless USB */
 #define USB_REQ_GET_ENCRYPTION		0x0E
@@ -409,6 +411,11 @@ struct usb_endpoint_descriptor {
 #define USB_ENDPOINT_XFER_INT		3
 #define USB_ENDPOINT_MAX_ADJUSTABLE	0x80
 
+/* The USB 3.0 spec redefines bits 5:4 of bmAttributes as interrupt ep type. */
+#define USB_ENDPOINT_INTRTYPE		0x30
+#define USB_ENDPOINT_INTR_PERIODIC	(0 << 4)
+#define USB_ENDPOINT_INTR_NOTIFICATION	(1 << 4)
+
 #define USB_ENDPOINT_SYNCTYPE		0x0c
 #define USB_ENDPOINT_SYNC_NONE		(0 << 2)
 #define USB_ENDPOINT_SYNC_ASYNC		(1 << 2)
@@ -609,6 +616,12 @@ static inline int usb_endpoint_is_isoc_out(
 static inline int usb_endpoint_maxp(const struct usb_endpoint_descriptor *epd)
 {
 	return __le16_to_cpu(epd->wMaxPacketSize);
+}
+
+static inline int usb_endpoint_interrupt_type(
+		const struct usb_endpoint_descriptor *epd)
+{
+	return epd->bmAttributes & USB_ENDPOINT_INTRTYPE;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -927,41 +940,13 @@ enum usb_device_speed {
  */
 extern const char *usb_speed_string(enum usb_device_speed speed);
 
-#endif
 
-enum usb_device_state {
-	/* NOTATTACHED isn't in the USB spec, and this state acts
-	 * the same as ATTACHED ... but it's clearer this way.
-	 */
-	USB_STATE_NOTATTACHED = 0,
-
-	/* chapter 9 and authentication (wireless) device states */
-	USB_STATE_ATTACHED,
-	USB_STATE_POWERED,			/* wired */
-	USB_STATE_RECONNECTING,			/* auth */
-	USB_STATE_UNAUTHENTICATED,		/* auth */
-	USB_STATE_DEFAULT,			/* limited function */
-	USB_STATE_ADDRESS,
-	USB_STATE_CONFIGURED,			/* most functions */
-
-	USB_STATE_SUSPENDED
-
-	/* NOTE:  there are actually four different SUSPENDED
-	 * states, returning to POWERED, DEFAULT, ADDRESS, or
-	 * CONFIGURED respectively when SOF tokens flow again.
-	 * At this level there's no difference between L1 and L2
-	 * suspend states.  (L2 being original USB 1.1 suspend.)
-	 */
-};
-
-/*-------------------------------------------------------------------------*/
-
-/*
- * As per USB compliance update, a device that is actively drawing
- * more than 100mA from USB must report itself as bus-powered in
- * the GetStatus(DEVICE) call.
- * http://compliance.usb.org/index.asp?UpdateFile=Electrical&Format=Standard#34
+/**
+ * usb_state_string - Returns human readable name for the state.
+ * @state: The state to return a human-readable name for. If it's not
+ *	any of the states devices in usb_device_state_string enum,
+ *	the string UNKNOWN will be returned.
  */
-#define USB_SELF_POWER_VBUS_MAX_DRAW		100
+extern const char *usb_state_string(enum usb_device_state state);
 
 #endif /* __LINUX_USB_CH9_H */

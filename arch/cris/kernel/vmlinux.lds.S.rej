@@ -1,0 +1,10 @@
+--- arch/cris/kernel/vmlinux.lds.S
++++ arch/cris/kernel/vmlinux.lds.S
+@@ -52,6 +52,7 @@
+ 
+ 	EXCEPTION_TABLE(4)
+ 
++	_sdata = .;
+ 	RODATA
+ 
+ 	. = ALIGN (4);

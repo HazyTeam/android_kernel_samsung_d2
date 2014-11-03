@@ -1,0 +1,11 @@
+--- arch/arm/kernel/perf_event_v7.c
++++ arch/arm/kernel/perf_event_v7.c
+@@ -774,7 +774,7 @@
+ /*
+  * PMXEVTYPER: Event selection reg
+  */
+-#define	ARMV7_EVTYPE_MASK	0xc00000ff	/* Mask for writable bits */
++#define	ARMV7_EVTYPE_MASK	0xc80000ff	/* Mask for writable bits */
+ #define	ARMV7_EVTYPE_EVENT	0xff		/* Mask for EVENT bits */
+ 
+ /*

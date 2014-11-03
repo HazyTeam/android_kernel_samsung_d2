@@ -16,6 +16,9 @@
 
 #include <linux/types.h>
 
+/* For key_map array */
+#define MXT_NUM_GPIO		4
+
 /* Orient */
 #define MXT_NORMAL		0x0
 #define MXT_DIAGONAL		0x1

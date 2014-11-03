@@ -1,0 +1,13 @@
+--- fs/direct-io.c
++++ fs/direct-io.c
+@@ -261,9 +261,9 @@
+ 		dio->end_io(dio->iocb, offset, transferred,
+ 			    dio->private, ret, is_async);
+ 	} else {
++		inode_dio_done(dio->inode);
+ 		if (is_async)
+ 			aio_complete(dio->iocb, ret, 0);
+-		inode_dio_done(dio->inode);
+ 	}
+ 
+ 	return ret;

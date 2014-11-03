@@ -1,0 +1,20 @@
+--- net/sunrpc/rpcb_clnt.c
++++ net/sunrpc/rpcb_clnt.c
+@@ -251,7 +251,7 @@
+ 	if (IS_ERR(clnt)) {
+ 		dprintk("RPC:       failed to create AF_LOCAL rpcbind "
+ 				"client (errno %ld).\n", PTR_ERR(clnt));
+-		result = -PTR_ERR(clnt);
++		result = PTR_ERR(clnt);
+ 		goto out;
+ 	}
+ 
+@@ -298,7 +298,7 @@
+ 	if (IS_ERR(clnt)) {
+ 		dprintk("RPC:       failed to create local rpcbind "
+ 				"client (errno %ld).\n", PTR_ERR(clnt));
+-		result = -PTR_ERR(clnt);
++		result = PTR_ERR(clnt);
+ 		goto out;
+ 	}
+ 

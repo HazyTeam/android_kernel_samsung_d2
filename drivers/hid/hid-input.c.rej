@@ -1,0 +1,11 @@
+--- drivers/hid/hid-input.c
++++ drivers/hid/hid-input.c
+@@ -1229,6 +1230,8 @@
+ 				 * UGCI) cram a lot of unrelated inputs into the
+ 				 * same interface. */
+ 				hidinput->report = report;
++				if (drv->input_configured)
++					drv->input_configured(hid, hidinput);
+ 				if (input_register_device(hidinput->input))
+ 					goto out_cleanup;
+ 				hidinput = NULL;

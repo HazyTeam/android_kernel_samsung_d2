@@ -1,0 +1,10 @@
+--- arch/alpha/oprofile/common.c
++++ arch/alpha/oprofile/common.c
+@@ -12,6 +12,7 @@
+ #include <linux/smp.h>
+ #include <linux/errno.h>
+ #include <asm/ptrace.h>
++#include <asm/special_insns.h>
+ 
+ #include "op_impl.h"
+ 

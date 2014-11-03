@@ -1,0 +1,12 @@
+--- fs/proc/proc_sysctl.c
++++ fs/proc/proc_sysctl.c
+@@ -462,9 +462,6 @@
+ 
+ 	err = ERR_PTR(-ENOMEM);
+ 	inode = proc_sys_make_inode(dir->i_sb, h ? h : head, p);
+-	if (h)
+-		sysctl_head_finish(h);
+-
+ 	if (!inode)
+ 		goto out;
+ 

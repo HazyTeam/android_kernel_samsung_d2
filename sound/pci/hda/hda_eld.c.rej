@@ -1,0 +1,24 @@
+--- sound/pci/hda/hda_eld.c
++++ sound/pci/hda/hda_eld.c
+@@ -316,17 +314,16 @@
+ 						 AC_DIPSIZE_ELD_BUF);
+ }
+ 
+-int snd_hdmi_get_eld(struct hdmi_eld *eld,
+-		     struct hda_codec *codec, hda_nid_t nid)
++int snd_hdmi_get_eld(struct hda_codec *codec, hda_nid_t nid,
++		     unsigned char *buf, int *eld_size)
+ {
+ 	int i;
+-	int ret;
++	int ret = 0;
+ 	int size;
+-	unsigned char *buf;
+ 
+ 	/*
+ 	 * ELD size is initialized to zero in caller function. If no errors and
+-	 * ELD is valid, actual eld_size is assigned in hdmi_update_eld()
++	 * ELD is valid, actual eld_size is assigned.
+ 	 */
+ 
+ 	size = snd_hdmi_get_eld_size(codec, nid);

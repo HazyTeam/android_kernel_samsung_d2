@@ -1,0 +1,11 @@
+--- arch/x86/kvm/lapic.h
++++ arch/x86/kvm/lapic.h
+@@ -35,6 +38,8 @@
+ 	void *regs;
+ 	gpa_t vapic_addr;
+ 	struct page *vapic_page;
++	unsigned long pending_events;
++	unsigned int sipi_vector;
+ };
+ int kvm_create_lapic(struct kvm_vcpu *vcpu);
+ void kvm_free_lapic(struct kvm_vcpu *vcpu);

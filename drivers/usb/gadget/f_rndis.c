@@ -105,7 +105,7 @@ static unsigned int bitrate(struct usb_gadget *g)
 /*
  */
 
-#define LOG2_STATUS_INTERVAL_MSEC	5	/* 1 << 5 == 32 msec */
+#define RNDIS_STATUS_INTERVAL_MS	32
 #define STATUS_BYTECOUNT		8	/* 8 bytes data */
 
 
@@ -194,7 +194,7 @@ static struct usb_endpoint_descriptor fs_notify_desc = {
 	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
 	.wMaxPacketSize =	cpu_to_le16(STATUS_BYTECOUNT),
-	.bInterval =		1 << LOG2_STATUS_INTERVAL_MSEC,
+	.bInterval =		RNDIS_STATUS_INTERVAL_MS,
 };
 
 static struct usb_endpoint_descriptor fs_in_desc = {
@@ -240,7 +240,7 @@ static struct usb_endpoint_descriptor hs_notify_desc = {
 	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
 	.wMaxPacketSize =	cpu_to_le16(STATUS_BYTECOUNT),
-	.bInterval =		LOG2_STATUS_INTERVAL_MSEC + 4,
+	.bInterval =		USB_MS_TO_HS_INTERVAL(RNDIS_STATUS_INTERVAL_MS)
 };
 
 static struct usb_endpoint_descriptor hs_in_desc = {
@@ -288,7 +288,7 @@ static struct usb_endpoint_descriptor ss_notify_desc = {
 	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
 	.wMaxPacketSize =	cpu_to_le16(STATUS_BYTECOUNT),
-	.bInterval =		LOG2_STATUS_INTERVAL_MSEC + 4,
+	.bInterval =		USB_MS_TO_HS_INTERVAL(RNDIS_STATUS_INTERVAL_MS)
 };
 
 static struct usb_ss_ep_comp_descriptor ss_intr_comp_desc = {
@@ -752,42 +752,22 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 	rndis->notify_req->context = rndis;
 	rndis->notify_req->complete = rndis_response_complete;
 
-	/* copy descriptors, and track endpoint copies */
-	f->descriptors = usb_copy_descriptors(eth_fs_function);
-	if (!f->descriptors)
-		goto fail;
-
 	/* support all relevant hardware speeds... we expect that when
 	 * hardware is dual speed, all bulk-capable endpoints work at
 	 * both speeds
 	 */
-	if (gadget_is_dualspeed(c->cdev->gadget)) {
-		hs_in_desc.bEndpointAddress =
-				fs_in_desc.bEndpointAddress;
-		hs_out_desc.bEndpointAddress =
-				fs_out_desc.bEndpointAddress;
-		hs_notify_desc.bEndpointAddress =
-				fs_notify_desc.bEndpointAddress;
+	hs_in_desc.bEndpointAddress = fs_in_desc.bEndpointAddress;
+	hs_out_desc.bEndpointAddress = fs_out_desc.bEndpointAddress;
+	hs_notify_desc.bEndpointAddress = fs_notify_desc.bEndpointAddress;
 
-		/* copy descriptors, and track endpoint copies */
-		f->hs_descriptors = usb_copy_descriptors(eth_hs_function);
-		if (!f->hs_descriptors)
-			goto fail;
-	}
+	ss_in_desc.bEndpointAddress = fs_in_desc.bEndpointAddress;
+	ss_out_desc.bEndpointAddress = fs_out_desc.bEndpointAddress;
+	ss_notify_desc.bEndpointAddress = fs_notify_desc.bEndpointAddress;
 
-	if (gadget_is_superspeed(c->cdev->gadget)) {
-		ss_in_desc.bEndpointAddress =
-				fs_in_desc.bEndpointAddress;
-		ss_out_desc.bEndpointAddress =
-				fs_out_desc.bEndpointAddress;
-		ss_notify_desc.bEndpointAddress =
-				fs_notify_desc.bEndpointAddress;
-
-		/* copy descriptors, and track endpoint copies */
-		f->ss_descriptors = usb_copy_descriptors(eth_ss_function);
-		if (!f->ss_descriptors)
-			goto fail;
-	}
+	status = usb_assign_descriptors(f, eth_fs_function, eth_hs_function,
+			eth_ss_function);
+	if (status)
+		goto fail;
 
 	rndis->port.open = rndis_open;
 	rndis->port.close = rndis_close;
@@ -818,12 +798,7 @@ rndis_bind(struct usb_configuration *c, struct usb_function *f)
 	return 0;
 
 fail:
-	if (gadget_is_superspeed(c->cdev->gadget) && f->ss_descriptors)
-		usb_free_descriptors(f->ss_descriptors);
-	if (gadget_is_dualspeed(c->cdev->gadget) && f->hs_descriptors)
-		usb_free_descriptors(f->hs_descriptors);
-	if (f->descriptors)
-		usb_free_descriptors(f->descriptors);
+	usb_free_all_descriptors(f);
 
 	if (rndis->notify_req) {
 		kfree(rndis->notify_req->buf);
@@ -890,7 +865,7 @@ rndis_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 
 int
 rndis_bind_config_vendor(struct usb_configuration *c, u8 ethaddr[ETH_ALEN],
-				u32 vendorID, const char *manufacturer)
+		u32 vendorID, const char *manufacturer, struct eth_dev *dev)
 {
 	struct f_rndis	*rndis;
 	int		status;
@@ -938,6 +913,7 @@ rndis_bind_config_vendor(struct usb_configuration *c, u8 ethaddr[ETH_ALEN],
 	rndis->vendorID = vendorID;
 	rndis->manufacturer = manufacturer;
 
+	rndis->port.ioport = dev;
 	/* RNDIS activates when the host changes this filter */
 	rndis->port.cdc_filter = 0;
 

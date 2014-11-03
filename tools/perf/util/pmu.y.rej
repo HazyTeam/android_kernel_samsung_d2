@@ -1,0 +1,8 @@
+--- tools/perf/util/pmu.y
++++ tools/perf/util/pmu.y
+@@ -1,5 +1,4 @@
+ 
+-%name-prefix "perf_pmu_"
+ %parse-param {struct list_head *format}
+ %parse-param {char *name}
+ 

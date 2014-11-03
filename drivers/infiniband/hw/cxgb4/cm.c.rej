@@ -1,0 +1,24 @@
+--- drivers/infiniband/hw/cxgb4/cm.c
++++ drivers/infiniband/hw/cxgb4/cm.c
+@@ -1618,7 +1643,7 @@
+ 					n, n->dev, 0);
+ 		if (!ep->l2t)
+ 			goto out;
+-		ep->mtu = dst_mtu(ep->dst);
++		ep->mtu = dst_mtu(dst);
+ 		ep->tx_chan = cxgb4_port_chan(n->dev);
+ 		ep->smac_idx = (cxgb4_port_viid(n->dev) & 0x7F) << 1;
+ 		step = cdev->rdev.lldi.ntxq /
+@@ -2698,11 +2729,8 @@
+ 
+ 	/*
+ 	 * Wake up any threads in rdma_init() or rdma_fini().
+-	 * However, this is not needed if com state is just
+-	 * MPA_REQ_SENT
+ 	 */
+-	if (ep->com.state != MPA_REQ_SENT)
+-		c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
++	c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
+ 	sched(dev, skb);
+ 	return 0;
+ }

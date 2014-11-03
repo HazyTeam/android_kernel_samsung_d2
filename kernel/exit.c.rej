@@ -1,0 +1,10 @@
+--- kernel/exit.c
++++ kernel/exit.c
+@@ -794,6 +793,7 @@
+ 	exit_shm(tsk);
+ 	exit_files(tsk);
+ 	exit_fs(tsk);
++	exit_task_namespaces(tsk);
+ 	exit_task_work(tsk);
+ 	check_stack_usage();
+ 	exit_thread();

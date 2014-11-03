@@ -1,0 +1,12 @@
+--- drivers/xen/xen-pciback/pciback_ops.c
++++ drivers/xen/xen-pciback/pciback_ops.c
+@@ -113,7 +113,8 @@
+ 		if (dev->msi_enabled)
+ 			pci_disable_msi(dev);
+ #endif
+-		pci_disable_device(dev);
++		if (pci_is_enabled(dev))
++			pci_disable_device(dev);
+ 
+ 		pci_write_config_word(dev, PCI_COMMAND, 0);
+ 

@@ -1,0 +1,30 @@
+--- kernel/power/wakelock.c
++++ kernel/power/wakelock.c
+@@ -9,6 +9,7 @@
+  * manipulate wakelocks on Android.
+  */
+ 
++#include <linux/capability.h>
+ #include <linux/ctype.h>
+ #include <linux/device.h>
+ #include <linux/err.h>
+@@ -188,6 +189,9 @@
+ 	size_t len;
+ 	int ret = 0;
+ 
++	if (!capable(CAP_BLOCK_SUSPEND))
++		return -EPERM;
++
+ 	while (*str && !isspace(*str))
+ 		str++;
+ 
+@@ -231,6 +235,9 @@
+ 	size_t len;
+ 	int ret = 0;
+ 
++	if (!capable(CAP_BLOCK_SUSPEND))
++		return -EPERM;
++
+ 	len = strlen(buf);
+ 	if (!len)
+ 		return -EINVAL;

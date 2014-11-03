@@ -1,0 +1,9 @@
+--- drivers/block/aoe/aoe.h
++++ drivers/block/aoe/aoe.h
+@@ -1,5 +1,5 @@
+ /* Copyright (c) 2012 Coraid, Inc.  See COPYING for GPL terms. */
+-#define VERSION "50"
++#define VERSION "81"
+ #define AOE_MAJOR 152
+ #define DEVICE_NAME "aoe"
+ 

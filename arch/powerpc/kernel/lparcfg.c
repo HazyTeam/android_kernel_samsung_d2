@@ -47,8 +47,6 @@
 
 /* #define LPARCFG_DEBUG */
 
-static struct proc_dir_entry *proc_ppc64_lparcfg;
-
 /*
  * Track sum of all purrs across all processors. This is used to further
  * calculate usage values by different applications

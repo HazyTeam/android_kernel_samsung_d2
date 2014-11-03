@@ -1,0 +1,11 @@
+--- drivers/net/wireless/ath/ath9k/beacon.c
++++ drivers/net/wireless/ath/ath9k/beacon.c
+@@ -120,7 +120,7 @@
+ 
+ 	if (ath_tx_start(hw, skb, &txctl) != 0) {
+ 		ath_dbg(common, XMIT, "CABQ TX failed\n");
+-		dev_kfree_skb_any(skb);
++		ieee80211_free_txskb(hw, skb);
+ 	}
+ }
+ 

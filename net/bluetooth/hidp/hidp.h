@@ -24,7 +24,9 @@
 #define __HIDP_H
 
 #include <linux/types.h>
+#include <linux/kref.h>
 #include <net/bluetooth/bluetooth.h>
+#include <net/bluetooth/l2cap.h>
 
 /* HIDP header masks */
 #define HIDP_HEADER_TRANS_MASK			0xf0

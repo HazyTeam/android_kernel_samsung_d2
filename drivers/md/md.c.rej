@@ -1,0 +1,32 @@
+--- drivers/md/md.c
++++ drivers/md/md.c
+@@ -1558,8 +1552,8 @@
+ 					     sector, count, 1) == 0)
+ 				return -EINVAL;
+ 		}
+-	} else if (sb->bblog_offset == 0)
+-		rdev->badblocks.shift = -1;
++	} else if (sb->bblog_offset != 0)
++		rdev->badblocks.shift = 0;
+ 
+ 	if (!refdev) {
+ 		ret = 1;
+@@ -3218,7 +3215,7 @@
+ 	 * be used - I wonder if that matters
+ 	 */
+ 	rdev->badblocks.count = 0;
+-	rdev->badblocks.shift = 0;
++	rdev->badblocks.shift = -1; /* disabled until explicitly enabled */
+ 	rdev->badblocks.page = kmalloc(PAGE_SIZE, GFP_KERNEL);
+ 	seqlock_init(&rdev->badblocks.lock);
+ 	if (rdev->badblocks.page == NULL)
+@@ -3290,9 +3287,6 @@
+ 			goto abort_free;
+ 		}
+ 	}
+-	if (super_format == -1)
+-		/* hot-add for 0.90, or non-persistent: so no badblocks */
+-		rdev->badblocks.shift = -1;
+ 
+ 	return rdev;
+ 

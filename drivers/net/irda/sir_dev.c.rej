@@ -1,0 +1,11 @@
+--- drivers/net/irda/sir_dev.c
++++ drivers/net/irda/sir_dev.c
+@@ -222,7 +222,7 @@
+ 			break;
+ 
+ 		case SIRDEV_STATE_DONGLE_SPEED:
+-			if (dev->dongle_drv->reset) {
++			if (dev->dongle_drv->set_speed) {
+ 				ret = dev->dongle_drv->set_speed(dev, fsm->param);
+ 				if (ret < 0) {
+ 					fsm->result = ret;

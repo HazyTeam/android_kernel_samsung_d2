@@ -60,6 +60,20 @@
 	.driver_info = (flags) \
 }
 
+/* Define the device is matched with Vendor ID and interface descriptors */
+#define UNUSUAL_VENDOR_INTF(id_vendor, cl, sc, pr, \
+			vendorName, productName, useProtocol, useTransport, \
+			initFunction, flags) \
+{ \
+	.match_flags = USB_DEVICE_ID_MATCH_INT_INFO \
+				| USB_DEVICE_ID_MATCH_VENDOR, \
+	.idVendor    = (id_vendor), \
+	.bInterfaceClass = (cl), \
+	.bInterfaceSubClass = (sc), \
+	.bInterfaceProtocol = (pr), \
+	.driver_info = (flags) \
+}
+
 struct usb_device_id usb_storage_usb_ids[] = {
 #	include "unusual_devs.h"
 	{ }		/* Terminating entry */
@@ -110,7 +124,6 @@ static struct ignore_entry ignore_ids[] = {
 
 #undef UNUSUAL_DEV
 
-
 /* Return an error if a device is in the ignore_ids list */
 int usb_usual_ignore_device(struct usb_interface *intf)
 {
@@ -130,4 +143,3 @@ int usb_usual_ignore_device(struct usb_interface *intf)
 	}
 	return 0;
 }
-EXPORT_SYMBOL_GPL(usb_usual_ignore_device);

@@ -1,0 +1,64 @@
+--- drivers/gpu/drm/radeon/radeon_gart.c
++++ drivers/gpu/drm/radeon/radeon_gart.c
+@@ -1249,35 +1580,15 @@
+  * @rdev: radeon_device pointer
+  * @vm: requested vm
+  *
+- * Init @vm (cayman+).
+- * Map the IB pool and any other shared objects into the VM
+- * by default as it's used by all VMs.
+- * Returns 0 for success, error for failure.
++ * Init @vm fields (cayman+).
+  */
+-int radeon_vm_init(struct radeon_device *rdev, struct radeon_vm *vm)
++void radeon_vm_init(struct radeon_device *rdev, struct radeon_vm *vm)
+ {
+-	int r;
+-
+-	vm->id = -1;
++	vm->id = 0;
+ 	vm->fence = NULL;
+ 	mutex_init(&vm->mutex);
+ 	INIT_LIST_HEAD(&vm->list);
+ 	INIT_LIST_HEAD(&vm->va);
+-	/* SI requires equal sized PTs for all VMs, so always set
+-	 * last_pfn to max_pfn.  cayman allows variable sized
+-	 * pts so we can grow then as needed.  Once we switch
+-	 * to two level pts we can unify this again.
+-	 */
+-	if (rdev->family >= CHIP_TAHITI)
+-		vm->last_pfn = rdev->vm_manager.max_pfn;
+-	else
+-		vm->last_pfn = 0;
+-	/* map the ib pool buffer at 0 in virtual address space, set
+-	 * read only
+-	 */
+-	r = radeon_vm_bo_add(rdev, vm, rdev->ring_tmp_bo.bo, 0,
+-			     RADEON_VM_PAGE_READABLE | RADEON_VM_PAGE_SNOOPED);
+-	return r;
+ }
+ 
+ /**
+@@ -1296,21 +1607,9 @@
+ 
+ 	mutex_lock(&rdev->vm_manager.lock);
+ 	mutex_lock(&vm->mutex);
+-	radeon_vm_unbind_locked(rdev, vm);
++	radeon_vm_free_pt(rdev, vm);
+ 	mutex_unlock(&rdev->vm_manager.lock);
+ 
+-	/* remove all bo at this point non are busy any more because unbind
+-	 * waited for the last vm fence to signal
+-	 */
+-	r = radeon_bo_reserve(rdev->ring_tmp_bo.bo, false);
+-	if (!r) {
+-		bo_va = radeon_bo_va(rdev->ring_tmp_bo.bo, vm);
+-		list_del_init(&bo_va->bo_list);
+-		list_del_init(&bo_va->vm_list);
+-		radeon_fence_unref(&bo_va->fence);
+-		radeon_bo_unreserve(rdev->ring_tmp_bo.bo);
+-		kfree(bo_va);
+-	}
+ 	if (!list_empty(&vm->va)) {
+ 		dev_err(rdev->dev, "still active bo inside vm\n");
+ 	}

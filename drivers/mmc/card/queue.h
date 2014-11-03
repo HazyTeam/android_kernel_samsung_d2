@@ -1,6 +1,8 @@
 #ifndef MMC_QUEUE_H
 #define MMC_QUEUE_H
 
+#define MMC_REQ_SPECIAL_MASK	(REQ_DISCARD | REQ_FLUSH)
+
 struct request;
 struct task_struct;
 
@@ -15,6 +17,23 @@ struct mmc_blk_request {
 enum mmc_packed_cmd {
 	MMC_PACKED_NONE = 0,
 	MMC_PACKED_WRITE,
+};
+
+enum mmc_packed_type {
+	MMC_PACKED_NONE = 0,
+	MMC_PACKED_WRITE,
+};
+
+#define mmc_packed_cmd(type)	((type) != MMC_PACKED_NONE)
+#define mmc_packed_wr(type)	((type) == MMC_PACKED_WRITE)
+
+struct mmc_packed {
+	struct list_head	list;
+	u32			cmd_hdr[1024];
+	unsigned int		blocks;
+	u8			nr_entries;
+	u8			retries;
+	s16			idx_failure;
 };
 
 struct mmc_queue_req {
@@ -69,5 +88,8 @@ extern void mmc_queue_bounce_pre(struct mmc_queue_req *);
 extern void mmc_queue_bounce_post(struct mmc_queue_req *);
 
 extern void print_mmc_packing_stats(struct mmc_card *card);
+
+extern int mmc_packed_init(struct mmc_queue *, struct mmc_card *);
+extern void mmc_packed_clean(struct mmc_queue *);
 
 #endif

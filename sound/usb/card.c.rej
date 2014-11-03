@@ -1,0 +1,56 @@
+--- sound/usb/card.c
++++ sound/usb/card.c
+@@ -82,6 +82,7 @@
+ static int nrpacks = 8;		/* max. number of packets per urb */
+ static int device_setup[SNDRV_CARDS]; /* device parameter for this card */
+ static bool ignore_ctl_error;
++static bool autoclock = true;
+ 
+ module_param_array(index, int, NULL, 0444);
+ MODULE_PARM_DESC(index, "Index value for the USB audio adapter.");
+@@ -146,14 +149,32 @@
+ 		return -EINVAL;
+ 	}
+ 
++	alts = &iface->altsetting[0];
++	altsd = get_iface_desc(alts);
++
++	/*
++	 * Android with both accessory and audio interfaces enabled gets the
++	 * interface numbers wrong.
++	 */
++	if ((chip->usb_id == USB_ID(0x18d1, 0x2d04) ||
++	     chip->usb_id == USB_ID(0x18d1, 0x2d05)) &&
++	    interface == 0 &&
++	    altsd->bInterfaceClass == USB_CLASS_VENDOR_SPEC &&
++	    altsd->bInterfaceSubClass == USB_SUBCLASS_VENDOR_SPEC) {
++		interface = 2;
++		iface = usb_ifnum_to_if(dev, interface);
++		if (!iface)
++			return -EINVAL;
++		alts = &iface->altsetting[0];
++		altsd = get_iface_desc(alts);
++	}
++
+ 	if (usb_interface_claimed(iface)) {
+ 		snd_printdd(KERN_INFO "%d:%d:%d: skipping, already claimed\n",
+ 						dev->devnum, ctrlif, interface);
+ 		return -EINVAL;
+ 	}
+ 
+-	alts = &iface->altsetting[0];
+-	altsd = get_iface_desc(alts);
+ 	if ((altsd->bInterfaceClass == USB_CLASS_AUDIO ||
+ 	     altsd->bInterfaceClass == USB_CLASS_VENDOR_SPEC) &&
+ 	    altsd->bInterfaceSubClass == USB_SUBCLASS_MIDISTREAMING) {
+@@ -630,7 +652,9 @@
+ 	int err = -ENODEV;
+ 
+ 	down_read(&chip->shutdown_rwsem);
+-	if (!chip->shutdown && !chip->probing)
++	if (chip->probing)
++		err = 0;
++	else if (!chip->shutdown)
+ 		err = usb_autopm_get_interface(chip->pm_intf);
+ 	up_read(&chip->shutdown_rwsem);
+ 

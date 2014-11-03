@@ -1,0 +1,15 @@
+--- drivers/net/wireless/ath/ath9k/ath9k.h
++++ drivers/net/wireless/ath/ath9k/ath9k.h
+@@ -316,10 +313,11 @@
+ 	unsigned int rxfilter;
+ 	struct list_head rxbuf;
+ 	struct ath_descdma rxdma;
+-	struct ath_buf *rx_bufptr;
+ 	struct ath_rx_edma rx_edma[ATH9K_RX_QUEUE_MAX];
+ 
+ 	struct sk_buff *frag;
++
++	u32 ampdu_ref;
+ };
+ 
+ int ath_startrecv(struct ath_softc *sc);

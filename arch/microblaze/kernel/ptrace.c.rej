@@ -1,0 +1,11 @@
+--- arch/microblaze/kernel/ptrace.c
++++ arch/microblaze/kernel/ptrace.c
+@@ -136,7 +136,7 @@
+ {
+ 	long ret = 0;
+ 
+-	secure_computing(regs->r12);
++	secure_computing_strict(regs->r12);
+ 
+ 	if (test_thread_flag(TIF_SYSCALL_TRACE) &&
+ 	    tracehook_report_syscall_entry(regs))

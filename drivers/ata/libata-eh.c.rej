@@ -1,0 +1,10 @@
+--- drivers/ata/libata-eh.c
++++ drivers/ata/libata-eh.c
+@@ -2657,6 +2657,7 @@
+ 		 * bus as we may be talking too fast.
+ 		 */
+ 		dev->pio_mode = XFER_PIO_0;
++		dev->dma_mode = 0xff;
+ 
+ 		/* If the controller has a pio mode setup function
+ 		 * then use it to set the chipset to rights. Don't

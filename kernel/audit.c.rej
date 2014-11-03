@@ -1,0 +1,29 @@
+--- kernel/audit.c
++++ kernel/audit.c
+@@ -1163,20 +1184,13 @@
+ 
+ 	while (audit_backlog_limit
+ 	       && skb_queue_len(&audit_skb_queue) > audit_backlog_limit + reserve) {
+-		if (gfp_mask & __GFP_WAIT && audit_backlog_wait_time
+-		    && time_before(jiffies, timeout_start + audit_backlog_wait_time)) {
++		if (gfp_mask & __GFP_WAIT && audit_backlog_wait_time) {
++			unsigned long sleep_time;
+ 
+-			/* Wait for auditd to drain the queue a little */
+-			DECLARE_WAITQUEUE(wait, current);
+-			set_current_state(TASK_INTERRUPTIBLE);
+-			add_wait_queue(&audit_backlog_wait, &wait);
+-
+-			if (audit_backlog_limit &&
+-			    skb_queue_len(&audit_skb_queue) > audit_backlog_limit)
+-				schedule_timeout(timeout_start + audit_backlog_wait_time - jiffies);
+-
+-			__set_current_state(TASK_RUNNING);
+-			remove_wait_queue(&audit_backlog_wait, &wait);
++			sleep_time = timeout_start + audit_backlog_wait_time -
++					jiffies;
++			if ((long)sleep_time > 0)
++				wait_for_auditd(sleep_time);
+ 			continue;
+ 		}
+ 		if (audit_rate_check() && printk_ratelimit())

@@ -1,0 +1,13 @@
+--- drivers/net/team/team_mode_roundrobin.c
++++ drivers/net/team/team_mode_roundrobin.c
+@@ -32,7 +12,9 @@
+ 
+ 	port_index = rr_priv(team)->sent_packets++ % team->en_port_count;
+ 	port = team_get_port_by_index_rcu(team, port_index);
+-	port = __get_first_port_up(team, port);
++	if (unlikely(!port))
++		goto drop;
++	port = team_get_first_port_txable_rcu(team, port);
+ 	if (unlikely(!port))
+ 		goto drop;
+ 	if (team_dev_queue_xmit(team, port, skb))

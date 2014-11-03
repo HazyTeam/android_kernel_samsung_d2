@@ -1,0 +1,11 @@
+--- drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c
++++ drivers/net/ethernet/broadcom/bnx2x/bnx2x_cmn.c
+@@ -725,7 +732,7 @@
+ 		if (!bnx2x_fill_frag_skb(bp, fp, tpa_info, pages,
+ 					 skb, cqe, cqe_idx)) {
+ 			if (tpa_info->parsing_flags & PARSING_FLAGS_VLAN)
+-				__vlan_hwaccel_put_tag(skb, tpa_info->vlan_tag);
++				__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), tpa_info->vlan_tag);
+ 			bnx2x_gro_receive(bp, fp, skb);
+ 		} else {
+ 			DP(NETIF_MSG_RX_STATUS,

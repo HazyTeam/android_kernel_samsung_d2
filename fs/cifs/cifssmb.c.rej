@@ -1,0 +1,11 @@
+--- fs/cifs/cifssmb.c
++++ fs/cifs/cifssmb.c
+@@ -3311,7 +3318,7 @@
+ 	else if (acl_type == ACL_TYPE_DEFAULT)
+ 		cifs_acl->default_entry_count = cpu_to_le16(count);
+ 	else {
+-		cFYI(1, "unknown ACL type %d", acl_type);
++		cifs_dbg(FYI, "unknown ACL type %d\n", acl_type);
+ 		return 0;
+ 	}
+ 	for (i = 0; i < count; i++) {

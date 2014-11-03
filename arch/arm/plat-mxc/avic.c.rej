@@ -1,0 +1,11 @@
+--- arch/arm/plat-mxc/avic.c
++++ arch/arm/plat-mxc/avic.c
+@@ -218,7 +237,7 @@
+ 
+ #ifdef CONFIG_FIQ
+ 	/* Initialize FIQ */
+-	init_FIQ();
++	init_FIQ(FIQ_START);
+ #endif
+ 
+ 	printk(KERN_INFO "MXC IRQ initialized\n");

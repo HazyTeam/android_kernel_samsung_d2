@@ -1,0 +1,27 @@
+--- net/mac80211/util.c
++++ net/mac80211/util.c
+@@ -1210,15 +1253,23 @@
+ 	/* add any remaining custom IEs */
+ 	if (ie && ie_len) {
+ 		noffset = ie_len;
++		if (end - pos < noffset - offset)
++			goto out_err;
+ 		memcpy(pos, ie + offset, noffset - offset);
+ 		pos += noffset - offset;
+ 	}
+ 
+-	if (sband->vht_cap.vht_supported)
++	if (sband->vht_cap.vht_supported) {
++		if (end - pos < 2 + sizeof(struct ieee80211_vht_cap))
++			goto out_err;
+ 		pos = ieee80211_ie_build_vht_cap(pos, &sband->vht_cap,
+ 						 sband->vht_cap.cap);
++	}
+ 
+ 	return pos - buffer;
++ out_err:
++	WARN_ONCE(1, "not enough space for preq IEs\n");
++	return pos - buffer;
+ }
+ 
+ struct sk_buff *ieee80211_build_probe_req(struct ieee80211_sub_if_data *sdata,

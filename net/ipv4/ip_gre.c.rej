@@ -1,0 +1,601 @@
+--- net/ipv4/ip_gre.c
++++ net/ipv4/ip_gre.c
+@@ -369,494 +-22,157 @@
+ 	return ERR_PTR(err);
+ }
+ 
+-static netdev_tx_t ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
++static struct sk_buff *gre_build_header(struct sk_buff *skb,
++					const struct tnl_ptk_info *tpi,
++					int hdr_len)
+ {
+-	struct pcpu_tstats *tstats = this_cpu_ptr(dev->tstats);
+-	struct ip_tunnel *tunnel = netdev_priv(dev);
+-	const struct iphdr  *old_iph;
+-	const struct iphdr  *tiph;
+-	struct flowi4 fl4;
+-	u8     tos;
+-	__be16 df;
+-	struct rtable *rt;     			/* Route to the other host */
+-	struct net_device *tdev;		/* Device to other host */
+-	struct iphdr  *iph;			/* Our new IP header */
+-	unsigned int max_headroom;		/* The extra header space needed */
+-	int    gre_hlen;
+-	__be32 dst;
+-	int    mtu;
+-	u8     ttl;
+-	int    err;
+-	int    pkt_len;
+-
+-	skb = handle_offloads(tunnel, skb);
+-	if (IS_ERR(skb)) {
+-		dev->stats.tx_dropped++;
+-		return NETDEV_TX_OK;
+-	}
++	struct gre_base_hdr *greh;
+ 
+-	if (!skb->encapsulation) {
+-		skb_reset_inner_headers(skb);
+-		skb->encapsulation = 1;
+-	}
++	skb_push(skb, hdr_len);
+ 
+-	old_iph = ip_hdr(skb);
++	greh = (struct gre_base_hdr *)skb->data;
++	greh->flags = tnl_flags_to_gre_flags(tpi->flags);
++	greh->protocol = tpi->proto;
+ 
+-	if (dev->type == ARPHRD_ETHER)
+-		IPCB(skb)->flags = 0;
++	if (tpi->flags&(TUNNEL_KEY|TUNNEL_CSUM|TUNNEL_SEQ)) {
++		__be32 *ptr = (__be32 *)(((u8 *)greh) + hdr_len - 4);
+ 
+-	if (dev->header_ops && dev->type == ARPHRD_IPGRE) {
+-		gre_hlen = 0;
+-		tiph = (const struct iphdr *)skb->data;
+-	} else {
+-		gre_hlen = tunnel->hlen;
+-		tiph = &tunnel->parms.iph;
+-	}
+-
+-	if ((dst = tiph->daddr) == 0) {
+-		/* NBMA tunnel */
+-
+-		if (skb_dst(skb) == NULL) {
+-			dev->stats.tx_fifo_errors++;
+-			goto tx_error;
++		if (tpi->flags&TUNNEL_SEQ) {
++			*ptr = tpi->seq;
++			ptr--;
+ 		}
+-
+-		if (skb->protocol == htons(ETH_P_IP)) {
+-			rt = skb_rtable(skb);
+-			dst = rt_nexthop(rt, old_iph->daddr);
++		if (tpi->flags&TUNNEL_KEY) {
++			*ptr = tpi->key;
++			ptr--;
+ 		}
+-#if IS_ENABLED(CONFIG_IPV6)
+-		else if (skb->protocol == htons(ETH_P_IPV6)) {
+-			const struct in6_addr *addr6;
+-			struct neighbour *neigh;
+-			bool do_tx_error_icmp;
+-			int addr_type;
+-
+-			neigh = dst_neigh_lookup(skb_dst(skb), &ipv6_hdr(skb)->daddr);
+-			if (neigh == NULL)
+-				goto tx_error;
+-
+-			addr6 = (const struct in6_addr *)&neigh->primary_key;
+-			addr_type = ipv6_addr_type(addr6);
+-
+-			if (addr_type == IPV6_ADDR_ANY) {
+-				addr6 = &ipv6_hdr(skb)->daddr;
+-				addr_type = ipv6_addr_type(addr6);
+-			}
+-
+-			if ((addr_type & IPV6_ADDR_COMPATv4) == 0)
+-				do_tx_error_icmp = true;
+-			else {
+-				do_tx_error_icmp = false;
+-				dst = addr6->s6_addr32[3];
+-			}
+-			neigh_release(neigh);
+-			if (do_tx_error_icmp)
+-				goto tx_error_icmp;
++		if (tpi->flags&TUNNEL_CSUM &&
++		    !(skb_shinfo(skb)->gso_type & SKB_GSO_GRE)) {
++			*(__sum16 *)ptr = 0;
++			*(__sum16 *)ptr = csum_fold(skb_checksum(skb, 0,
++								 skb->len, 0));
+ 		}
+-#endif
+-		else
+-			goto tx_error;
+ 	}
+ 
+-	ttl = tiph->ttl;
+-	tos = tiph->tos;
+-	if (tos & 0x1) {
+-		tos &= ~0x1;
+-		if (skb->protocol == htons(ETH_P_IP))
+-			tos = old_iph->tos;
+-		else if (skb->protocol == htons(ETH_P_IPV6))
+-			tos = ipv6_get_dsfield((const struct ipv6hdr *)old_iph);
+-	}
++	return skb;
++}
+ 
+-	rt = ip_route_output_gre(dev_net(dev), &fl4, dst, tiph->saddr,
+-				 tunnel->parms.o_key, RT_TOS(tos),
+-				 tunnel->parms.link);
+-	if (IS_ERR(rt)) {
+-		dev->stats.tx_carrier_errors++;
+-		goto tx_error;
+-	}
+-	tdev = rt->dst.dev;
++static void __gre_xmit(struct sk_buff *skb, struct net_device *dev,
++		       const struct iphdr *tnl_params,
++		       __be16 proto)
++{
++	struct ip_tunnel *tunnel = netdev_priv(dev);
++	struct tnl_ptk_info tpi;
+ 
+-	if (tdev == dev) {
+-		ip_rt_put(rt);
+-		dev->stats.collisions++;
+-		goto tx_error;
++	if (likely(!skb->encapsulation)) {
++		skb_reset_inner_headers(skb);
++		skb->encapsulation = 1;
+ 	}
+ 
+-	df = tiph->frag_off;
+-	if (df)
+-		mtu = dst_mtu(&rt->dst) - dev->hard_header_len - tunnel->hlen;
+-	else
+-		mtu = skb_dst(skb) ? dst_mtu(skb_dst(skb)) : dev->mtu;
+-
+-	if (skb_dst(skb))
+-		skb_dst(skb)->ops->update_pmtu(skb_dst(skb), NULL, skb, mtu);
++	tpi.flags = tunnel->parms.o_flags;
++	tpi.proto = proto;
++	tpi.key = tunnel->parms.o_key;
++	if (tunnel->parms.o_flags & TUNNEL_SEQ)
++		tunnel->o_seqno++;
++	tpi.seq = htonl(tunnel->o_seqno);
+ 
+-	if (skb->protocol == htons(ETH_P_IP)) {
+-		df |= (old_iph->frag_off&htons(IP_DF));
+-
+-		if (!skb_is_gso(skb) &&
+-		    (old_iph->frag_off&htons(IP_DF)) &&
+-		    mtu < ntohs(old_iph->tot_len)) {
+-			icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED, htonl(mtu));
+-			ip_rt_put(rt);
+-			goto tx_error;
+-		}
+-	}
+-#if IS_ENABLED(CONFIG_IPV6)
+-	else if (skb->protocol == htons(ETH_P_IPV6)) {
+-		struct rt6_info *rt6 = (struct rt6_info *)skb_dst(skb);
+-
+-		if (rt6 && mtu < dst_mtu(skb_dst(skb)) && mtu >= IPV6_MIN_MTU) {
+-			if ((tunnel->parms.iph.daddr &&
+-			     !ipv4_is_multicast(tunnel->parms.iph.daddr)) ||
+-			    rt6->rt6i_dst.plen == 128) {
+-				rt6->rt6i_flags |= RTF_MODIFIED;
+-				dst_metric_set(skb_dst(skb), RTAX_MTU, mtu);
+-			}
+-		}
+-
+-		if (!skb_is_gso(skb) &&
+-		    mtu >= IPV6_MIN_MTU &&
+-		    mtu < skb->len - tunnel->hlen + gre_hlen) {
+-			icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu);
+-			ip_rt_put(rt);
+-			goto tx_error;
+-		}
++	/* Push GRE header. */
++	skb = gre_build_header(skb, &tpi, tunnel->hlen);
++	if (unlikely(!skb)) {
++		dev->stats.tx_dropped++;
++		return;
+ 	}
+-#endif
+-
+-	if (tunnel->err_count > 0) {
+-		if (time_before(jiffies,
+-				tunnel->err_time + IPTUNNEL_ERR_TIMEO)) {
+-			tunnel->err_count--;
+ 
+-			dst_link_failure(skb);
+-		} else
+-			tunnel->err_count = 0;
+-	}
++	ip_tunnel_xmit(skb, dev, tnl_params);
++}
+ 
+-	max_headroom = LL_RESERVED_SPACE(tdev) + gre_hlen + rt->dst.header_len;
+-
+-	if (skb_headroom(skb) < max_headroom || skb_shared(skb)||
+-	    (skb_cloned(skb) && !skb_clone_writable(skb, 0))) {
+-		struct sk_buff *new_skb = skb_realloc_headroom(skb, max_headroom);
+-		if (max_headroom > dev->needed_headroom)
+-			dev->needed_headroom = max_headroom;
+-		if (!new_skb) {
+-			ip_rt_put(rt);
+-			dev->stats.tx_dropped++;
+-			dev_kfree_skb(skb);
+-			return NETDEV_TX_OK;
+-		}
+-		if (skb->sk)
+-			skb_set_owner_w(new_skb, skb->sk);
+-		dev_kfree_skb(skb);
+-		skb = new_skb;
+-		old_iph = ip_hdr(skb);
+-		/* Warning : tiph value might point to freed memory */
+-	}
++static netdev_tx_t ipgre_xmit(struct sk_buff *skb,
++			      struct net_device *dev)
++{
++	struct ip_tunnel *tunnel = netdev_priv(dev);
++	const struct iphdr *tnl_params;
+ 
+-	skb_push(skb, gre_hlen);
+-	skb_reset_network_header(skb);
+-	skb_set_transport_header(skb, sizeof(*iph));
+-	memset(&(IPCB(skb)->opt), 0, sizeof(IPCB(skb)->opt));
+-	IPCB(skb)->flags &= ~(IPSKB_XFRM_TUNNEL_SIZE | IPSKB_XFRM_TRANSFORMED |
+-			      IPSKB_REROUTED);
+-	skb_dst_drop(skb);
+-	skb_dst_set(skb, &rt->dst);
+-
+-	/*
+-	 *	Push down and install the IPIP header.
+-	 */
++	skb = handle_offloads(tunnel, skb);
++	if (IS_ERR(skb))
++		goto out;
+ 
+-	iph 			=	ip_hdr(skb);
+-	iph->version		=	4;
+-	iph->ihl		=	sizeof(struct iphdr) >> 2;
+-	iph->frag_off		=	df;
+-	iph->protocol		=	IPPROTO_GRE;
+-	iph->tos		=	ipgre_ecn_encapsulate(tos, old_iph, skb);
+-	iph->daddr		=	fl4.daddr;
+-	iph->saddr		=	fl4.saddr;
+-	iph->ttl		=	ttl;
+-
+-	tunnel_ip_select_ident(skb, old_iph, &rt->dst);
+-
+-	if (ttl == 0) {
+-		if (skb->protocol == htons(ETH_P_IP))
+-			iph->ttl = old_iph->ttl;
+-#if IS_ENABLED(CONFIG_IPV6)
+-		else if (skb->protocol == htons(ETH_P_IPV6))
+-			iph->ttl = ((const struct ipv6hdr *)old_iph)->hop_limit;
+-#endif
+-		else
+-			iph->ttl = ip4_dst_hoplimit(&rt->dst);
+-	}
++	if (dev->header_ops) {
++		/* Need space for new headers */
++		if (skb_cow_head(skb, dev->needed_headroom -
++				      (tunnel->hlen + sizeof(struct iphdr))))
++			goto free_skb;
+ 
+-	((__be16 *)(iph + 1))[0] = tunnel->parms.o_flags;
+-	((__be16 *)(iph + 1))[1] = (dev->type == ARPHRD_ETHER) ?
+-				   htons(ETH_P_TEB) : skb->protocol;
++		tnl_params = (const struct iphdr *)skb->data;
+ 
+-	if (tunnel->parms.o_flags&(GRE_KEY|GRE_CSUM|GRE_SEQ)) {
+-		__be32 *ptr = (__be32 *)(((u8 *)iph) + tunnel->hlen - 4);
++		/* Pull skb since ip_tunnel_xmit() needs skb->data pointing
++		 * to gre header.
++		 */
++		skb_pull(skb, tunnel->hlen + sizeof(struct iphdr));
++	} else {
++		if (skb_cow_head(skb, dev->needed_headroom))
++			goto free_skb;
+ 
+-		if (tunnel->parms.o_flags&GRE_SEQ) {
+-			++tunnel->o_seqno;
+-			*ptr = htonl(tunnel->o_seqno);
+-			ptr--;
+-		}
+-		if (tunnel->parms.o_flags&GRE_KEY) {
+-			*ptr = tunnel->parms.o_key;
+-			ptr--;
+-		}
+-		/* Skip GRE checksum if skb is getting offloaded. */
+-		if (!(skb_shinfo(skb)->gso_type & SKB_GSO_GRE) &&
+-		    (tunnel->parms.o_flags&GRE_CSUM)) {
+-			int offset = skb_transport_offset(skb);
+-
+-			if (skb_has_shared_frag(skb)) {
+-				err = __skb_linearize(skb);
+-				if (err)
+-					goto tx_error;
+-			}
+-
+-			*ptr = 0;
+-			*(__sum16 *)ptr = csum_fold(skb_checksum(skb, offset,
+-								 skb->len - offset,
+-								 0));
+-		}
++		tnl_params = &tunnel->parms.iph;
+ 	}
+ 
+-	nf_reset(skb);
++	__gre_xmit(skb, dev, tnl_params, skb->protocol);
+ 
+-	pkt_len = skb->len - skb_transport_offset(skb);
+-	err = ip_local_out(skb);
+-	if (likely(net_xmit_eval(err) == 0)) {
+-		u64_stats_update_begin(&tstats->syncp);
+-		tstats->tx_bytes += pkt_len;
+-		tstats->tx_packets++;
+-		u64_stats_update_end(&tstats->syncp);
+-	} else {
+-		dev->stats.tx_errors++;
+-		dev->stats.tx_aborted_errors++;
+-	}
+ 	return NETDEV_TX_OK;
+ 
+-#if IS_ENABLED(CONFIG_IPV6)
+-tx_error_icmp:
+-	dst_link_failure(skb);
+-#endif
+-tx_error:
+-	dev->stats.tx_errors++;
++free_skb:
+ 	dev_kfree_skb(skb);
++out:
++	dev->stats.tx_dropped++;
+ 	return NETDEV_TX_OK;
+ }
+ 
+-static int ipgre_tunnel_bind_dev(struct net_device *dev)
++static netdev_tx_t gre_tap_xmit(struct sk_buff *skb,
++				struct net_device *dev)
+ {
+-	struct net_device *tdev = NULL;
+-	struct ip_tunnel *tunnel;
+-	const struct iphdr *iph;
+-	int hlen = LL_MAX_HEADER;
+-	int mtu = ETH_DATA_LEN;
+-	int addend = sizeof(struct iphdr) + 4;
+-
+-	tunnel = netdev_priv(dev);
+-	iph = &tunnel->parms.iph;
+-
+-	/* Guess output device to choose reasonable mtu and needed_headroom */
+-
+-	if (iph->daddr) {
+-		struct flowi4 fl4;
+-		struct rtable *rt;
+-
+-		rt = ip_route_output_gre(dev_net(dev), &fl4,
+-					 iph->daddr, iph->saddr,
+-					 tunnel->parms.o_key,
+-					 RT_TOS(iph->tos),
+-					 tunnel->parms.link);
+-		if (!IS_ERR(rt)) {
+-			tdev = rt->dst.dev;
+-			ip_rt_put(rt);
+-		}
+-
+-		if (dev->type != ARPHRD_ETHER)
+-			dev->flags |= IFF_POINTOPOINT;
+-	}
++	struct ip_tunnel *tunnel = netdev_priv(dev);
+ 
+-	if (!tdev && tunnel->parms.link)
+-		tdev = __dev_get_by_index(dev_net(dev), tunnel->parms.link);
++	skb = handle_offloads(tunnel, skb);
++	if (IS_ERR(skb))
++		goto out;
+ 
+-	if (tdev) {
+-		hlen = tdev->hard_header_len + tdev->needed_headroom;
+-		mtu = tdev->mtu;
+-	}
+-	dev->iflink = tunnel->parms.link;
+-
+-	/* Precalculate GRE options length */
+-	if (tunnel->parms.o_flags&(GRE_CSUM|GRE_KEY|GRE_SEQ)) {
+-		if (tunnel->parms.o_flags&GRE_CSUM)
+-			addend += 4;
+-		if (tunnel->parms.o_flags&GRE_KEY)
+-			addend += 4;
+-		if (tunnel->parms.o_flags&GRE_SEQ)
+-			addend += 4;
+-	}
+-	dev->needed_headroom = addend + hlen;
+-	mtu -= dev->hard_header_len + addend;
++	if (skb_cow_head(skb, dev->needed_headroom))
++		goto free_skb;
+ 
+-	if (mtu < 68)
+-		mtu = 68;
++	__gre_xmit(skb, dev, &tunnel->parms.iph, htons(ETH_P_TEB));
+ 
+-	tunnel->hlen = addend;
+-	/* TCP offload with GRE SEQ is not supported. */
+-	if (!(tunnel->parms.o_flags & GRE_SEQ)) {
+-		dev->features		|= NETIF_F_GSO_SOFTWARE;
+-		dev->hw_features	|= NETIF_F_GSO_SOFTWARE;
+-	}
++	return NETDEV_TX_OK;
+ 
+-	return mtu;
++free_skb:
++	dev_kfree_skb(skb);
++out:
++	dev->stats.tx_dropped++;
++	return NETDEV_TX_OK;
+ }
+ 
+-static int
+-ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
++static int ipgre_tunnel_ioctl(struct net_device *dev,
++			      struct ifreq *ifr, int cmd)
+ {
+ 	int err = 0;
+ 	struct ip_tunnel_parm p;
+-	struct ip_tunnel *t;
+-	struct net *net = dev_net(dev);
+-	struct ipgre_net *ign = net_generic(net, ipgre_net_id);
+-
+-	switch (cmd) {
+-	case SIOCGETTUNNEL:
+-		t = NULL;
+-		if (dev == ign->fb_tunnel_dev) {
+-			if (copy_from_user(&p, ifr->ifr_ifru.ifru_data, sizeof(p))) {
+-				err = -EFAULT;
+-				break;
+-			}
+-			t = ipgre_tunnel_locate(net, &p, 0);
+-		}
+-		if (t == NULL)
+-			t = netdev_priv(dev);
+-		memcpy(&p, &t->parms, sizeof(p));
+-		if (copy_to_user(ifr->ifr_ifru.ifru_data, &p, sizeof(p)))
+-			err = -EFAULT;
+-		break;
+ 
+-	case SIOCADDTUNNEL:
+-	case SIOCCHGTUNNEL:
+-		err = -EPERM;
+-		if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
+-			goto done;
+-
+-		err = -EFAULT;
+-		if (copy_from_user(&p, ifr->ifr_ifru.ifru_data, sizeof(p)))
+-			goto done;
+-
+-		err = -EINVAL;
+-		if (p.iph.version != 4 || p.iph.protocol != IPPROTO_GRE ||
+-		    p.iph.ihl != 5 || (p.iph.frag_off&htons(~IP_DF)) ||
+-		    ((p.i_flags|p.o_flags)&(GRE_VERSION|GRE_ROUTING)))
+-			goto done;
+-		if (p.iph.ttl)
+-			p.iph.frag_off |= htons(IP_DF);
+-
+-		if (!(p.i_flags&GRE_KEY))
+-			p.i_key = 0;
+-		if (!(p.o_flags&GRE_KEY))
+-			p.o_key = 0;
+-
+-		t = ipgre_tunnel_locate(net, &p, cmd == SIOCADDTUNNEL);
+-
+-		if (dev != ign->fb_tunnel_dev && cmd == SIOCCHGTUNNEL) {
+-			if (t != NULL) {
+-				if (t->dev != dev) {
+-					err = -EEXIST;
+-					break;
+-				}
+-			} else {
+-				unsigned int nflags = 0;
+-
+-				t = netdev_priv(dev);
+-
+-				if (ipv4_is_multicast(p.iph.daddr))
+-					nflags = IFF_BROADCAST;
+-				else if (p.iph.daddr)
+-					nflags = IFF_POINTOPOINT;
+-
+-				if ((dev->flags^nflags)&(IFF_POINTOPOINT|IFF_BROADCAST)) {
+-					err = -EINVAL;
+-					break;
+-				}
+-				ipgre_tunnel_unlink(ign, t);
+-				synchronize_net();
+-				t->parms.iph.saddr = p.iph.saddr;
+-				t->parms.iph.daddr = p.iph.daddr;
+-				t->parms.i_key = p.i_key;
+-				t->parms.o_key = p.o_key;
+-				memcpy(dev->dev_addr, &p.iph.saddr, 4);
+-				memcpy(dev->broadcast, &p.iph.daddr, 4);
+-				ipgre_tunnel_link(ign, t);
+-				netdev_state_change(dev);
+-			}
+-		}
+-
+-		if (t) {
+-			err = 0;
+-			if (cmd == SIOCCHGTUNNEL) {
+-				t->parms.iph.ttl = p.iph.ttl;
+-				t->parms.iph.tos = p.iph.tos;
+-				t->parms.iph.frag_off = p.iph.frag_off;
+-				if (t->parms.link != p.link) {
+-					t->parms.link = p.link;
+-					dev->mtu = ipgre_tunnel_bind_dev(dev);
+-					netdev_state_change(dev);
+-				}
+-			}
+-			if (copy_to_user(ifr->ifr_ifru.ifru_data, &t->parms, sizeof(p)))
+-				err = -EFAULT;
+-		} else
+-			err = (cmd == SIOCADDTUNNEL ? -ENOBUFS : -ENOENT);
+-		break;
+-
+-	case SIOCDELTUNNEL:
+-		err = -EPERM;
+-		if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
+-			goto done;
+-
+-		if (dev == ign->fb_tunnel_dev) {
+-			err = -EFAULT;
+-			if (copy_from_user(&p, ifr->ifr_ifru.ifru_data, sizeof(p)))
+-				goto done;
+-			err = -ENOENT;
+-			if ((t = ipgre_tunnel_locate(net, &p, 0)) == NULL)
+-				goto done;
+-			err = -EPERM;
+-			if (t == netdev_priv(ign->fb_tunnel_dev))
+-				goto done;
+-			dev = t->dev;
+-		}
+-		unregister_netdevice(dev);
+-		err = 0;
+-		break;
+-
+-	default:
+-		err = -EINVAL;
++	if (copy_from_user(&p, ifr->ifr_ifru.ifru_data, sizeof(p)))
++		return -EFAULT;
++	if (p.iph.version != 4 || p.iph.protocol != IPPROTO_GRE ||
++	    p.iph.ihl != 5 || (p.iph.frag_off&htons(~IP_DF)) ||
++	    ((p.i_flags|p.o_flags)&(GRE_VERSION|GRE_ROUTING))) {
++		return -EINVAL;
+ 	}
++	p.i_flags = gre_flags_to_tnl_flags(p.i_flags);
++	p.o_flags = gre_flags_to_tnl_flags(p.o_flags);
+ 
+-done:
+-	return err;
+-}
++	err = ip_tunnel_ioctl(dev, &p, cmd);
++	if (err)
++		return err;
+ 
+-static int ipgre_tunnel_change_mtu(struct net_device *dev, int new_mtu)
+-{
+-	struct ip_tunnel *tunnel = netdev_priv(dev);
+-	if (new_mtu < 68 ||
+-	    new_mtu > 0xFFF8 - dev->hard_header_len - tunnel->hlen)
+-		return -EINVAL;
+-	dev->mtu = new_mtu;
++	p.i_flags = tnl_flags_to_gre_flags(p.i_flags);
++	p.o_flags = tnl_flags_to_gre_flags(p.o_flags);
++
++	if (copy_to_user(ifr->ifr_ifru.ifru_data, &p, sizeof(p)))
++		return -EFAULT;
+ 	return 0;
+ }
+ 

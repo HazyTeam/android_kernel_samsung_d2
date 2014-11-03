@@ -1,0 +1,18 @@
+--- drivers/char/misc.c
++++ drivers/char/misc.c
+@@ -198,6 +191,15 @@
+ 		}
+ 		misc->minor = DYNAMIC_MINORS - i - 1;
+ 		set_bit(i, misc_minors);
++	} else {
++		struct miscdevice *c;
++
++		list_for_each_entry(c, &misc_list, list) {
++			if (c->minor == misc->minor) {
++				mutex_unlock(&misc_mtx);
++				return -EBUSY;
++			}
++		}
+ 	}
+ 
+ 	dev = MKDEV(MISC_MAJOR, misc->minor);

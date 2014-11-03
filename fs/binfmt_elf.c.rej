@@ -1,0 +1,59 @@
+--- fs/binfmt_elf.c
++++ fs/binfmt_elf.c
+@@ -1809,48 +1928,37 @@
+ 	memset(info, 0, sizeof(*info));
+ 	INIT_LIST_HEAD(&info->thread_list);
+ 
+-	/* Allocate space for six ELF notes */
+-	info->notes = kmalloc(6 * sizeof(struct memelfnote), GFP_KERNEL);
++	/* Allocate space for ELF notes */
++	info->notes = kmalloc(8 * sizeof(struct memelfnote), GFP_KERNEL);
+ 	if (!info->notes)
+ 		return 0;
+ 	info->psinfo = kmalloc(sizeof(*info->psinfo), GFP_KERNEL);
+ 	if (!info->psinfo)
+-		goto notes_free;
++		return 0;
+ 	info->prstatus = kmalloc(sizeof(*info->prstatus), GFP_KERNEL);
+ 	if (!info->prstatus)
+-		goto psinfo_free;
++		return 0;
+ 	info->fpu = kmalloc(sizeof(*info->fpu), GFP_KERNEL);
+ 	if (!info->fpu)
+-		goto prstatus_free;
++		return 0;
+ #ifdef ELF_CORE_COPY_XFPREGS
+ 	info->xfpu = kmalloc(sizeof(*info->xfpu), GFP_KERNEL);
+ 	if (!info->xfpu)
+-		goto fpu_free;
++		return 0;
+ #endif
+ 	return 1;
+-#ifdef ELF_CORE_COPY_XFPREGS
+- fpu_free:
+-	kfree(info->fpu);
+-#endif
+- prstatus_free:
+-	kfree(info->prstatus);
+- psinfo_free:
+-	kfree(info->psinfo);
+- notes_free:
+-	kfree(info->notes);
+-	return 0;
+ }
+ 
+ static int fill_note_info(struct elfhdr *elf, int phdrs,
+ 			  struct elf_note_info *info,
+-			  long signr, struct pt_regs *regs)
++			  siginfo_t *siginfo, struct pt_regs *regs)
+ {
+ 	struct list_head *t;
+ 
+ 	if (!elf_note_info_init(info))
+ 		return 0;
+ 
+-	if (signr) {
++	if (siginfo->si_signo) {
+ 		struct core_thread *ct;
+ 		struct elf_thread_status *ets;
+ 

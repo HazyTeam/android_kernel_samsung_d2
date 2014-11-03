@@ -84,9 +84,9 @@ static struct mfd_cell power_devs[] = {
 static struct resource rtc_resources[] = {
 	{
 		.name	= "max8925-rtc",
-		.start	= MAX8925_RTC_IRQ,
-		.end	= MAX8925_RTC_IRQ_MASK,
-		.flags	= IORESOURCE_IO,
+		.start	= MAX8925_IRQ_RTC_ALARM0,
+		.end	= MAX8925_IRQ_RTC_ALARM0,
+		.flags	= IORESOURCE_IRQ,
 	},
 };
 
@@ -508,17 +508,33 @@ static struct irq_chip max8925_irq_chip = {
 	.irq_disable	= max8925_irq_disable,
 };
 
+static int max8925_irq_domain_map(struct irq_domain *d, unsigned int virq,
+				 irq_hw_number_t hw)
+{
+	irq_set_chip_data(virq, d->host_data);
+	irq_set_chip_and_handler(virq, &max8925_irq_chip, handle_edge_irq);
+	irq_set_nested_thread(virq, 1);
+#ifdef CONFIG_ARM
+	set_irq_flags(virq, IRQF_VALID);
+#else
+	irq_set_noprobe(virq);
+#endif
+	return 0;
+}
+
+static struct irq_domain_ops max8925_irq_domain_ops = {
+	.map	= max8925_irq_domain_map,
+	.xlate	= irq_domain_xlate_onetwocell,
+};
+
+
 static int max8925_irq_init(struct max8925_chip *chip, int irq,
 			    struct max8925_platform_data *pdata)
 {
 	unsigned long flags = IRQF_TRIGGER_FALLING | IRQF_ONESHOT;
-	int i, ret;
-	int __irq;
+	int ret;
+	struct device_node *node = chip->dev->of_node;
 
-	if (!pdata || !pdata->irq_base) {
-		dev_warn(chip->dev, "No interrupt support on IRQ base\n");
-		return -EINVAL;
-	}
 	/* clear all interrupts */
 	max8925_reg_read(chip->i2c, MAX8925_CHG_IRQ1);
 	max8925_reg_read(chip->i2c, MAX8925_CHG_IRQ2);
@@ -536,35 +552,30 @@ static int max8925_irq_init(struct max8925_chip *chip, int irq,
 	max8925_reg_write(chip->rtc, MAX8925_RTC_IRQ_MASK, 0xff);
 
 	mutex_init(&chip->irq_lock);
+	chip->irq_base = irq_alloc_descs(-1, 0, MAX8925_NR_IRQS, 0);
+	if (chip->irq_base < 0) {
+		dev_err(chip->dev, "Failed to allocate interrupts, ret:%d\n",
+			chip->irq_base);
+		return -EBUSY;
+	}
+
+	irq_domain_add_legacy(node, MAX8925_NR_IRQS, chip->irq_base, 0,
+			      &max8925_irq_domain_ops, chip);
+
+	/* request irq handler for pmic main irq*/
 	chip->core_irq = irq;
-	chip->irq_base = pdata->irq_base;
-
-	/* register with genirq */
-	for (i = 0; i < ARRAY_SIZE(max8925_irqs); i++) {
-		__irq = i + chip->irq_base;
-		irq_set_chip_data(__irq, chip);
-		irq_set_chip_and_handler(__irq, &max8925_irq_chip,
-					 handle_edge_irq);
-		irq_set_nested_thread(__irq, 1);
-#ifdef CONFIG_ARM
-		set_irq_flags(__irq, IRQF_VALID);
-#else
-		irq_set_noprobe(__irq);
-#endif
-	}
-	if (!irq) {
-		dev_warn(chip->dev, "No interrupt support on core IRQ\n");
-		goto tsc_irq;
-	}
-
-	ret = request_threaded_irq(irq, NULL, max8925_irq, flags,
+	if (!chip->core_irq)
+		return -EBUSY;
+	ret = request_threaded_irq(irq, NULL, max8925_irq, flags | IRQF_ONESHOT,
 				   "max8925", chip);
 	if (ret) {
 		dev_err(chip->dev, "Failed to request core IRQ: %d\n", ret);
 		chip->core_irq = 0;
+		return -EBUSY;
 	}
 
-tsc_irq:
+	/* request irq handler for pmic tsc irq*/
+
 	/* mask TSC interrupt */
 	max8925_reg_write(chip->adc, MAX8925_TSC_IRQ_MASK, 0x0f);
 
@@ -573,9 +584,8 @@ tsc_irq:
 		return 0;
 	}
 	chip->tsc_irq = pdata->tsc_irq;
-
 	ret = request_threaded_irq(chip->tsc_irq, NULL, max8925_tsc_irq,
-				   flags, "max8925-tsc", chip);
+				   flags | IRQF_ONESHOT, "max8925-tsc", chip);
 	if (ret) {
 		dev_err(chip->dev, "Failed to request TSC IRQ: %d\n", ret);
 		chip->tsc_irq = 0;
@@ -583,7 +593,114 @@ tsc_irq:
 	return 0;
 }
 
-int __devinit max8925_device_init(struct max8925_chip *chip,
+static void init_regulator(struct max8925_chip *chip,
+				     struct max8925_platform_data *pdata)
+{
+	int ret;
+
+	if (!pdata)
+		return;
+	if (pdata->sd1) {
+		reg_devs[0].platform_data = pdata->sd1;
+		reg_devs[0].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->sd2) {
+		reg_devs[1].platform_data = pdata->sd2;
+		reg_devs[1].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->sd3) {
+		reg_devs[2].platform_data = pdata->sd3;
+		reg_devs[2].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo1) {
+		reg_devs[3].platform_data = pdata->ldo1;
+		reg_devs[3].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo2) {
+		reg_devs[4].platform_data = pdata->ldo2;
+		reg_devs[4].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo3) {
+		reg_devs[5].platform_data = pdata->ldo3;
+		reg_devs[5].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo4) {
+		reg_devs[6].platform_data = pdata->ldo4;
+		reg_devs[6].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo5) {
+		reg_devs[7].platform_data = pdata->ldo5;
+		reg_devs[7].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo6) {
+		reg_devs[8].platform_data = pdata->ldo6;
+		reg_devs[8].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo7) {
+		reg_devs[9].platform_data = pdata->ldo7;
+		reg_devs[9].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo8) {
+		reg_devs[10].platform_data = pdata->ldo8;
+		reg_devs[10].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo9) {
+		reg_devs[11].platform_data = pdata->ldo9;
+		reg_devs[11].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo10) {
+		reg_devs[12].platform_data = pdata->ldo10;
+		reg_devs[12].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo11) {
+		reg_devs[13].platform_data = pdata->ldo11;
+		reg_devs[13].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo12) {
+		reg_devs[14].platform_data = pdata->ldo12;
+		reg_devs[14].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo13) {
+		reg_devs[15].platform_data = pdata->ldo13;
+		reg_devs[15].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo14) {
+		reg_devs[16].platform_data = pdata->ldo14;
+		reg_devs[16].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo15) {
+		reg_devs[17].platform_data = pdata->ldo15;
+		reg_devs[17].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo16) {
+		reg_devs[18].platform_data = pdata->ldo16;
+		reg_devs[18].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo17) {
+		reg_devs[19].platform_data = pdata->ldo17;
+		reg_devs[19].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo18) {
+		reg_devs[20].platform_data = pdata->ldo18;
+		reg_devs[20].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo19) {
+		reg_devs[21].platform_data = pdata->ldo19;
+		reg_devs[21].pdata_size = sizeof(struct regulator_init_data);
+	}
+	if (pdata->ldo20) {
+		reg_devs[22].platform_data = pdata->ldo20;
+		reg_devs[22].pdata_size = sizeof(struct regulator_init_data);
+	}
+	ret = mfd_add_devices(chip->dev, 0, reg_devs, ARRAY_SIZE(reg_devs),
+			      NULL, 0, NULL);
+	if (ret < 0) {
+		dev_err(chip->dev, "Failed to add regulator subdev\n");
+		return;
+	}
+}
+
+int max8925_device_init(struct max8925_chip *chip,
 				  struct max8925_platform_data *pdata)
 {
 	int ret;
@@ -608,7 +725,7 @@ int __devinit max8925_device_init(struct max8925_chip *chip,
 
 	ret = mfd_add_devices(chip->dev, 0, &rtc_devs[0],
 			      ARRAY_SIZE(rtc_devs),
-			      &rtc_resources[0], 0);
+			      NULL, chip->irq_base, NULL);
 	if (ret < 0) {
 		dev_err(chip->dev, "Failed to add rtc subdev\n");
 		goto out;
@@ -616,47 +733,38 @@ int __devinit max8925_device_init(struct max8925_chip *chip,
 
 	ret = mfd_add_devices(chip->dev, 0, &onkey_devs[0],
 			      ARRAY_SIZE(onkey_devs),
-			      &onkey_resources[0], 0);
+			      NULL, chip->irq_base, NULL);
 	if (ret < 0) {
 		dev_err(chip->dev, "Failed to add onkey subdev\n");
 		goto out_dev;
 	}
 
-	if (pdata) {
-		ret = mfd_add_devices(chip->dev, 0, &regulator_devs[0],
-				      ARRAY_SIZE(regulator_devs),
-				      &regulator_resources[0], 0);
-		if (ret < 0) {
-			dev_err(chip->dev, "Failed to add regulator subdev\n");
-			goto out_dev;
-		}
-	}
+	init_regulator(chip, pdata);
 
 	if (pdata && pdata->backlight) {
-		ret = mfd_add_devices(chip->dev, 0, &backlight_devs[0],
-				      ARRAY_SIZE(backlight_devs),
-				      &backlight_resources[0], 0);
-		if (ret < 0) {
-			dev_err(chip->dev, "Failed to add backlight subdev\n");
-			goto out_dev;
-		}
+		bk_devs[0].platform_data = &pdata->backlight;
+		bk_devs[0].pdata_size = sizeof(struct max8925_backlight_pdata);
+	}
+	ret = mfd_add_devices(chip->dev, 0, bk_devs, ARRAY_SIZE(bk_devs),
+			      NULL, 0, NULL);
+	if (ret < 0) {
+		dev_err(chip->dev, "Failed to add backlight subdev\n");
+		goto out_dev;
 	}
 
-	if (pdata && pdata->power) {
-		ret = mfd_add_devices(chip->dev, 0, &power_devs[0],
-					ARRAY_SIZE(power_devs),
-					&power_supply_resources[0], 0);
-		if (ret < 0) {
-			dev_err(chip->dev, "Failed to add power supply "
-				"subdev\n");
-			goto out_dev;
-		}
+	ret = mfd_add_devices(chip->dev, 0, &power_devs[0],
+			      ARRAY_SIZE(power_devs),
+			      NULL, 0, NULL);
+	if (ret < 0) {
+		dev_err(chip->dev,
+			"Failed to add power supply subdev, err = %d\n", ret);
+		goto out_dev;
 	}
 
 	if (pdata && pdata->touch) {
 		ret = mfd_add_devices(chip->dev, 0, &touch_devs[0],
 				      ARRAY_SIZE(touch_devs),
-				      &touch_resources[0], 0);
+				      NULL, chip->tsc_irq, NULL);
 		if (ret < 0) {
 			dev_err(chip->dev, "Failed to add touch subdev\n");
 			goto out_dev;
@@ -670,7 +778,7 @@ out:
 	return ret;
 }
 
-void __devexit max8925_device_exit(struct max8925_chip *chip)
+void max8925_device_exit(struct max8925_chip *chip)
 {
 	if (chip->core_irq)
 		free_irq(chip->core_irq, chip);

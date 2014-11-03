@@ -1,0 +1,11 @@
+--- drivers/dma/dmaengine.c
++++ drivers/dma/dmaengine.c
+@@ -582,7 +582,7 @@
+ 				list_del_rcu(&device->global_node);
+ 				break;
+ 			} else if (err)
+-				pr_err("%s: failed to get %s: (%d)\n",
++				pr_debug("%s: failed to get %s: (%d)\n",
+ 				       __func__, dma_chan_name(chan), err);
+ 		}
+ 	}

@@ -1,0 +1,21 @@
+--- drivers/hv/ring_buffer.c
++++ drivers/hv/ring_buffer.c
+@@ -440,14 +529,16 @@
+ 					     &prev_indices,
+ 					     sizeof(u64));
+ 
+-	/* Make sure we flush all writes before updating the writeIndex */
+-	smp_wmb();
++	/* Issue a full memory barrier before updating the write index */
++	smp_mb();
+ 
+ 	/* Now, update the write location */
+ 	hv_set_next_write_location(outring_info, next_write_location);
+ 
+ 
+ 	spin_unlock_irqrestore(&outring_info->ring_lock, flags);
++
++	*signal = hv_need_to_signal(old_write, outring_info);
+ 	return 0;
+ }
+ 

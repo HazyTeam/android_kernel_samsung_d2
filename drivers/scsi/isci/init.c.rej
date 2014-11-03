@@ -1,0 +1,11 @@
+--- drivers/scsi/isci/init.c
++++ drivers/scsi/isci/init.c
+@@ -633,7 +633,7 @@
+ 		return -ENOMEM;
+ 	pci_set_drvdata(pdev, pci_info);
+ 
+-	if (efi_enabled)
++	if (efi_enabled(EFI_RUNTIME_SERVICES))
+ 		orom = isci_get_efi_var(pdev);
+ 
+ 	if (!orom)

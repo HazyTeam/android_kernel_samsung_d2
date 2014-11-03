@@ -1,0 +1,32 @@
+--- drivers/scsi/sd.c
++++ drivers/scsi/sd.c
+@@ -142,6 +142,7 @@
+ 	char *buffer_data;
+ 	struct scsi_mode_data data;
+ 	struct scsi_sense_hdr sshdr;
++	const char *temp = "temporary ";
+ 	int len;
+ 
+ 	if (sdp->type != TYPE_DISK)
+@@ -169,6 +177,13 @@
+ 		return -EINVAL;
+ 	rcd = ct & 0x01 ? 1 : 0;
+ 	wce = ct & 0x02 ? 1 : 0;
++
++	if (sdkp->cache_override) {
++		sdkp->WCE = wce;
++		sdkp->RCD = rcd;
++		return count;
++	}
++
+ 	if (scsi_mode_sense(sdp, 0x08, 8, buffer, sizeof(buffer), SD_TIMEOUT,
+ 			    SD_MAX_RETRIES, &data, NULL))
+ 		return -EINVAL;
+@@ -2811,6 +2818,7 @@
+ 	sdkp->capacity = 0;
+ 	sdkp->media_present = 1;
+ 	sdkp->write_prot = 0;
++	sdkp->cache_override = 0;
+ 	sdkp->WCE = 0;
+ 	sdkp->RCD = 0;
+ 	sdkp->ATO = 0;

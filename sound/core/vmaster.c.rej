@@ -1,0 +1,14 @@
+--- sound/core/vmaster.c
++++ sound/core/vmaster.c
+@@ -213,7 +213,10 @@
+ 	}
+ 	if (!changed)
+ 		return 0;
+-	return slave_put_val(slave, ucontrol);
++	err = slave_put_val(slave, ucontrol);
++	if (err < 0)
++		return err;
++	return 1;
+ }
+ 
+ static int slave_tlv_cmd(struct snd_kcontrol *kcontrol,

@@ -1,0 +1,11 @@
+--- kernel/power/process.c
++++ kernel/power/process.c
+@@ -79,7 +79,7 @@
+ 
+ 		/*
+ 		 * We need to retry, but first give the freezing tasks some
+-		 * time to enter the regrigerator.
++		 * time to enter the refrigerator.
+ 		 */
+ 		msleep(10);
+ 	}

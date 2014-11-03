@@ -217,7 +217,7 @@ int usb_hcd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 				driver->description)) {
 			dev_dbg(&dev->dev, "controller already in use\n");
 			retval = -EBUSY;
-			goto clear_companion;
+			goto put_hcd;
 		}
 		hcd->regs = ioremap_nocache(hcd->rsrc_start, hcd->rsrc_len);
 		if (hcd->regs == NULL) {
@@ -244,16 +244,35 @@ int usb_hcd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 		if (region == PCI_ROM_RESOURCE) {
 			dev_dbg(&dev->dev, "no i/o regions available\n");
 			retval = -EBUSY;
-			goto clear_companion;
+			goto put_hcd;
 		}
 	}
 
 	pci_set_master(dev);
 
-	retval = usb_add_hcd(hcd, hcd_irq, IRQF_SHARED);
+	/* Note: dev_set_drvdata must be called while holding the rwsem */
+	if (dev->class == CL_EHCI) {
+		down_write(&companions_rwsem);
+		dev_set_drvdata(&dev->dev, hcd);
+		for_each_companion(dev, hcd, ehci_pre_add);
+		retval = usb_add_hcd(hcd, hcd_irq, IRQF_SHARED);
+		if (retval != 0)
+			dev_set_drvdata(&dev->dev, NULL);
+		for_each_companion(dev, hcd, ehci_post_add);
+		up_write(&companions_rwsem);
+	} else {
+		down_read(&companions_rwsem);
+		dev_set_drvdata(&dev->dev, hcd);
+		retval = usb_add_hcd(hcd, hcd_irq, IRQF_SHARED);
+		if (retval != 0)
+			dev_set_drvdata(&dev->dev, NULL);
+		else
+			for_each_companion(dev, hcd, non_ehci_add);
+		up_read(&companions_rwsem);
+	}
+
 	if (retval != 0)
 		goto unmap_registers;
-	set_hs_companion(dev, hcd);
 
 	if (pci_dev_run_wake(dev))
 		pm_runtime_put_noidle(&dev->dev);
@@ -266,8 +285,7 @@ release_mem_region:
 		release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
 	} else
 		release_region(hcd->rsrc_start, hcd->rsrc_len);
-clear_companion:
-	clear_hs_companion(dev, hcd);
+put_hcd:
 	usb_put_hcd(hcd);
 disable_pci:
 	pci_disable_device(dev);
@@ -310,14 +328,29 @@ void usb_hcd_pci_remove(struct pci_dev *dev)
 	usb_hcd_irq(0, hcd);
 	local_irq_enable();
 
-	usb_remove_hcd(hcd);
+	/* Note: dev_set_drvdata must be called while holding the rwsem */
+	if (dev->class == CL_EHCI) {
+		down_write(&companions_rwsem);
+		for_each_companion(dev, hcd, ehci_remove);
+		usb_remove_hcd(hcd);
+		dev_set_drvdata(&dev->dev, NULL);
+		up_write(&companions_rwsem);
+	} else {
+		/* Not EHCI; just clear the companion pointer */
+		down_read(&companions_rwsem);
+		hcd->self.hs_companion = NULL;
+		usb_remove_hcd(hcd);
+		dev_set_drvdata(&dev->dev, NULL);
+		up_read(&companions_rwsem);
+	}
+
 	if (hcd->driver->flags & HCD_MEMORY) {
 		iounmap(hcd->regs);
 		release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
 	} else {
 		release_region(hcd->rsrc_start, hcd->rsrc_len);
 	}
-	clear_hs_companion(dev, hcd);
+
 	usb_put_hcd(hcd);
 	pci_disable_device(dev);
 }
@@ -463,8 +496,15 @@ static int resume_common(struct device *dev, int event)
 	pci_set_master(pci_dev);
 
 	if (hcd->driver->pci_resume && !HCD_DEAD(hcd)) {
-		if (event != PM_EVENT_AUTO_RESUME)
-			wait_for_companions(pci_dev, hcd);
+
+		/*
+		 * Only EHCI controllers have to wait for their companions.
+		 * No locking is needed because PCI controller drivers do not
+		 * get unbound during system resume.
+		 */
+		if (pci_dev->class == CL_EHCI && event != PM_EVENT_AUTO_RESUME)
+			for_each_companion(pci_dev, hcd,
+					ehci_wait_for_companions);
 
 		retval = hcd->driver->pci_resume(hcd,
 				event == PM_EVENT_RESTORE);

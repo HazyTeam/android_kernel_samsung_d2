@@ -1,0 +1,20 @@
+--- drivers/hwmon/sht15.c
++++ drivers/hwmon/sht15.c
+@@ -963,9 +1002,15 @@
+ 
+ 		voltage = regulator_get_voltage(data->reg);
+ 		if (voltage)
+-			data->supply_uV = voltage;
++			data->supply_uv = voltage;
++
++		ret = regulator_enable(data->reg);
++		if (ret != 0) {
++			dev_err(&pdev->dev,
++				"failed to enable regulator: %d\n", ret);
++			return ret;
++		}
+ 
+-		regulator_enable(data->reg);
+ 		/*
+ 		 * Setup a notifier block to update this if another device
+ 		 * causes the voltage to change

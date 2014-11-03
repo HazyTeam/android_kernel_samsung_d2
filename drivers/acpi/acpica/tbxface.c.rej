@@ -1,0 +1,11 @@
+--- drivers/acpi/acpica/tbxface.c
++++ drivers/acpi/acpica/tbxface.c
+@@ -405,7 +357,7 @@
+  * FUNCTION:    acpi_get_table_by_index
+  *
+  * PARAMETERS:  table_index         - Table index
+- *              Table               - Where the pointer to the table is returned
++ *              table               - Where the pointer to the table is returned
+  *
+  * RETURN:      Status and pointer to the table
+  *

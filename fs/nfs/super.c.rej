@@ -1,0 +1,11 @@
+--- fs/nfs/super.c
++++ fs/nfs/super.c
+@@ -1152,7 +1154,7 @@
+ {
+ 	kfree(*option);
+ 	*option = match_strdup(args);
+-	return !option;
++	return !*option;
+ }
+ 
+ static int nfs_get_option_ul(substring_t args[], unsigned long *option)

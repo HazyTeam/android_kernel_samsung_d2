@@ -1,0 +1,92 @@
+--- drivers/platform/x86/msi-wmi.c
++++ drivers/platform/x86/msi-wmi.c
+@@ -200,39 +235,67 @@
+ 		pr_debug("Eventcode: 0x%x\n", eventcode);
+ 		key = sparse_keymap_entry_from_scancode(msi_wmi_input_dev,
+ 				eventcode);
+-		if (key) {
+-			ktime_t diff;
+-			cur = ktime_get_real();
+-			diff = ktime_sub(cur, last_pressed[key->code -
+-					SCANCODE_BASE]);
+-			/* Ignore event if the same event happened in a 50 ms
++		if (!key) {
++			pr_info("Unknown key pressed - %x\n", eventcode);
++			goto msi_wmi_notify_exit;
++		}
++
++		if (event_wmi->quirk_last_pressed) {
++			ktime_t cur = ktime_get_real();
++			ktime_t diff = ktime_sub(cur, last_pressed);
++			/* Ignore event if any event happened in a 50 ms
+ 			   timeframe -> Key press may result in 10-20 GPEs */
+ 			if (ktime_to_us(diff) < 1000 * 50) {
+ 				pr_debug("Suppressed key event 0x%X - "
+ 					 "Last press was %lld us ago\n",
+ 					 key->code, ktime_to_us(diff));
+-				return;
+-			}
+-			last_pressed[key->code - SCANCODE_BASE] = cur;
+-
+-			if (key->type == KE_KEY &&
+-			/* Brightness is served via acpi video driver */
+-			(!acpi_video_backlight_support() ||
+-			(key->code != MSI_WMI_BRIGHTNESSUP &&
+-			key->code != MSI_WMI_BRIGHTNESSDOWN))) {
+-				pr_debug("Send key: 0x%X - "
+-					 "Input layer keycode: %d\n",
+-					 key->code, key->keycode);
+-				sparse_keymap_report_entry(msi_wmi_input_dev,
+-						key, 1, true);
++				goto msi_wmi_notify_exit;
+ 			}
+-		} else
+-			pr_info("Unknown key pressed - %x\n", eventcode);
++			last_pressed = cur;
++		}
++
++		if (key->type == KE_KEY &&
++		/* Brightness is served via acpi video driver */
++		(backlight ||
++		(key->code != MSI_KEY_BRIGHTNESSUP &&
++		key->code != MSI_KEY_BRIGHTNESSDOWN))) {
++			pr_debug("Send key: 0x%X - Input layer keycode: %d\n",
++				 key->code, key->keycode);
++			sparse_keymap_report_entry(msi_wmi_input_dev, key, 1,
++						   true);
++		}
+ 	} else
+ 		pr_info("Unknown event received\n");
++
++msi_wmi_notify_exit:
+ 	kfree(response.pointer);
+ }
+ 
++static int __init msi_wmi_backlight_setup(void)
++{
++	int err;
++	struct backlight_properties props;
++
++	memset(&props, 0, sizeof(struct backlight_properties));
++	props.type = BACKLIGHT_PLATFORM;
++	props.max_brightness = ARRAY_SIZE(backlight_map) - 1;
++	backlight = backlight_device_register(DRV_NAME, NULL, NULL,
++					      &msi_backlight_ops,
++					      &props);
++	if (IS_ERR(backlight))
++		return PTR_ERR(backlight);
++
++	err = bl_get(NULL);
++	if (err < 0) {
++		backlight_device_unregister(backlight);
++		return err;
++	}
++
++	backlight->props.brightness = err;
++
++	return 0;
++}
++
+ static int __init msi_wmi_input_setup(void)
+ {
+ 	int err;

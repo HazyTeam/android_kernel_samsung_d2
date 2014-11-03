@@ -1,0 +1,12 @@
+--- fs/ext4/namei.c
++++ fs/ext4/namei.c
+@@ -2647,7 +2796,8 @@
+ 	struct ext4_iloc iloc;
+ 	int err = 0;
+ 
+-	if (!EXT4_SB(inode->i_sb)->s_journal)
++	if ((!EXT4_SB(inode->i_sb)->s_journal) &&
++	    !(EXT4_SB(inode->i_sb)->s_mount_state & EXT4_ORPHAN_FS))
+ 		return 0;
+ 
+ 	mutex_lock(&EXT4_SB(inode->i_sb)->s_orphan_lock);

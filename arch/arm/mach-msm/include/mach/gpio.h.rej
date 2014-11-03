@@ -1,0 +1,4 @@
+--- arch/arm/mach-msm/include/mach/gpio.h
++++ arch/arm/mach-msm/include/mach/gpio.h
+@@ -1 +0,0 @@
+-/* empty */

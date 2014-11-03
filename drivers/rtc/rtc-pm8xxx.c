@@ -392,7 +392,7 @@ rtc_alarm_handled:
 	return IRQ_HANDLED;
 }
 
-static int __devinit pm8xxx_rtc_probe(struct platform_device *pdev)
+static int pm8xxx_rtc_probe(struct platform_device *pdev)
 {
 	int rc;
 	u8 ctrl_reg;
@@ -503,7 +503,7 @@ fail_rtc_enable:
 	return rc;
 }
 
-static int __devexit pm8xxx_rtc_remove(struct platform_device *pdev)
+static int pm8xxx_rtc_remove(struct platform_device *pdev)
 {
 	struct pm8xxx_rtc *rtc_dd = platform_get_drvdata(pdev);
 

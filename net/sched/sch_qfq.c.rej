@@ -1,0 +1,14 @@
+--- net/sched/sch_qfq.c
++++ net/sched/sch_qfq.c
+@@ -865,7 +899,10 @@
+ 		if (mask) {
+ 			struct qfq_group *next = qfq_ffs(q, mask);
+ 			if (qfq_gt(roundedF, next->F)) {
+-				cl->S = next->F;
++				if (qfq_gt(limit, next->F))
++					cl->S = next->F;
++				else /* preserve timestamp correctness */
++					cl->S = limit;
+ 				return;
+ 			}
+ 		}

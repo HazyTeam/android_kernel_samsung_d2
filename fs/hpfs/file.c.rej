@@ -1,0 +1,16 @@
+--- fs/hpfs/file.c
++++ fs/hpfs/file.c
+@@ -125,11 +135,8 @@
+ 	ret = cont_write_begin(file, mapping, pos, len, flags, pagep, fsdata,
+ 				hpfs_get_block,
+ 				&hpfs_i(mapping->host)->mmu_private);
+-	if (unlikely(ret)) {
+-		loff_t isize = mapping->host->i_size;
+-		if (pos + len > isize)
+-			vmtruncate(mapping->host, isize);
+-	}
++	if (unlikely(ret))
++		hpfs_write_failed(mapping, pos + len);
+ 
+ 	return ret;
+ }

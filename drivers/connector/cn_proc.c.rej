@@ -1,0 +1,11 @@
+--- drivers/connector/cn_proc.c
++++ drivers/connector/cn_proc.c
+@@ -331,6 +337,8 @@
+ 		err = EINVAL;
+ 		break;
+ 	}
++
++out:
+ 	cn_proc_ack(err, msg->seq, msg->ack);
+ }
+ 

@@ -133,6 +133,8 @@ struct arm_pmu {
 	void		(*start)(void);
 	void		(*stop)(void);
 	void		(*reset)(void *);
+	int		(*request_irq)(irq_handler_t handler);
+	void		(*free_irq)(void);
 	int		(*map_event)(struct perf_event *event);
 	struct pmu_hw_events	*(*get_hw_events)(void);
 	int	(*test_set_event_constraints)(struct perf_event *event);
@@ -143,18 +145,21 @@ struct arm_pmu {
 
 #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
 
-int armpmu_register(struct arm_pmu *armpmu, char *name, int type);
+int armpmu_register(struct arm_pmu *armpmu, int type);
 
-u64 armpmu_event_update(struct perf_event *event,
-			struct hw_perf_event *hwc,
-			int idx);
+u64 armpmu_event_update(struct perf_event *event);
 
-int armpmu_event_set_period(struct perf_event *event,
-			    struct hw_perf_event *hwc,
-			    int idx);
+int armpmu_event_set_period(struct perf_event *event);
 
 extern void enable_irq_callback(void *);
 extern void disable_irq_callback(void *);
+
+int armpmu_map_event(struct perf_event *event,
+		     const unsigned (*event_map)[PERF_COUNT_HW_MAX],
+		     const unsigned (*cache_map)[PERF_COUNT_HW_CACHE_MAX]
+						[PERF_COUNT_HW_CACHE_OP_MAX]
+						[PERF_COUNT_HW_CACHE_RESULT_MAX],
+		     u32 raw_event_mask);
 
 #endif /* CONFIG_HW_PERF_EVENTS */
 

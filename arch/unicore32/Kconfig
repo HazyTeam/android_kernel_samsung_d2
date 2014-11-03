@@ -9,6 +9,8 @@ config UNICORE32
 	select GENERIC_ATOMIC64
 	select HAVE_KERNEL_LZO
 	select HAVE_KERNEL_LZMA
+	select VIRT_TO_BUS
+	select ARCH_HAVE_CUSTOM_GPIO_H
 	select GENERIC_FIND_FIRST_BIT
 	select GENERIC_IRQ_PROBE
 	select GENERIC_IRQ_SHOW
@@ -21,12 +23,6 @@ config UNICORE32
 	  Please see web page at <http://www.pkunity.com/>.
 
 config HAVE_PWM
-	bool
-
-config GENERIC_GPIO
-	def_bool y
-
-config GENERIC_CLOCKEVENTS
 	bool
 
 config GENERIC_CSUM
@@ -147,8 +143,6 @@ endmenu
 
 menu "Kernel Features"
 
-source "kernel/time/Kconfig"
-
 source "kernel/Kconfig.preempt"
 
 source "kernel/Kconfig.hz"
@@ -157,7 +151,7 @@ source "mm/Kconfig"
 
 config LEDS
 	def_bool y
-	depends on GENERIC_GPIO
+	depends on GPIOLIB
 
 config ALIGNMENT_TRAP
 	def_bool y
@@ -243,7 +237,6 @@ config I2C_BATTERY_BQ27200
 config I2C_EEPROM_AT24
 	tristate "I2C EEPROMs AT24 support"
 	select I2C_PUV3
-	select MISC_DEVICES
 	select EEPROM_AT24
 
 config LCD_BACKLIGHT

@@ -1,0 +1,18 @@
+--- arch/sparc/mm/init_64.c
++++ arch/sparc/mm/init_64.c
+@@ -1098,7 +1097,14 @@
+ 		m->size = *val;
+ 		val = mdesc_get_property(md, node,
+ 					 "address-congruence-offset", NULL);
+-		m->offset = *val;
++
++		/* The address-congruence-offset property is optional.
++		 * Explicity zero it be identifty this.
++		 */
++		if (val)
++			m->offset = *val;
++		else
++			m->offset = 0UL;
+ 
+ 		numadbg("MBLOCK[%d]: base[%llx] size[%llx] offset[%llx]\n",
+ 			count - 1, m->base, m->size, m->offset);

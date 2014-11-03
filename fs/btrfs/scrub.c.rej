@@ -1,0 +1,20 @@
+--- fs/btrfs/scrub.c
++++ fs/btrfs/scrub.c
+@@ -542,7 +543,6 @@
+ 	eb = path->nodes[0];
+ 	ei = btrfs_item_ptr(eb, path->slots[0], struct btrfs_extent_item);
+ 	item_size = btrfs_item_size_nr(eb, path->slots[0]);
+-	btrfs_release_path(path);
+ 
+ 	if (flags & BTRFS_EXTENT_FLAG_TREE_BLOCK) {
+ 		do {
+@@ -558,7 +558,9 @@
+ 				ret < 0 ? -1 : ref_level,
+ 				ret < 0 ? -1 : ref_root);
+ 		} while (ret != 1);
++		btrfs_release_path(path);
+ 	} else {
++		btrfs_release_path(path);
+ 		swarn.path = path;
+ 		swarn.dev = dev;
+ 		iterate_extent_inodes(fs_info, found_key.objectid,

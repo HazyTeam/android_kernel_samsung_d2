@@ -1,0 +1,82 @@
+--- net/core/dev_addr_lists.c
++++ net/core/dev_addr_lists.c
+@@ -65,43 +67,62 @@
+ 				else
+ 					ha->global_use = true;
+ 			}
++			if (sync) {
++				if (ha->synced)
++					return -EEXIST;
++				else
++					ha->synced = true;
++			}
+ 			ha->refcount++;
+ 			return 0;
+ 		}
+ 	}
+ 
+-	return __hw_addr_create_ex(list, addr, addr_len, addr_type, global);
++	return __hw_addr_create_ex(list, addr, addr_len, addr_type, global,
++				   sync);
+ }
+ 
+ static int __hw_addr_add(struct netdev_hw_addr_list *list,
+ 			 const unsigned char *addr, int addr_len,
+ 			 unsigned char addr_type)
+ {
+-	return __hw_addr_add_ex(list, addr, addr_len, addr_type, false);
++	return __hw_addr_add_ex(list, addr, addr_len, addr_type, false, false);
++}
++
++static int __hw_addr_del_entry(struct netdev_hw_addr_list *list,
++			       struct netdev_hw_addr *ha, bool global,
++			       bool sync)
++{
++	if (global && !ha->global_use)
++		return -ENOENT;
++
++	if (sync && !ha->synced)
++		return -ENOENT;
++
++	if (global)
++		ha->global_use = false;
++
++	if (sync)
++		ha->synced = false;
++
++	if (--ha->refcount)
++		return 0;
++	list_del_rcu(&ha->list);
++	kfree_rcu(ha, rcu_head);
++	list->count--;
++	return 0;
+ }
+ 
+ static int __hw_addr_del_ex(struct netdev_hw_addr_list *list,
+ 			    const unsigned char *addr, int addr_len,
+-			    unsigned char addr_type, bool global)
++			    unsigned char addr_type, bool global, bool sync)
+ {
+ 	struct netdev_hw_addr *ha;
+ 
+ 	list_for_each_entry(ha, &list->list, list) {
+ 		if (!memcmp(ha->addr, addr, addr_len) &&
+-		    (ha->type == addr_type || !addr_type)) {
+-			if (global) {
+-				if (!ha->global_use)
+-					break;
+-				else
+-					ha->global_use = false;
+-			}
+-			if (--ha->refcount)
+-				return 0;
+-			list_del_rcu(&ha->list);
+-			kfree_rcu(ha, rcu_head);
+-			list->count--;
+-			return 0;
+-		}
++		    (ha->type == addr_type || !addr_type))
++			return __hw_addr_del_entry(list, ha, global, sync);
+ 	}
+ 	return -ENOENT;
+ }

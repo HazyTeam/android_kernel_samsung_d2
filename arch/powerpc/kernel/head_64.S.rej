@@ -1,0 +1,10 @@
+--- arch/powerpc/kernel/head_64.S
++++ arch/powerpc/kernel/head_64.S
+@@ -509,6 +509,7 @@
+ 	sync
+ 	addi	r5,r5,8
+ 	addi	r6,r6,8
++	isync
+ 	blr
+ 
+ .align 8

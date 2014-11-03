@@ -1,0 +1,18 @@
+--- sound/pci/hda/patch_cirrus.c
++++ sound/pci/hda/patch_cirrus.c
+@@ -58,6 +58,7 @@
+ 	CS420X_GPIO_23,
+ 	CS420X_MBP101,
+ 	CS420X_MBP81,
++	CS420X_MBA42,
+ 	CS420X_AUTO,
+ 	/* aliases */
+ 	CS420X_IMAC27_122 = CS420X_GPIO_23,
+@@ -68,6 +69,7 @@
+ enum {
+ 	CS421X_CDB4210,
+ 	CS421X_SENSE_B,
++	CS421X_STUMPY,
+ };
+ 
+ /* Vendor-specific processing widget */

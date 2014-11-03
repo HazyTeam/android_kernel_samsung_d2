@@ -1,0 +1,11 @@
+--- fs/nfsd/nfs4idmap.c
++++ fs/nfsd/nfs4idmap.c
+@@ -598,7 +598,7 @@
+ 	/* Just to make sure it's null-terminated: */
+ 	memcpy(buf, name, namelen);
+ 	buf[namelen] = '\0';
+-	ret = kstrtouint(name, 10, id);
++	ret = kstrtouint(buf, 10, id);
+ 	return ret == 0;
+ }
+ 

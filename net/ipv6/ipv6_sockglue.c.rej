@@ -1,0 +1,10 @@
+--- net/ipv6/ipv6_sockglue.c
++++ net/ipv6/ipv6_sockglue.c
+@@ -827,6 +827,7 @@
+ 		if (val < 0 || val > 255)
+ 			goto e_inval;
+ 		np->min_hopcount = val;
++		retv = 0;
+ 		break;
+ 	case IPV6_DONTFRAG:
+ 		np->dontfrag = valbool;

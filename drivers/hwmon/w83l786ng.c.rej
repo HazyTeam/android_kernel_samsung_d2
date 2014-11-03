@@ -1,0 +1,11 @@
+--- drivers/hwmon/w83l786ng.c
++++ drivers/hwmon/w83l786ng.c
+@@ -480,7 +479,7 @@
+ 	err = kstrtoul(buf, 10, &val);
+ 	if (err)
+ 		return err;
+-	val = SENSORS_LIMIT(val, 0, 255);
++	val = clamp_val(val, 0, 255);
+ 
+ 	mutex_lock(&data->update_lock);
+ 	data->pwm[nr] = val;

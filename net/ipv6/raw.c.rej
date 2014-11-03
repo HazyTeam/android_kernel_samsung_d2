@@ -1,0 +1,14 @@
+--- net/ipv6/raw.c
++++ net/ipv6/raw.c
+@@ -498,9 +498,8 @@
+ 		sin6->sin6_port = 0;
+ 		sin6->sin6_addr = ipv6_hdr(skb)->saddr;
+ 		sin6->sin6_flowinfo = 0;
+-		sin6->sin6_scope_id = 0;
+-		if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL)
+-			sin6->sin6_scope_id = IP6CB(skb)->iif;
++		sin6->sin6_scope_id = ipv6_iface_scope_id(&sin6->sin6_addr,
++							  IP6CB(skb)->iif);
+ 	}
+ 
+ 	sock_recv_ts_and_drops(msg, sk, skb);

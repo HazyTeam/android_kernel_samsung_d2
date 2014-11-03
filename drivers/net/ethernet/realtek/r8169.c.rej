@@ -1,0 +1,65 @@
+--- drivers/net/ethernet/realtek/r8169.c
++++ drivers/net/ethernet/realtek/r8169.c
+@@ -5856,7 +5965,20 @@
+ 	return -EIO;
+ }
+ 
+-static inline void rtl8169_tso_csum(struct rtl8169_private *tp,
++static bool rtl_skb_pad(struct sk_buff *skb)
++{
++	if (skb_padto(skb, ETH_ZLEN))
++		return false;
++	skb_put(skb, ETH_ZLEN - skb->len);
++	return true;
++}
++
++static bool rtl_test_hw_pad_bug(struct rtl8169_private *tp, struct sk_buff *skb)
++{
++	return skb->len < ETH_ZLEN && tp->mac_version == RTL_GIGA_MAC_VER_34;
++}
++
++static inline bool rtl8169_tso_csum(struct rtl8169_private *tp,
+ 				    struct sk_buff *skb, u32 *opts)
+ {
+ 	const struct rtl_tx_desc_info *info = tx_desc_info + tp->txd_version;
+@@ -5869,13 +5991,20 @@
+ 	} else if (skb->ip_summed == CHECKSUM_PARTIAL) {
+ 		const struct iphdr *ip = ip_hdr(skb);
+ 
++		if (unlikely(rtl_test_hw_pad_bug(tp, skb)))
++			return skb_checksum_help(skb) == 0 && rtl_skb_pad(skb);
++
+ 		if (ip->protocol == IPPROTO_TCP)
+ 			opts[offset] |= info->checksum.tcp;
+ 		else if (ip->protocol == IPPROTO_UDP)
+ 			opts[offset] |= info->checksum.udp;
+ 		else
+ 			WARN_ON_ONCE(1);
++	} else {
++		if (unlikely(rtl_test_hw_pad_bug(tp, skb)))
++			return rtl_skb_pad(skb);
+ 	}
++	return true;
+ }
+ 
+ static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
+@@ -5916,11 +6051,6 @@
+ 	tp->tx_skb[entry].len = len;
+ 	txd->addr = cpu_to_le64(mapping);
+ 
+-	opts[1] = cpu_to_le32(rtl8169_tx_vlan_tag(skb));
+-	opts[0] = DescOwn;
+-
+-	rtl8169_tso_csum(tp, skb, opts);
+-
+ 	frags = rtl8169_xmit_frags(tp, skb, opts);
+ 	if (frags < 0)
+ 		goto err_dma_1;
+@@ -5973,6 +6103,7 @@
+ 	rtl8169_unmap_tx_skb(d, tp->tx_skb + entry, txd);
+ err_dma_0:
+ 	dev_kfree_skb(skb);
++err_update_stats:
+ 	dev->stats.tx_dropped++;
+ 	return NETDEV_TX_OK;
+ 

@@ -1,0 +1,10 @@
+--- drivers/gpu/drm/radeon/evergreen_cs.c
++++ drivers/gpu/drm/radeon/evergreen_cs.c
+@@ -3316,6 +3908,7 @@
+ 
+ 	/* check config regs */
+ 	switch (reg) {
++	case WAIT_UNTIL:
+ 	case GRBM_GFX_INDEX:
+ 	case CP_STRMOUT_CNTL:
+ 	case CP_COHER_CNTL:

@@ -1,0 +1,14 @@
+--- arch/x86/boot/compressed/eboot.c
++++ arch/x86/boot/compressed/eboot.c
+@@ -434,10 +552,9 @@
+ 			 * Once we've found a GOP supporting ConOut,
+ 			 * don't bother looking any further.
+ 			 */
++			first_gop = gop;
+ 			if (conout_found)
+ 				break;
+-
+-			first_gop = gop;
+ 		}
+ 	}
+ 

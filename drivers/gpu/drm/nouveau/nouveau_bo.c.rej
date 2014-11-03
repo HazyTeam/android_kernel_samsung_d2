@@ -1,0 +1,11 @@
+--- drivers/gpu/drm/nouveau/nouveau_bo.c
++++ drivers/gpu/drm/nouveau/nouveau_bo.c
+@@ -1277,7 +1275,7 @@
+ 		if (drm->agp.stat == ENABLED) {
+ 			mem->bus.offset = mem->start << PAGE_SHIFT;
+ 			mem->bus.base = drm->agp.base;
+-			mem->bus.is_iomem = true;
++			mem->bus.is_iomem = !dev->agp->cant_use_aperture;
+ 		}
+ #endif
+ 		break;

@@ -1,0 +1,10 @@
+--- tools/lguest/lguest.c
++++ tools/lguest/lguest.c
+@@ -1299,6 +1299,7 @@
+ 	dev->feature_len = 0;
+ 	dev->num_vq = 0;
+ 	dev->running = false;
++	dev->next = NULL;
+ 
+ 	/*
+ 	 * Append to device list.  Prepending to a single-linked list is

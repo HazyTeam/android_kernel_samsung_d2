@@ -1,0 +1,11 @@
+--- block/blk-exec.c
++++ block/blk-exec.c
+@@ -66,7 +66,7 @@
+ 
+ 	spin_lock_irq(q->queue_lock);
+ 
+-	if (unlikely(blk_queue_dead(q))) {
++	if (unlikely(blk_queue_dying(q))) {
+ 		rq->errors = -ENXIO;
+ 		if (rq->end_io)
+ 			rq->end_io(rq, rq->errors);

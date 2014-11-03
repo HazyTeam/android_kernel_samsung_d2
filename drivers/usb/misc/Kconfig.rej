@@ -1,0 +1,10 @@
+--- drivers/usb/misc/Kconfig
++++ drivers/usb/misc/Kconfig
+@@ -226,7 +206,6 @@
+ 
+ config USB_EZUSB_FX2
+ 	tristate "Functions for loading firmware on EZUSB chips"
+-	depends on USB
+ 	help
+ 	  Say Y here if you need EZUSB device support.
+ 	  (Cypress FX/FX2/FX2LP microcontrollers)

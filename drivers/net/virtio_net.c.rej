@@ -1,0 +1,11 @@
+--- drivers/net/virtio_net.c
++++ drivers/net/virtio_net.c
+@@ -581,7 +580,7 @@
+ 	bool still_empty;
+ 	int i;
+ 
+-	for (i = 0; i < vi->max_queue_pairs; i++) {
++	for (i = 0; i < vi->curr_queue_pairs; i++) {
+ 		struct receive_queue *rq = &vi->rq[i];
+ 
+ 		napi_disable(&rq->napi);

@@ -1,0 +1,65 @@
+--- include/linux/pwm.h
++++ include/linux/pwm.h
+@@ -1,11 +1,13 @@
+ #ifndef __LINUX_PWM_H
+ #define __LINUX_PWM_H
+ 
++#include <linux/err.h>
+ #include <linux/of.h>
+ 
+ struct pwm_device;
+ struct seq_file;
+ 
++#if IS_ENABLED(CONFIG_PWM) || IS_ENABLED(CONFIG_HAVE_PWM)
+ /*
+  * pwm_request - request a PWM device
+  */
+@@ -30,10 +32,47 @@
+  * pwm_disable - stop a PWM output toggling
+  */
+ void pwm_disable(struct pwm_device *pwm);
++#else
++static inline struct pwm_device *pwm_request(int pwm_id, const char *label)
++{
++	return ERR_PTR(-ENODEV);
++}
++
++static inline void pwm_free(struct pwm_device *pwm)
++{
++}
++
++static inline int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
++{
++	return -EINVAL;
++}
++
++static inline int pwm_enable(struct pwm_device *pwm)
++{
++	return -EINVAL;
++}
++
++static inline void pwm_disable(struct pwm_device *pwm)
++{
++}
++#endif
+ 
+-#ifdef CONFIG_PWM
+ struct pwm_chip;
+ 
++/**
++ * enum pwm_polarity - polarity of a PWM signal
++ * @PWM_POLARITY_NORMAL: a high signal for the duration of the duty-
++ * cycle, followed by a low signal for the remainder of the pulse
++ * period
++ * @PWM_POLARITY_INVERSED: a low signal for the duration of the duty-
++ * cycle, followed by a high signal for the remainder of the pulse
++ * period
++ */
++enum pwm_polarity {
++	PWM_POLARITY_NORMAL,
++	PWM_POLARITY_INVERSED,
++};
++
+ enum {
+ 	PWMF_REQUESTED = 1 << 0,
+ 	PWMF_ENABLED = 1 << 1,

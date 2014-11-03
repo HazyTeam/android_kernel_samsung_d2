@@ -1,0 +1,14 @@
+--- mm/mempolicy.c
++++ mm/mempolicy.c
+@@ -1258,9 +1244,8 @@
+ 		if (!list_empty(&pagelist)) {
+ 			WARN_ON_ONCE(flags & MPOL_MF_LAZY);
+ 			nr_failed = migrate_pages(&pagelist, new_vma_page,
+-						(unsigned long)vma,
+-						false, MIGRATE_SYNC,
+-						MR_MEMPOLICY_MBIND);
++					(unsigned long)vma,
++					MIGRATE_SYNC, MR_MEMPOLICY_MBIND);
+ 			if (nr_failed)
+ 				putback_lru_pages(&pagelist);
+ 		}

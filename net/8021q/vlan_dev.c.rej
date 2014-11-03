@@ -1,0 +1,20 @@
+--- net/8021q/vlan_dev.c
++++ net/8021q/vlan_dev.c
+@@ -584,7 +585,7 @@
+ #endif
+ 
+ 	dev->needed_headroom = real_dev->needed_headroom;
+-	if (real_dev->features & NETIF_F_HW_VLAN_TX) {
++	if (real_dev->features & NETIF_F_HW_VLAN_CTAG_TX) {
+ 		dev->header_ops      = real_dev->header_ops;
+ 		dev->hard_header_len = real_dev->hard_header_len;
+ 	} else {
+@@ -628,7 +629,7 @@
+ 	netdev_features_t features)
+ {
+ 	struct net_device *real_dev = vlan_dev_priv(dev)->real_dev;
+-	u32 old_features = features;
++	netdev_features_t old_features = features;
+ 
+ 	features &= real_dev->vlan_features;
+ 	features |= NETIF_F_RXCSUM;

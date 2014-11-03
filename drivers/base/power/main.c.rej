@@ -1,0 +1,100 @@
+--- drivers/base/power/main.c
++++ drivers/base/power/main.c
+@@ -570,11 +575,13 @@
+ 	pm_callback_t callback = NULL;
+ 	char *info = NULL;
+ 	int error = 0;
+-	bool put = false;
+ 
+ 	TRACE_DEVICE(dev);
+ 	TRACE_RESUME(0);
+ 
++	if (dev->power.syscore)
++		goto Complete;
++
+ 	dpm_wait(dev->parent, async);
+ 	device_lock(dev);
+ 
+@@ -588,7 +595,6 @@
+ 		goto Unlock;
+ 
+ 	pm_runtime_enable(dev);
+-	put = true;
+ 
+ 	if (dev->pm_domain) {
+ 		info = "power domain ";
+@@ -637,13 +643,12 @@
+ 
+  Unlock:
+ 	device_unlock(dev);
++
++ Complete:
+ 	complete_all(&dev->power.completion);
+ 
+ 	TRACE_RESUME(error);
+ 
+-	if (put)
+-		pm_runtime_put_sync(dev);
+-
+ 	return error;
+ }
+ 
+@@ -757,6 +765,8 @@
+ 	}
+ 
+ 	device_unlock(dev);
++
++	pm_runtime_put_sync(dev);
+ }
+ 
+ /**
+@@ -1010,7 +1026,7 @@
+ 
+ 	error = dpm_suspend_noirq(state);
+ 	if (error) {
+-		dpm_resume_early(state);
++		dpm_resume_early(resume_event(state));
+ 		return error;
+ 	}
+ 
+@@ -1057,16 +1073,23 @@
+ 	if (async_error)
+ 		goto Complete;
+ 
+-	pm_runtime_get_noresume(dev);
++	/*
++	 * If a device configured to wake up the system from sleep states
++	 * has been suspended at run time and there's a resume request pending
++	 * for it, this is equivalent to the device signaling wakeup, so the
++	 * system suspend operation should be aborted.
++	 */
+ 	if (pm_runtime_barrier(dev) && device_may_wakeup(dev))
+ 		pm_wakeup_event(dev, 0);
+ 
+ 	if (pm_wakeup_pending()) {
+-		pm_runtime_put_sync(dev);
+ 		async_error = -EBUSY;
+ 		goto Complete;
+ 	}
+ 
++	if (dev->power.syscore)
++		goto Complete;
++
+ 	device_lock(dev);
+ 
+ 	if (dev->pm_domain) {
+@@ -1125,12 +1148,10 @@
+  Complete:
+ 	complete_all(&dev->power.completion);
+ 
+-	if (error) {
+-		pm_runtime_put_sync(dev);
++	if (error)
+ 		async_error = error;
+-	} else if (dev->power.is_suspended) {
++	else if (dev->power.is_suspended)
+ 		__pm_runtime_disable(dev, false);
+-	}
+ 
+ 	return error;
+ }

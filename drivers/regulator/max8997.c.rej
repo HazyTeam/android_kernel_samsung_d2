@@ -1,0 +1,11 @@
+--- drivers/regulator/max8997.c
++++ drivers/regulator/max8997.c
+@@ -506,7 +490,7 @@
+ 	return ret;
+ }
+ 
+-static int max8997_set_voltage_ldobuck_time_sel(struct regulator_dev *rdev,
++static int max8997_set_voltage_buck_time_sel(struct regulator_dev *rdev,
+ 						unsigned int old_selector,
+ 						unsigned int new_selector)
+ {

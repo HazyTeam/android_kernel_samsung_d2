@@ -3,7 +3,7 @@
  *
  * Registration and callback for the s390 common I/O layer.
  *
- * Copyright IBM Corporation 2002, 2010
+ * Copyright IBM Corp. 2002, 2010
  */
 
 #define KMSG_COMPONENT "zfcp"
@@ -212,6 +212,18 @@ static int zfcp_ccw_set_offline(struct ccw_device *cdev)
 }
 
 /**
+ * zfcp_ccw_set_offline - set_offline function of zfcp driver
+ * @cdev: pointer to belonging ccw device
+ *
+ * This function gets called by the common i/o layer and sets an adapter
+ * into state offline.
+ */
+static int zfcp_ccw_set_offline(struct ccw_device *cdev)
+{
+	return zfcp_ccw_offline_sync(cdev, 0, "ccsoff1");
+}
+
+/**
  * zfcp_ccw_notify - ccw notify function
  * @cdev: pointer to belonging ccw device
  * @event: indicates if adapter was detached or attached
@@ -280,6 +292,28 @@ static void zfcp_ccw_shutdown(struct ccw_device *cdev)
 	zfcp_erp_thread_kill(adapter);
 
 	zfcp_ccw_adapter_put(adapter);
+}
+
+static int zfcp_ccw_suspend(struct ccw_device *cdev)
+{
+	zfcp_ccw_offline_sync(cdev, ZFCP_STATUS_ADAPTER_SUSPENDED, "ccsusp1");
+	return 0;
+}
+
+static int zfcp_ccw_thaw(struct ccw_device *cdev)
+{
+	/* trace records for thaw and final shutdown during suspend
+	   can only be found in system dump until the end of suspend
+	   but not after resume because it's based on the memory image
+	   right after the very first suspend (freeze) callback */
+	zfcp_ccw_activate(cdev, 0, "ccthaw1");
+	return 0;
+}
+
+static int zfcp_ccw_resume(struct ccw_device *cdev)
+{
+	zfcp_ccw_activate(cdev, ZFCP_STATUS_ADAPTER_SUSPENDED, "ccresu1");
+	return 0;
 }
 
 static int zfcp_ccw_suspend(struct ccw_device *cdev)

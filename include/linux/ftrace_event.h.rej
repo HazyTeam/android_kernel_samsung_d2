@@ -1,0 +1,12 @@
+--- include/linux/ftrace_event.h
++++ include/linux/ftrace_event.h
+@@ -83,6 +82,9 @@
+ 	long			idx;
+ 
+ 	cpumask_var_t		started;
++
++	/* it's true when current open file is snapshot */
++	bool			snapshot;
+ };
+ 
+ enum trace_iter_flags {

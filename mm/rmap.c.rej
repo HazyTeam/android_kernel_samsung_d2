@@ -1,0 +1,11 @@
+--- mm/rmap.c
++++ mm/rmap.c
+@@ -105,7 +105,7 @@
+ 	 */
+ 	if (rwsem_is_locked(&anon_vma->root->rwsem)) {
+ 		anon_vma_lock_write(anon_vma);
+-		anon_vma_unlock(anon_vma);
++		anon_vma_unlock_write(anon_vma);
+ 	}
+ 
+ 	kmem_cache_free(anon_vma_cachep, anon_vma);

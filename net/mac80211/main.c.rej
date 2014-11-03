@@ -1,0 +1,10 @@
+--- net/mac80211/main.c
++++ net/mac80211/main.c
+@@ -668,6 +653,7 @@
+ 	int channels, max_bitrates;
+ 	bool supp_ht, supp_vht;
+ 	netdev_features_t feature_whitelist;
++	struct cfg80211_chan_def dflt_chandef = {};
+ 	static const u32 cipher_suites[] = {
+ 		/* keep WEP first, it may be removed below */
+ 		WLAN_CIPHER_SUITE_WEP40,

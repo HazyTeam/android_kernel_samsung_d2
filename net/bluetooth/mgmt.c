@@ -65,19 +65,19 @@ static int cmd_status(struct sock *sk, u16 index, u16 cmd, u8 status)
 
 	BT_DBG("sock %p, index %u, cmd %u, status %u", sk, index, cmd, status);
 
-	skb = alloc_skb(sizeof(*hdr) + sizeof(*ev), GFP_ATOMIC);
+	skb = alloc_skb(sizeof(*hdr) + sizeof(*ev), GFP_KERNEL);
 	if (!skb)
 		return -ENOMEM;
 
 	hdr = (void *) skb_put(skb, sizeof(*hdr));
 
-	hdr->opcode = cpu_to_le16(MGMT_EV_CMD_STATUS);
+	hdr->opcode = __constant_cpu_to_le16(MGMT_EV_CMD_STATUS);
 	hdr->index = cpu_to_le16(index);
 	hdr->len = cpu_to_le16(sizeof(*ev));
 
 	ev = (void *) skb_put(skb, sizeof(*ev));
 	ev->status = status;
-	put_unaligned_le16(cmd, &ev->opcode);
+	ev->opcode = cpu_to_le16(cmd);
 
 	if (sock_queue_rcv_skb(sk, skb) < 0)
 		kfree_skb(skb);
@@ -94,13 +94,13 @@ static int cmd_complete(struct sock *sk, u16 index, u16 cmd, void *rp,
 
 	BT_DBG("sock %p", sk);
 
-	skb = alloc_skb(sizeof(*hdr) + sizeof(*ev) + rp_len, GFP_ATOMIC);
+	skb = alloc_skb(sizeof(*hdr) + sizeof(*ev) + rp_len, GFP_KERNEL);
 	if (!skb)
 		return -ENOMEM;
 
 	hdr = (void *) skb_put(skb, sizeof(*hdr));
 
-	hdr->opcode = cpu_to_le16(MGMT_EV_CMD_COMPLETE);
+	hdr->opcode = __constant_cpu_to_le16(MGMT_EV_CMD_COMPLETE);
 	hdr->index = cpu_to_le16(index);
 	hdr->len = cpu_to_le16(sizeof(*ev) + rp_len);
 
@@ -123,7 +123,7 @@ static int read_version(struct sock *sk)
 	BT_DBG("sock %p", sk);
 
 	rp.version = MGMT_VERSION;
-	put_unaligned_le16(MGMT_REVISION, &rp.revision);
+	rp.revision = __constant_cpu_to_le16(MGMT_REVISION);
 
 	return cmd_complete(sk, MGMT_INDEX_NONE, MGMT_OP_READ_VERSION, &rp,
 								sizeof(rp));
@@ -642,7 +642,20 @@ static int set_connectable(struct sock *sk, u16 index, unsigned char *data,
 	else
 		scan = 0;
 
-	err = hci_send_cmd(hdev, HCI_OP_WRITE_SCAN_ENABLE, 1, &scan);
+	hci_req_init(&req, hdev);
+
+	hci_req_add(&req, HCI_OP_WRITE_SCAN_ENABLE, 1, &scan);
+
+	/* If we're going from non-connectable to connectable or
+	 * vice-versa when fast connectable is enabled ensure that fast
+	 * connectable gets disabled. write_fast_connectable won't do
+	 * anything if the page scan parameters are already what they
+	 * should be.
+	 */
+	if (cp->val || test_bit(HCI_FAST_CONNECTABLE, &hdev->dev_flags))
+		write_fast_connectable(&req, false);
+
+	err = hci_req_run(&req, set_connectable_complete);
 	if (err < 0)
 		mgmt_pending_remove(cmd);
 
@@ -661,7 +674,7 @@ static int mgmt_event(u16 event, u16 index, void *data, u16 data_len,
 
 	BT_DBG("hci%d %d", index, event);
 
-	skb = alloc_skb(sizeof(*hdr) + data_len, GFP_ATOMIC);
+	skb = alloc_skb(sizeof(*hdr) + data_len, GFP_KERNEL);
 	if (!skb)
 		return -ENOMEM;
 
@@ -759,9 +772,7 @@ static u16 get_uuid16(u8 *uuid128)
 			return 0;
 	}
 
-	memcpy(&val, &uuid128[12], 4);
-
-	val = le32_to_cpu(val);
+	val = get_unaligned_le32(&uuid128[12]);
 	if (val > 0xffff)
 		return 0;
 
@@ -792,8 +803,28 @@ static void create_eir(struct hci_dev *hdev, u8 *data)
 
 		memcpy(ptr + 2, hdev->dev_name, name_len);
 
-		eir_len += (name_len + 2);
 		ptr += (name_len + 2);
+	}
+
+	if (hdev->inq_tx_power != HCI_TX_POWER_INVALID) {
+		ptr[0] = 2;
+		ptr[1] = EIR_TX_POWER;
+		ptr[2] = (u8) hdev->inq_tx_power;
+
+		ptr += 3;
+	}
+
+	if (hdev->devid_source > 0) {
+		ptr[0] = 9;
+		ptr[1] = EIR_DEVICE_ID;
+
+		put_unaligned_le16(hdev->devid_source, ptr + 2);
+		put_unaligned_le16(hdev->devid_vendor, ptr + 4);
+		put_unaligned_le16(hdev->devid_product, ptr + 6);
+		put_unaligned_le16(hdev->devid_version, ptr + 8);
+
+		eir_len += 10;
+		ptr += 10;
 	}
 
 	memset(uuid16_list, 0, sizeof(uuid16_list));
@@ -853,7 +884,7 @@ static int update_eir(struct hci_dev *hdev)
 {
 	struct hci_cp_write_eir cp;
 
-	if (!(hdev->features[6] & LMP_EXT_INQ))
+	if (!lmp_ext_inq_capable(hdev))
 		return 0;
 
 	if (hdev->ssp_mode == 0)
@@ -894,7 +925,7 @@ static int add_uuid(struct sock *sk, u16 index, unsigned char *data, u16 len)
 
 	hci_dev_lock_bh(hdev);
 
-	uuid = kmalloc(sizeof(*uuid), GFP_ATOMIC);
+	uuid = kmalloc(sizeof(*uuid), GFP_KERNEL);
 	if (!uuid) {
 		err = -ENOMEM;
 		goto failed;
@@ -902,8 +933,9 @@ static int add_uuid(struct sock *sk, u16 index, unsigned char *data, u16 len)
 
 	memcpy(uuid->uuid, cp->uuid, 16);
 	uuid->svc_hint = cp->svc_hint;
+	uuid->size = get_uuid_size(cp->uuid);
 
-	list_add(&uuid->list, &hdev->uuids);
+	list_add_tail(&uuid->list, &hdev->uuids);
 
 	if (test_bit(HCI_UP, &hdev->flags)) {
 
@@ -954,13 +986,12 @@ static int remove_uuid(struct sock *sk, u16 index, unsigned char *data, u16 len)
 
 	found = 0;
 
-	list_for_each_safe(p, n, &hdev->uuids) {
-		struct bt_uuid *match = list_entry(p, struct bt_uuid, list);
-
+	list_for_each_entry_safe(match, tmp, &hdev->uuids, list) {
 		if (memcmp(match->uuid, cp->uuid, 16) != 0)
 			continue;
 
 		list_del(&match->list);
+		kfree(match);
 		found++;
 	}
 
@@ -1082,7 +1113,7 @@ static int load_keys(struct sock *sk, u16 index, unsigned char *data, u16 len)
 	if (len < sizeof(*cp))
 		return -EINVAL;
 
-	key_count = get_unaligned_le16(&cp->key_count);
+	key_count = __le16_to_cpu(cp->key_count);
 
 	expected_len = sizeof(*cp) + key_count * sizeof(struct mgmt_key_info);
 	if (expected_len > len) {
@@ -1235,8 +1266,8 @@ static int disconnect(struct sock *sk, u16 index, unsigned char *data, u16 len)
 		goto failed;
 	}
 
-	put_unaligned_le16(conn->handle, &dc.handle);
-	dc.reason = 0x13; /* Remote User Terminated Connection */
+	dc.handle = cpu_to_le16(conn->handle);
+	dc.reason = HCI_ERROR_REMOTE_USER_TERM;
 
 	err = hci_send_cmd(hdev, HCI_OP_DISCONNECT, sizeof(dc), &dc);
 	if (err < 0)
@@ -1658,7 +1689,7 @@ static int set_io_capability(struct sock *sk, u16 index, unsigned char *data,
 	hdev->io_capability = cp->io_capability;
 
 	BT_DBG("%s IO capability set to 0x%02x", hdev->name,
-							hdev->io_capability);
+	       hdev->io_capability);
 
 	hci_dev_unlock_bh(hdev);
 	hci_dev_put(hdev);
@@ -1666,7 +1697,7 @@ static int set_io_capability(struct sock *sk, u16 index, unsigned char *data,
 	return cmd_complete(sk, index, MGMT_OP_SET_IO_CAPABILITY, NULL, 0);
 }
 
-static inline struct pending_cmd *find_pairing(struct hci_conn *conn)
+static struct pending_cmd *find_pairing(struct hci_conn *conn)
 {
 	struct hci_dev *hdev = conn->hdev;
 	struct list_head *p;
@@ -1842,7 +1873,7 @@ static int pair_device(struct sock *sk, u16 index, unsigned char *data, u16 len)
 	cmd = mgmt_pending_add(sk, MGMT_OP_PAIR_DEVICE, index, data, len);
 	if (!cmd) {
 		err = -ENOMEM;
-		hci_conn_put(conn);
+		hci_conn_drop(conn);
 		goto unlock;
 	}
 
@@ -1853,10 +1884,11 @@ static int pair_device(struct sock *sk, u16 index, unsigned char *data, u16 len)
 	cmd->user_data = conn;
 
 	if (conn->state == BT_CONNECTED &&
-				hci_conn_security(conn, sec_level, auth_type))
+	    hci_conn_security(conn, sec_level, auth_type))
 		pairing_complete(cmd, 0);
 
-	err = 0;
+	err = cmd_complete(sk, hdev->id, MGMT_OP_CONFIRM_NAME, 0, &cp->addr,
+			   sizeof(cp->addr));
 
 unlock:
 	hci_dev_unlock_bh(hdev);

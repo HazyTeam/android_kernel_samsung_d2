@@ -13,7 +13,6 @@
 
 #include <linux/kernel.h>
 #include <linux/irq.h>
-#include <linux/gpio.h>
 #include <linux/platform_device.h>
 #include <linux/android_pmem.h>
 #include <linux/bootmem.h>
@@ -2526,12 +2525,18 @@ static void __init qsd8x50_map_io(void)
 		       __func__);
 }
 
+static void __init qsd8x50_init_late(void)
+{
+	smd_debugfs_init();
+}
+
 MACHINE_START(QSD8X50_SURF, "QCT QSD8X50 SURF")
 	.atag_offset = 0x100,
 	.map_io = qsd8x50_map_io,
 	.init_irq = qsd8x50_init_irq,
 	.init_machine = qsd8x50_init,
-	.timer = &msm_timer,
+	.init_late = qsd8x50_init_late,
+	.init_time	= qsd8x50_timer_init,
 MACHINE_END
 
 MACHINE_START(QSD8X50_FFA, "QCT QSD8X50 FFA")
@@ -2539,5 +2544,6 @@ MACHINE_START(QSD8X50_FFA, "QCT QSD8X50 FFA")
 	.map_io = qsd8x50_map_io,
 	.init_irq = qsd8x50_init_irq,
 	.init_machine = qsd8x50_init,
-	.timer = &msm_timer,
+	.init_late = qsd8x50_init_late,
+	.init_time	= qsd8x50_timer_init,
 MACHINE_END

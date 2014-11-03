@@ -1,0 +1,11 @@
+--- sound/pci/ice1712/ice1712.c
++++ sound/pci/ice1712/ice1712.c
+@@ -2594,6 +2594,8 @@
+ 	snd_ice1712_proc_init(ice);
+ 	synchronize_irq(pci->irq);
+ 
++	card->private_data = ice;
++
+ 	err = pci_request_regions(pci, "ICE1712");
+ 	if (err < 0) {
+ 		kfree(ice);

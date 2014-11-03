@@ -1,0 +1,36 @@
+--- drivers/staging/Kconfig
++++ drivers/staging/Kconfig
+@@ -72,10 +72,10 @@
+ 
+ source "drivers/staging/iio/Kconfig"
+ 
+-source "drivers/staging/zram/Kconfig"
+-
+ source "drivers/staging/zsmalloc/Kconfig"
+ 
++source "drivers/staging/zram/Kconfig"
++
+ source "drivers/staging/wlags49_h2/Kconfig"
+ 
+ source "drivers/staging/wlags49_h25/Kconfig"
+@@ -110,19 +110,15 @@
+ 
+ source "drivers/staging/media/Kconfig"
+ 
+-source "drivers/staging/net/Kconfig"
+-
+ source "drivers/staging/android/Kconfig"
+ 
+ source "drivers/staging/ozwpan/Kconfig"
+ 
+-source "drivers/staging/ccg/Kconfig"
+-
+ source "drivers/staging/gdm72xx/Kconfig"
+ 
+ source "drivers/staging/csr/Kconfig"
+ 
+-source "drivers/staging/omap-thermal/Kconfig"
++source "drivers/staging/ti-soc-thermal/Kconfig"
+ 
+ source "drivers/staging/silicom/Kconfig"
+ 

@@ -1,0 +1,11 @@
+--- arch/x86/power/hibernate_32.c
++++ arch/x86/power/hibernate_32.c
+@@ -129,8 +129,6 @@
+ 		}
+ 	}
+ 
+-	resume_map_numa_kva(pgd_base);
+-
+ 	return 0;
+ }
+ 

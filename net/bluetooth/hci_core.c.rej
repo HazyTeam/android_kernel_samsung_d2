@@ -1,0 +1,417 @@
+--- net/bluetooth/hci_core.c
++++ net/bluetooth/hci_core.c
+@@ -57,36 +57,9 @@
+ 
+ /* ---- HCI requests ---- */
+ 
+-void hci_req_complete(struct hci_dev *hdev, __u16 cmd, int result)
++static void hci_req_sync_complete(struct hci_dev *hdev, u8 result)
+ {
+-	BT_DBG("%s command 0x%4.4x result 0x%2.2x", hdev->name, cmd, result);
+-
+-	/* If this is the init phase check if the completed command matches
+-	 * the last init command, and if not just return.
+-	 */
+-	if (test_bit(HCI_INIT, &hdev->flags) && hdev->init_last_cmd != cmd) {
+-		struct hci_command_hdr *sent = (void *) hdev->sent_cmd->data;
+-		u16 opcode = __le16_to_cpu(sent->opcode);
+-		struct sk_buff *skb;
+-
+-		/* Some CSR based controllers generate a spontaneous
+-		 * reset complete event during init and any pending
+-		 * command will never be completed. In such a case we
+-		 * need to resend whatever was the last sent
+-		 * command.
+-		 */
+-
+-		if (cmd != HCI_OP_RESET || opcode == HCI_OP_RESET)
+-			return;
+-
+-		skb = skb_clone(hdev->sent_cmd, GFP_ATOMIC);
+-		if (skb) {
+-			skb_queue_head(&hdev->cmd_q, skb);
+-			queue_work(hdev->workqueue, &hdev->cmd_work);
+-		}
+-
+-		return;
+-	}
++	BT_DBG("%s result 0x%2.2x", hdev->name, result);
+ 
+ 	if (hdev->req_status == HCI_REQ_PEND) {
+ 		hdev->req_result = result;
+@@ -298,75 +408,66 @@
+ 
+ 	/* Serialize all requests */
+ 	hci_req_lock(hdev);
+-	ret = __hci_request(hdev, req, opt, timeout);
++	ret = __hci_req_sync(hdev, req, opt, timeout);
+ 	hci_req_unlock(hdev);
+ 
+ 	return ret;
+ }
+ 
+-static void hci_reset_req(struct hci_dev *hdev, unsigned long opt)
++static void hci_reset_req(struct hci_request *req, unsigned long opt)
+ {
+-	BT_DBG("%s %ld", hdev->name, opt);
++	BT_DBG("%s %ld", req->hdev->name, opt);
+ 
+ 	/* Reset device */
+-	set_bit(HCI_RESET, &hdev->flags);
+-	hci_send_cmd(hdev, HCI_OP_RESET, 0, NULL);
++	set_bit(HCI_RESET, &req->hdev->flags);
++	hci_req_add(req, HCI_OP_RESET, 0, NULL);
+ }
+ 
+-static void bredr_init(struct hci_dev *hdev)
++static void bredr_init(struct hci_request *req)
+ {
+-	hdev->flow_ctl_mode = HCI_FLOW_CTL_MODE_PACKET_BASED;
++	req->hdev->flow_ctl_mode = HCI_FLOW_CTL_MODE_PACKET_BASED;
+ 
+ 	/* Read Local Supported Features */
+-	hci_send_cmd(hdev, HCI_OP_READ_LOCAL_FEATURES, 0, NULL);
++	hci_req_add(req, HCI_OP_READ_LOCAL_FEATURES, 0, NULL);
+ 
+ 	/* Read Local Version */
+-	hci_send_cmd(hdev, HCI_OP_READ_LOCAL_VERSION, 0, NULL);
++	hci_req_add(req, HCI_OP_READ_LOCAL_VERSION, 0, NULL);
++
++	/* Read BD Address */
++	hci_req_add(req, HCI_OP_READ_BD_ADDR, 0, NULL);
+ }
+ 
+-static void amp_init(struct hci_dev *hdev)
++static void amp_init(struct hci_request *req)
+ {
+-	hdev->flow_ctl_mode = HCI_FLOW_CTL_MODE_BLOCK_BASED;
++	req->hdev->flow_ctl_mode = HCI_FLOW_CTL_MODE_BLOCK_BASED;
+ 
+ 	/* Read Local Version */
+-	hci_send_cmd(hdev, HCI_OP_READ_LOCAL_VERSION, 0, NULL);
++	hci_req_add(req, HCI_OP_READ_LOCAL_VERSION, 0, NULL);
+ 
+ 	/* Read Local AMP Info */
+-	hci_send_cmd(hdev, HCI_OP_READ_LOCAL_AMP_INFO, 0, NULL);
++	hci_req_add(req, HCI_OP_READ_LOCAL_AMP_INFO, 0, NULL);
+ 
+ 	/* Read Data Blk size */
+-	hci_send_cmd(hdev, HCI_OP_READ_DATA_BLOCK_SIZE, 0, NULL);
++	hci_req_add(req, HCI_OP_READ_DATA_BLOCK_SIZE, 0, NULL);
+ }
+ 
+-static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
++static void hci_init1_req(struct hci_request *req, unsigned long opt)
+ {
+-	struct sk_buff *skb;
++	struct hci_dev *hdev = req->hdev;
+ 
+ 	BT_DBG("%s %ld", hdev->name, opt);
+ 
+-	/* Driver initialization */
+-
+-	/* Special commands */
+-	while ((skb = skb_dequeue(&hdev->driver_init))) {
+-		bt_cb(skb)->pkt_type = HCI_COMMAND_PKT;
+-		skb->dev = (void *) hdev;
+-
+-		skb_queue_tail(&hdev->cmd_q, skb);
+-		queue_work(hdev->workqueue, &hdev->cmd_work);
+-	}
+-	skb_queue_purge(&hdev->driver_init);
+-
+ 	/* Reset */
+ 	if (!test_bit(HCI_QUIRK_RESET_ON_CLOSE, &hdev->quirks))
+-		hci_reset_req(hdev, 0);
++		hci_reset_req(req, 0);
+ 
+ 	switch (hdev->dev_type) {
+ 	case HCI_BREDR:
+-		bredr_init(hdev);
++		bredr_init(req);
+ 		break;
+ 
+ 	case HCI_AMP:
+-		amp_init(hdev);
++		amp_init(req);
+ 		break;
+ 
+ 	default:
+@@ -1169,34 +1583,37 @@
+ 		goto done;
+ 	}
+ 
+-	if (test_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks))
+-		set_bit(HCI_RAW, &hdev->flags);
+-
+-	/* Treat all non BR/EDR controllers as raw devices if
+-	   enable_hs is not set */
+-	if (hdev->dev_type != HCI_BREDR && !enable_hs)
+-		set_bit(HCI_RAW, &hdev->flags);
+-
+ 	if (hdev->open(hdev)) {
+ 		ret = -EIO;
+ 		goto done;
+ 	}
+ 
+-	if (!test_bit(HCI_RAW, &hdev->flags)) {
+-		atomic_set(&hdev->cmd_cnt, 1);
+-		set_bit(HCI_INIT, &hdev->flags);
+-		hdev->init_last_cmd = 0;
++	atomic_set(&hdev->cmd_cnt, 1);
++	set_bit(HCI_INIT, &hdev->flags);
+ 
+-		ret = __hci_request(hdev, hci_init_req, 0, HCI_INIT_TIMEOUT);
++	if (hdev->setup && test_bit(HCI_SETUP, &hdev->dev_flags))
++		ret = hdev->setup(hdev);
+ 
+-		clear_bit(HCI_INIT, &hdev->flags);
++	if (!ret) {
++		/* Treat all non BR/EDR controllers as raw devices if
++		 * enable_hs is not set.
++		 */
++		if (hdev->dev_type != HCI_BREDR && !enable_hs)
++			set_bit(HCI_RAW, &hdev->flags);
++
++		if (test_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks))
++			set_bit(HCI_RAW, &hdev->flags);
++
++		if (!test_bit(HCI_RAW, &hdev->flags))
++			ret = __hci_init(hdev);
+ 	}
+ 
++	clear_bit(HCI_INIT, &hdev->flags);
++
+ 	if (!ret) {
+ 		hci_dev_hold(hdev);
+ 		set_bit(HCI_UP, &hdev->flags);
+ 		hci_notify(hdev, HCI_DEV_UP);
+-		hci_update_ad(hdev);
+ 		if (!test_bit(HCI_SETUP, &hdev->dev_flags) &&
+ 		    mgmt_valid_hdev(hdev)) {
+ 			hci_dev_lock(hdev);
+@@ -1278,7 +1695,7 @@
+ 	if (!test_bit(HCI_RAW, &hdev->flags) &&
+ 	    test_bit(HCI_QUIRK_RESET_ON_CLOSE, &hdev->quirks)) {
+ 		set_bit(HCI_INIT, &hdev->flags);
+-		__hci_request(hdev, hci_reset_req, 0, HCI_CMD_TIMEOUT);
++		__hci_req_sync(hdev, hci_reset_req, 0, HCI_CMD_TIMEOUT);
+ 		clear_bit(HCI_INIT, &hdev->flags);
+ 	}
+ 
+@@ -1297,10 +1714,17 @@
+ 		hdev->sent_cmd = NULL;
+ 	}
+ 
++	kfree_skb(hdev->recv_evt);
++	hdev->recv_evt = NULL;
++
+ 	/* After this point our queues are empty
+ 	 * and no tasks are scheduled. */
+ 	hdev->close(hdev);
+ 
++	/* Clear flags */
++	hdev->flags = 0;
++	hdev->dev_flags &= ~HCI_PERSISTENT_MASK;
++
+ 	if (!test_and_clear_bit(HCI_AUTO_OFF, &hdev->dev_flags) &&
+ 	    mgmt_valid_hdev(hdev)) {
+ 		hci_dev_lock(hdev);
+@@ -1308,9 +1732,6 @@
+ 		hci_dev_unlock(hdev);
+ 	}
+ 
+-	/* Clear flags */
+-	hdev->flags = 0;
+-
+ 	/* Controller radio is available but is currently powered down */
+ 	hdev->amp_status = 0;
+ 
+@@ -1589,11 +2010,15 @@
+ static void hci_power_on(struct work_struct *work)
+ {
+ 	struct hci_dev *hdev = container_of(work, struct hci_dev, power_on);
++	int err;
+ 
+ 	BT_DBG("%s", hdev->name);
+ 
+-	if (hci_dev_open(hdev->id) < 0)
++	err = hci_dev_open(hdev->id);
++	if (err < 0) {
++		mgmt_set_powered_failed(hdev, err);
+ 		return;
++	}
+ 
+ 	if (test_bit(HCI_AUTO_OFF, &hdev->dev_flags))
+ 		queue_delayed_work(hdev->req_workqueue, &hdev->power_off,
+@@ -2016,7 +2441,7 @@
+ 	return mgmt_device_unblocked(hdev, bdaddr, type);
+ }
+ 
+-static void le_scan_param_req(struct hci_dev *hdev, unsigned long opt)
++static void le_scan_param_req(struct hci_request *req, unsigned long opt)
+ {
+ 	struct le_scan_params *param =  (struct le_scan_params *) opt;
+ 	struct hci_cp_le_set_scan_param cp;
+@@ -2026,18 +2451,18 @@
+ 	cp.interval = cpu_to_le16(param->interval);
+ 	cp.window = cpu_to_le16(param->window);
+ 
+-	hci_send_cmd(hdev, HCI_OP_LE_SET_SCAN_PARAM, sizeof(cp), &cp);
++	hci_req_add(req, HCI_OP_LE_SET_SCAN_PARAM, sizeof(cp), &cp);
+ }
+ 
+-static void le_scan_enable_req(struct hci_dev *hdev, unsigned long opt)
++static void le_scan_enable_req(struct hci_request *req, unsigned long opt)
+ {
+ 	struct hci_cp_le_set_scan_enable cp;
+ 
+ 	memset(&cp, 0, sizeof(cp));
+-	cp.enable = 1;
+-	cp.filter_dup = 1;
++	cp.enable = LE_SCAN_ENABLE;
++	cp.filter_dup = LE_SCAN_FILTER_DUP_ENABLE;
+ 
+-	hci_send_cmd(hdev, HCI_OP_LE_SET_SCAN_ENABLE, sizeof(cp), &cp);
++	hci_req_add(req, HCI_OP_LE_SET_SCAN_ENABLE, sizeof(cp), &cp);
+ }
+ 
+ static int hci_do_le_scan(struct hci_dev *hdev, u8 type, u16 interval,
+@@ -2058,10 +2483,10 @@
+ 
+ 	hci_req_lock(hdev);
+ 
+-	err = __hci_request(hdev, le_scan_param_req, (unsigned long) &param,
+-			    timeo);
++	err = __hci_req_sync(hdev, le_scan_param_req, (unsigned long) &param,
++			     timeo);
+ 	if (!err)
+-		err = __hci_request(hdev, le_scan_enable_req, 0, timeo);
++		err = __hci_req_sync(hdev, le_scan_enable_req, 0, timeo);
+ 
+ 	hci_req_unlock(hdev);
+ 
+@@ -2069,7 +2494,7 @@
+ 		return err;
+ 
+ 	queue_delayed_work(hdev->workqueue, &hdev->le_scan_disable,
+-			   msecs_to_jiffies(timeout));
++			   timeout);
+ 
+ 	return 0;
+ }
+@@ -2179,7 +2604,6 @@
+ 	INIT_DELAYED_WORK(&hdev->discov_off, hci_discov_off);
+ 	INIT_DELAYED_WORK(&hdev->le_scan_disable, le_scan_disable_work);
+ 
+-	skb_queue_head_init(&hdev->driver_init);
+ 	skb_queue_head_init(&hdev->rx_q);
+ 	skb_queue_head_init(&hdev->cmd_q);
+ 	skb_queue_head_init(&hdev->raw_q);
+@@ -2937,7 +3450,7 @@
+ 		if (c->type == type && c->sent) {
+ 			BT_ERR("%s killing stalled connection %pMR",
+ 			       hdev->name, &c->dst);
+-			hci_acl_disconn(c, HCI_ERROR_REMOTE_USER_TERM);
++			hci_disconnect(c, HCI_ERROR_REMOTE_USER_TERM);
+ 		}
+ 	}
+ 
+@@ -3399,6 +3912,97 @@
+ 	kfree_skb(skb);
+ }
+ 
++static bool hci_req_is_complete(struct hci_dev *hdev)
++{
++	struct sk_buff *skb;
++
++	skb = skb_peek(&hdev->cmd_q);
++	if (!skb)
++		return true;
++
++	return bt_cb(skb)->req.start;
++}
++
++static void hci_resend_last(struct hci_dev *hdev)
++{
++	struct hci_command_hdr *sent;
++	struct sk_buff *skb;
++	u16 opcode;
++
++	if (!hdev->sent_cmd)
++		return;
++
++	sent = (void *) hdev->sent_cmd->data;
++	opcode = __le16_to_cpu(sent->opcode);
++	if (opcode == HCI_OP_RESET)
++		return;
++
++	skb = skb_clone(hdev->sent_cmd, GFP_KERNEL);
++	if (!skb)
++		return;
++
++	skb_queue_head(&hdev->cmd_q, skb);
++	queue_work(hdev->workqueue, &hdev->cmd_work);
++}
++
++void hci_req_cmd_complete(struct hci_dev *hdev, u16 opcode, u8 status)
++{
++	hci_req_complete_t req_complete = NULL;
++	struct sk_buff *skb;
++	unsigned long flags;
++
++	BT_DBG("opcode 0x%04x status 0x%02x", opcode, status);
++
++	/* If the completed command doesn't match the last one that was
++	 * sent we need to do special handling of it.
++	 */
++	if (!hci_sent_cmd_data(hdev, opcode)) {
++		/* Some CSR based controllers generate a spontaneous
++		 * reset complete event during init and any pending
++		 * command will never be completed. In such a case we
++		 * need to resend whatever was the last sent
++		 * command.
++		 */
++		if (test_bit(HCI_INIT, &hdev->flags) && opcode == HCI_OP_RESET)
++			hci_resend_last(hdev);
++
++		return;
++	}
++
++	/* If the command succeeded and there's still more commands in
++	 * this request the request is not yet complete.
++	 */
++	if (!status && !hci_req_is_complete(hdev))
++		return;
++
++	/* If this was the last command in a request the complete
++	 * callback would be found in hdev->sent_cmd instead of the
++	 * command queue (hdev->cmd_q).
++	 */
++	if (hdev->sent_cmd) {
++		req_complete = bt_cb(hdev->sent_cmd)->req.complete;
++		if (req_complete)
++			goto call_complete;
++	}
++
++	/* Remove all pending commands belonging to this request */
++	spin_lock_irqsave(&hdev->cmd_q.lock, flags);
++	while ((skb = __skb_dequeue(&hdev->cmd_q))) {
++		if (bt_cb(skb)->req.start) {
++			__skb_queue_head(&hdev->cmd_q, skb);
++			break;
++		}
++
++		req_complete = bt_cb(skb)->req.complete;
++		kfree_skb(skb);
++	}
++	spin_unlock_irqrestore(&hdev->cmd_q.lock, flags);
++
++call_complete:
++	if (req_complete)
++		req_complete(hdev, status);
++}
++
+ static void hci_rx_work(struct work_struct *work)
+ {
+ 	struct hci_dev *hdev = container_of(work, struct hci_dev, rx_work);

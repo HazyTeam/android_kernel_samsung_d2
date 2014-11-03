@@ -1,0 +1,30 @@
+--- drivers/net/macvlan.c
++++ drivers/net/macvlan.c
+@@ -229,7 +236,8 @@
+ 	}
+ 
+ 	if (port->passthru)
+-		vlan = list_first_entry(&port->vlans, struct macvlan_dev, list);
++		vlan = list_first_or_null_rcu(&port->vlans,
++					      struct macvlan_dev, list);
+ 	else
+ 		vlan = macvlan_hash_lookup(port, eth->h_dest);
+ 	if (vlan == NULL)
+@@ -814,7 +822,7 @@
+ 	if (err < 0)
+ 		goto upper_dev_unlink;
+ 
+-	list_add_tail(&vlan->list, &port->vlans);
++	list_add_tail_rcu(&vlan->list, &port->vlans);
+ 	netif_stacked_transfer_operstate(lowerdev, dev);
+ 
+ 	return 0;
+@@ -842,7 +850,7 @@
+ {
+ 	struct macvlan_dev *vlan = netdev_priv(dev);
+ 
+-	list_del(&vlan->list);
++	list_del_rcu(&vlan->list);
+ 	unregister_netdevice_queue(dev, head);
+ 	netdev_upper_dev_unlink(vlan->lowerdev, dev);
+ }

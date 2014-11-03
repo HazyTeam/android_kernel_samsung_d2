@@ -1,0 +1,10 @@
+--- include/linux/thermal.h
++++ include/linux/thermal.h
+@@ -187,7 +190,6 @@
+ 	char name[THERMAL_NAME_LENGTH];
+ 	int (*throttle)(struct thermal_zone_device *tz, int trip);
+ 	struct list_head	governor_list;
+-	struct module		*owner;
+ };
+ 
+ /* Structure that holds binding parameters for a zone */

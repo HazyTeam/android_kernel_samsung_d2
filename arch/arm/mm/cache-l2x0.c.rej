@@ -1,0 +1,28 @@
+--- arch/arm/mm/cache-l2x0.c
++++ arch/arm/mm/cache-l2x0.c
+@@ -333,15 +333,14 @@
+ 	if (cache_id_part_number_from_dt)
+ 		cache_id = cache_id_part_number_from_dt;
+ 	else
+-		cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID)
+-			& L2X0_CACHE_ID_PART_MASK;
++		cache_id = readl_relaxed(l2x0_base + L2X0_CACHE_ID);
+ 	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
+ 
+ 	aux &= aux_mask;
+ 	aux |= aux_val;
+ 
+ 	/* Determine the number of ways */
+-	switch (cache_id) {
++	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
+ 	case L2X0_CACHE_ID_PART_L310:
+ 		if (aux & (1 << 16))
+ 			ways = 16;
+@@ -725,7 +724,6 @@
+ 		.flush_all   = l2x0_flush_all,
+ 		.inv_all     = l2x0_inv_all,
+ 		.disable     = l2x0_disable,
+-		.set_debug   = pl310_set_debug,
+ 	},
+ };
+ 

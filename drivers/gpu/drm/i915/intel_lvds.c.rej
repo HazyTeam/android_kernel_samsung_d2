@@ -1,0 +1,10 @@
+--- drivers/gpu/drm/i915/intel_lvds.c
++++ drivers/gpu/drm/i915/intel_lvds.c
+@@ -631,7 +644,6 @@
+ 	if (!IS_ERR_OR_NULL(lvds_connector->base.edid))
+ 		kfree(lvds_connector->base.edid);
+ 
+-	intel_panel_destroy_backlight(connector->dev);
+ 	intel_panel_fini(&lvds_connector->base.panel);
+ 
+ 	drm_sysfs_connector_remove(connector);

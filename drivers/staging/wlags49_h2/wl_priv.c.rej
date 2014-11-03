@@ -1,0 +1,271 @@
+--- drivers/staging/wlags49_h2/wl_priv.c
++++ drivers/staging/wlags49_h2/wl_priv.c
+@@ -670,163 +670,163 @@
+ 					break;
+ 				case CFG_CNF_PM_ENABLED:
+ 					lp->PMEnabled   = pLtv->u.u16[0];
+-					pLtv->u.u16[0]  = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]  = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ 				case CFG_CNF_MCAST_RX:
+ 					lp->MulticastReceive    = pLtv->u.u16[0];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ 				case CFG_CNF_MAX_SLEEP_DURATION:
+ 					lp->MaxSleepDuration    = pLtv->u.u16[0];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ 				case CFG_CNF_HOLDOVER_DURATION:
+ 					lp->holdoverDuration    = pLtv->u.u16[0];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ 				case CFG_CNF_OWN_NAME:
+-					memset( lp->StationName, 0, sizeof( lp->StationName ));
+-					memcpy( (void *)lp->StationName, (void *)&pLtv->u.u8[2], (size_t)pLtv->u.u16[0]);
+-					pLtv->u.u16[0] = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					memset(lp->StationName, 0, sizeof(lp->StationName));
++					memcpy((void *)lp->StationName, (void *)&pLtv->u.u8[2], (size_t)pLtv->u.u16[0]);
++					pLtv->u.u16[0] = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ 				case CFG_CNF_LOAD_BALANCING:
+ 					lp->loadBalancing       = pLtv->u.u16[0];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ 				case CFG_CNF_MEDIUM_DISTRIBUTION:
+ 					lp->mediumDistribution  = pLtv->u.u16[0];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ #ifdef WARP
+ 				case CFG_CNF_TX_POW_LVL:
+ 					lp->txPowLevel          = pLtv->u.u16[0];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+-				//case CFG_CNF_SHORT_RETRY_LIMIT:    // Short Retry Limit
+-				//case 0xFC33:    // Long Retry Limit
+-				case CFG_SUPPORTED_RATE_SET_CNTL:        // Supported Rate Set Control
++				/* case CFG_CNF_SHORT_RETRY_LIMIT: */ /* Short Retry Limit */
++				/* case 0xFC33: */   /* Long Retry Limit */
++				case CFG_SUPPORTED_RATE_SET_CNTL:        /* Supported Rate Set Control */
+ 					lp->srsc[0]             = pLtv->u.u16[0];
+ 					lp->srsc[1]             = pLtv->u.u16[1];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
+-					pLtv->u.u16[1]          = CNV_INT_TO_LITTLE( pLtv->u.u16[1] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
++					pLtv->u.u16[1]          = CNV_INT_TO_LITTLE(pLtv->u.u16[1]);
+ 					break;
+-				case CFG_BASIC_RATE_SET_CNTL:        // Basic Rate Set Control
++				case CFG_BASIC_RATE_SET_CNTL:        /* Basic Rate Set Control */
+ 					lp->brsc[0]             = pLtv->u.u16[0];
+ 					lp->brsc[1]             = pLtv->u.u16[1];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
+-					pLtv->u.u16[1]          = CNV_INT_TO_LITTLE( pLtv->u.u16[1] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
++					pLtv->u.u16[1]          = CNV_INT_TO_LITTLE(pLtv->u.u16[1]);
+ 					break;
+ 				case CFG_CNF_CONNECTION_CNTL:
+ 					lp->connectionControl   = pLtv->u.u16[0];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+-				//case CFG_PROBE_DATA_RATE:
+-#endif  // HERMES25
++				/* case CFG_PROBE_DATA_RATE: */
++#endif  /* HERMES25 */
+ 
+-#if 1 //;? (HCF_TYPE) & HCF_TYPE_AP
+-		//;?should we restore this to allow smaller memory footprint
++#if 1 /* ;? (HCF_TYPE) & HCF_TYPE_AP */
++		/* ;?should we restore this to allow smaller memory footprint */
+ 
+ 				case CFG_CNF_OWN_DTIM_PERIOD:
+ 					lp->DTIMPeriod  = pLtv->u.u16[0];
+-					pLtv->u.u16[0]  = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]  = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ #ifdef WARP
+-				case CFG_CNF_OWN_BEACON_INTERVAL:        // Own Beacon Interval
++				case CFG_CNF_OWN_BEACON_INTERVAL:        /* Own Beacon Interval */
+ 					lp->ownBeaconInterval   = pLtv->u.u16[0];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+-#endif // WARP
+-				case CFG_COEXISTENSE_BEHAVIOUR:         // Coexistence behavior
++#endif /* WARP */
++				case CFG_COEXISTENSE_BEHAVIOUR:         /* Coexistence behavior */
+ 					lp->coexistence         = pLtv->u.u16[0];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ #ifdef USE_WDS
+ 				case CFG_CNF_WDS_ADDR1:
+-					memcpy( &lp->wds_port[0].wdsAddress, &pLtv->u.u8[0], ETH_ALEN );
++					memcpy(&lp->wds_port[0].wdsAddress, &pLtv->u.u8[0], ETH_ALEN);
+ 					hcfPort = HCF_PORT_1;
+ 					break;
+ 				case CFG_CNF_WDS_ADDR2:
+-					memcpy( &lp->wds_port[1].wdsAddress, &pLtv->u.u8[0], ETH_ALEN );
++					memcpy(&lp->wds_port[1].wdsAddress, &pLtv->u.u8[0], ETH_ALEN);
+ 					hcfPort = HCF_PORT_2;
+ 					break;
+ 				case CFG_CNF_WDS_ADDR3:
+-					memcpy( &lp->wds_port[2].wdsAddress, &pLtv->u.u8[0], ETH_ALEN );
++					memcpy(&lp->wds_port[2].wdsAddress, &pLtv->u.u8[0], ETH_ALEN);
+ 					hcfPort = HCF_PORT_3;
+ 					break;
+ 				case CFG_CNF_WDS_ADDR4:
+-					memcpy( &lp->wds_port[3].wdsAddress, &pLtv->u.u8[0], ETH_ALEN );
++					memcpy(&lp->wds_port[3].wdsAddress, &pLtv->u.u8[0], ETH_ALEN);
+ 					hcfPort = HCF_PORT_4;
+ 					break;
+ 				case CFG_CNF_WDS_ADDR5:
+-					memcpy( &lp->wds_port[4].wdsAddress, &pLtv->u.u8[0], ETH_ALEN );
++					memcpy(&lp->wds_port[4].wdsAddress, &pLtv->u.u8[0], ETH_ALEN);
+ 					hcfPort = HCF_PORT_5;
+ 					break;
+ 				case CFG_CNF_WDS_ADDR6:
+-					memcpy( &lp->wds_port[5].wdsAddress, &pLtv->u.u8[0], ETH_ALEN );
++					memcpy(&lp->wds_port[5].wdsAddress, &pLtv->u.u8[0], ETH_ALEN);
+ 					hcfPort = HCF_PORT_6;
+ 					break;
+ #endif  /* USE_WDS */
+ 
+ 				case CFG_CNF_MCAST_PM_BUF:
+ 					lp->multicastPMBuffering    = pLtv->u.u16[0];
+-					pLtv->u.u16[0]              = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]              = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ 				case CFG_CNF_REJECT_ANY:
+ 					lp->RejectAny   = pLtv->u.u16[0];
+-					pLtv->u.u16[0]  = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]  = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ #endif
+ 
+ 				case CFG_CNF_ENCRYPTION:
+ 					lp->EnableEncryption    = pLtv->u.u16[0];
+-					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ 				case CFG_CNF_AUTHENTICATION:
+ 					lp->authentication  = pLtv->u.u16[0];
+-					pLtv->u.u16[0]      = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]      = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+-#if 1 //;? (HCF_TYPE) & HCF_TYPE_AP
+-		//;?should we restore this to allow smaller memory footprint
++#if 1 /* ;? (HCF_TYPE) & HCF_TYPE_AP */
++		/* ;?should we restore this to allow smaller memory footprint */
+ 
+-				//case CFG_CNF_EXCL_UNENCRYPTED:
+-					//lp->ExcludeUnencrypted  = pLtv->u.u16[0];
+-					//pLtv->u.u16[0]          = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
+-					//break;
++				/* case CFG_CNF_EXCL_UNENCRYPTED:
++					lp->ExcludeUnencrypted  = pLtv->u.u16[0];
++					pLtv->u.u16[0]          = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
++					break; */
+ 				case CFG_CNF_MCAST_RATE:
+ 					/* TODO: determine if we are going to store anything based on this */
+ 					break;
+ 				case CFG_CNF_INTRA_BSS_RELAY:
+ 					lp->intraBSSRelay   = pLtv->u.u16[0];
+-					pLtv->u.u16[0]      = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					pLtv->u.u16[0]      = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 					break;
+ #endif
+ 
+ 				case CFG_CNF_MICRO_WAVE:
+ 					/* TODO: determine if we are going to store anything based on this */
+ 					break;
+-				//case CFG_CNF_LOAD_BALANCING:
++				/*case CFG_CNF_LOAD_BALANCING:*/
+ 					/* TODO: determine if we are going to store anything based on this */
+-					//break;
+-				//case CFG_CNF_MEDIUM_DISTRIBUTION:
++					/* break; */
++				/* case CFG_CNF_MEDIUM_DISTRIBUTION: */
+ 					/* TODO: determine if we are going to store anything based on this */
+-					//break;
+-				//case CFG_CNF_RX_ALL_GROUP_ADDRESS:
+-					// TODO: determine if we are going to store anything based on this
+-					//break;
+-				//case CFG_CNF_COUNTRY_INFO:
++					/* break; */
++				/* case CFG_CNF_RX_ALL_GROUP_ADDRESS: */
++					/*  TODO: determine if we are going to store anything based on this */
++					/* break; */
++				/* case CFG_CNF_COUNTRY_INFO: */
+ 					/* TODO: determine if we are going to store anything based on this */
+-					//break;
++					/* break; */
+ 				case CFG_CNF_OWN_SSID:
+-				//case CNF_DESIRED_SSID:
++				/* case CNF_DESIRED_SSID: */
+ 				case CFG_DESIRED_SSID:
+-					memset( lp->NetworkName, 0, sizeof( lp->NetworkName ));
+-					memcpy( (void *)lp->NetworkName, (void *)&pLtv->u.u8[2], (size_t)pLtv->u.u16[0] );
+-					pLtv->u.u16[0] = CNV_INT_TO_LITTLE( pLtv->u.u16[0] );
++					memset(lp->NetworkName, 0, sizeof(lp->NetworkName));
++					memcpy((void *)lp->NetworkName, (void *)&pLtv->u.u8[2], (size_t)pLtv->u.u16[0]);
++					pLtv->u.u16[0] = CNV_INT_TO_LITTLE(pLtv->u.u16[0]);
+ 
+ 					/* take care of the special network name "ANY" case */
+-					if(( strlen( &pLtv->u.u8[2]        ) == 0 ) ||
+-					   ( strcmp( &pLtv->u.u8[2], "ANY" ) == 0 ) ||
+-					   ( strcmp( &pLtv->u.u8[2], "any" ) == 0 )) {
++					if ((strlen(&pLtv->u.u8[2]) == 0) ||
++					   (strcmp(&pLtv->u.u8[2], "ANY") == 0) ||
++					   (strcmp(&pLtv->u.u8[2], "any") == 0)) {
+ 						/* set the SSID_STRCT llen field (u16[0]) to zero, and the
+ 						effectually null the string u8[2] */
+ 						pLtv->u.u16[0] = 0;
+@@ -1781,28 +1764,28 @@
+ 		      union iwreq_data *wrqu,
+ 		      char *extra)
+ {
+-        struct wl_private *lp = wl_priv(dev);
+-        unsigned long flags;
+-        int         ret = 0;
++	struct wl_private *lp = wl_priv(dev);
++	unsigned long flags;
++	int         ret = 0;
+ 	/*------------------------------------------------------------------------*/
+ 
+ 
+-        DBG_FUNC( "wvlan_set_station_nickname" );
+-        DBG_ENTER( DbgInfo );
++	DBG_FUNC("wvlan_set_station_nickname");
++	DBG_ENTER(DbgInfo);
+ 
+-        wl_lock(lp, &flags);
++	wl_lock(lp, &flags);
+ 
+-        memset( lp->StationName, 0, sizeof( lp->StationName ));
++	memset(lp->StationName, 0, sizeof(lp->StationName));
+ 
+-        memcpy( lp->StationName, extra, wrqu->data.length);
++	memcpy(lp->StationName, extra, wrqu->data.length);
+ 
+-        /* Commit the adapter parameters */
+-        wl_apply( lp );
+-        wl_unlock(lp, &flags);
++	/* Commit the adapter parameters */
++	wl_apply(lp);
++	wl_unlock(lp, &flags);
+ 
+-        DBG_LEAVE( DbgInfo );
+-        return ret;
+-} // wvlan_set_station_nickname
++	DBG_LEAVE(DbgInfo);
++	return ret;
++} /* wvlan_set_station_nickname */
+ /*============================================================================*/
+ 
+ 

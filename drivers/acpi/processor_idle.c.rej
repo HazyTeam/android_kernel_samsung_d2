@@ -1,0 +1,10 @@
+--- drivers/acpi/processor_idle.c
++++ drivers/acpi/processor_idle.c
+@@ -1152,6 +1104,7 @@
+ 		}
+ 
+ 		/* Populate Updated C-state information */
++		acpi_processor_get_power_info(pr);
+ 		acpi_processor_setup_cpuidle_states(pr);
+ 
+ 		/* Enable all cpuidle devices */

@@ -1,0 +1,10 @@
+--- mm/page_io.c
++++ mm/page_io.c
+@@ -20,6 +20,7 @@
+ #include <linux/buffer_head.h>
+ #include <linux/writeback.h>
+ #include <linux/frontswap.h>
++#include <linux/aio.h>
+ #include <asm/pgtable.h>
+ 
+ static struct bio *get_swap_bio(gfp_t gfp_flags,

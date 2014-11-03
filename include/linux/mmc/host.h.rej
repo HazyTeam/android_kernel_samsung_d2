@@ -1,0 +1,11 @@
+--- include/linux/mmc/host.h
++++ include/linux/mmc/host.h
+@@ -360,6 +359,8 @@
+ 
+ 	unsigned int		actual_clock;	/* Actual HC clock rate */
+ 
++	unsigned int		slotno;	/* used for sdio acpi binding */
++
+ 	unsigned long		private[0] ____cacheline_aligned;
+ };
+ 

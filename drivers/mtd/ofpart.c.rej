@@ -1,0 +1,11 @@
+--- drivers/mtd/ofpart.c
++++ drivers/mtd/ofpart.c
+@@ -121,7 +121,7 @@
+ 	nr_parts = plen / sizeof(part[0]);
+ 
+ 	*pparts = kzalloc(nr_parts * sizeof(*(*pparts)), GFP_KERNEL);
+-	if (!pparts)
++	if (!*pparts)
+ 		return -ENOMEM;
+ 
+ 	names = of_get_property(dp, "partition-names", &plen);

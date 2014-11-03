@@ -563,6 +563,4 @@ struct usb_audio_control_selector {
 	struct usb_descriptor_header *desc;
 };
 
-#endif /* __KERNEL__ */
-
 #endif /* __LINUX_USB_AUDIO_H */

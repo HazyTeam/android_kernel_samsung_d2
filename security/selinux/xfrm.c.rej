@@ -1,0 +1,11 @@
+--- security/selinux/xfrm.c
++++ security/selinux/xfrm.c
+@@ -310,7 +310,7 @@
+ 
+ 	if (old_ctx) {
+ 		new_ctx = kmalloc(sizeof(*old_ctx) + old_ctx->ctx_len,
+-				  GFP_KERNEL);
++				  GFP_ATOMIC);
+ 		if (!new_ctx)
+ 			return -ENOMEM;
+ 

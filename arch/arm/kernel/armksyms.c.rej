@@ -1,0 +1,23 @@
+--- arch/arm/kernel/armksyms.c
++++ arch/arm/kernel/armksyms.c
+@@ -49,8 +49,7 @@
+ extern void fpundefinstr(void);
+ 
+ 	/* platform dependent support */
+-EXPORT_SYMBOL(__udelay);
+-EXPORT_SYMBOL(__const_udelay);
++EXPORT_SYMBOL(arm_delay_ops);
+ 
+ 	/* networking */
+ EXPORT_SYMBOL(csum_partial);
+@@ -87,10 +86,6 @@
+ EXPORT_SYMBOL(memchr);
+ EXPORT_SYMBOL(__memzero);
+ 
+-	/* user mem (segment) */
+-EXPORT_SYMBOL(__strnlen_user);
+-EXPORT_SYMBOL(__strncpy_from_user);
+-
+ #ifdef CONFIG_MMU
+ EXPORT_SYMBOL(copy_page);
+ 

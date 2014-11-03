@@ -1,0 +1,11 @@
+--- drivers/media/video/gspca/jl2005bcd.c
++++ drivers/media/video/gspca/jl2005bcd.c
+@@ -512,7 +510,7 @@
+ };
+ 
+ /* -- module initialisation -- */
+-static const __devinitdata struct usb_device_id device_table[] = {
++static const struct usb_device_id device_table[] = {
+ 	{USB_DEVICE(0x0979, 0x0227)},
+ 	{}
+ };

@@ -1,0 +1,11 @@
+--- drivers/block/umem.c
++++ drivers/block/umem.c
+@@ -561,6 +599,8 @@
+ 	*card->biotail = bio;
+ 	bio->bi_next = NULL;
+ 	card->biotail = &bio->bi_next;
++	if (bio->bi_rw & REQ_SYNC || !mm_check_plugged(card))
++		activate(card);
+ 	spin_unlock_irq(&card->lock);
+ 
+ 	return;

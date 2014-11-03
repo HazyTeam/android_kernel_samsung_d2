@@ -1,0 +1,123 @@
+--- kernel/sched/fair.c
++++ kernel/sched/fair.c
+@@ -3896,12 +3918,16 @@
+ 	int tsk_cache_hot = 0;
+ 	/*
+ 	 * We do not migrate tasks that are:
+-	 * 1) running (obviously), or
++	 * 1) throttled_lb_pair, or
+ 	 * 2) cannot be migrated to this CPU due to cpus_allowed, or
+-	 * 3) are cache-hot on their current CPU.
++	 * 3) running (obviously), or
++	 * 4) are cache-hot on their current CPU.
+ 	 */
++	if (throttled_lb_pair(task_group(p), env->src_cpu, env->dst_cpu))
++		return 0;
++
+ 	if (!cpumask_test_cpu(env->dst_cpu, tsk_cpus_allowed(p))) {
+-		int new_dst_cpu;
++		int cpu;
+ 
+ 		schedstat_inc(p, se.statistics.nr_failed_migrations_affine);
+ 
+@@ -3916,12 +3942,15 @@
+ 		if (!env->dst_grpmask || (env->flags & LBF_SOME_PINNED))
+ 			return 0;
+ 
+-		new_dst_cpu = cpumask_first_and(env->dst_grpmask,
+-						tsk_cpus_allowed(p));
+-		if (new_dst_cpu < nr_cpu_ids) {
+-			env->flags |= LBF_SOME_PINNED;
+-			env->new_dst_cpu = new_dst_cpu;
++		/* Prevent to re-select dst_cpu via env's cpus */
++		for_each_cpu_and(cpu, env->dst_grpmask, env->cpus) {
++			if (cpumask_test_cpu(cpu, tsk_cpus_allowed(p))) {
++				env->flags |= LBF_SOME_PINNED;
++				env->new_dst_cpu = cpu;
++				break;
++			}
+ 		}
++
+ 		return 0;
+ 	}
+ 
+@@ -5004,11 +5024,10 @@
+ 			int *balance)
+ {
+ 	int ld_moved, cur_ld_moved, active_balance = 0;
+-	int lb_iterations, max_lb_iterations;
+ 	struct sched_group *group;
+ 	struct rq *busiest;
+ 	unsigned long flags;
+-	struct cpumask *cpus = __get_cpu_var(load_balance_tmpmask);
++	struct cpumask *cpus = __get_cpu_var(load_balance_mask);
+ 
+ 	struct lb_env env = {
+ 		.sd		= sd,
+@@ -5020,8 +5039,14 @@
+ 		.cpus		= cpus,
+ 	};
+ 
++	/*
++	 * For NEWLY_IDLE load_balancing, we don't need to consider
++	 * other cpus in our group
++	 */
++	if (idle == CPU_NEWLY_IDLE)
++		env.dst_grpmask = NULL;
++
+ 	cpumask_copy(cpus, cpu_active_mask);
+-	max_lb_iterations = cpumask_weight(env.dst_grpmask);
+ 
+ 	schedstat_inc(sd, lb_count[idle]);
+ 
+@@ -5047,7 +5072,6 @@
+ 	schedstat_add(sd, lb_imbalance[idle], env.imbalance);
+ 
+ 	ld_moved = 0;
+-	lb_iterations = 1;
+ 	if (busiest->nr_running > 1) {
+ 		/*
+ 		 * Attempt to move tasks. If find_busiest_group has found
+@@ -5074,17 +5098,17 @@
+ 		double_rq_unlock(env.dst_rq, busiest);
+ 		local_irq_restore(flags);
+ 
+-		if (env.flags & LBF_NEED_BREAK) {
+-			env.flags &= ~LBF_NEED_BREAK;
+-			goto more_balance;
+-		}
+-
+ 		/*
+ 		 * some other cpu did the load balance for us.
+ 		 */
+ 		if (cur_ld_moved && env.dst_cpu != smp_processor_id())
+ 			resched_cpu(env.dst_cpu);
+ 
++		if (env.flags & LBF_NEED_BREAK) {
++			env.flags &= ~LBF_NEED_BREAK;
++			goto more_balance;
++		}
++
+ 		/*
+ 		 * Revisit (affine) tasks on src_cpu that couldn't be moved to
+ 		 * us and move them to an alternate dst_cpu in our sched_group
+@@ -5104,14 +5128,17 @@
+ 		 * moreover subsequent load balance cycles should correct the
+ 		 * excess load moved.
+ 		 */
+-		if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0 &&
+-				lb_iterations++ < max_lb_iterations) {
++		if ((env.flags & LBF_SOME_PINNED) && env.imbalance > 0) {
+ 
+ 			env.dst_rq	 = cpu_rq(env.new_dst_cpu);
+ 			env.dst_cpu	 = env.new_dst_cpu;
+ 			env.flags	&= ~LBF_SOME_PINNED;
+ 			env.loop	 = 0;
+ 			env.loop_break	 = sched_nr_migrate_break;
++
++			/* Prevent to re-select dst_cpu via env's cpus */
++			cpumask_clear_cpu(env.dst_cpu, env.cpus);
++
+ 			/*
+ 			 * Go back to "more_balance" rather than "redo" since we
+ 			 * need to continue with same src_cpu.

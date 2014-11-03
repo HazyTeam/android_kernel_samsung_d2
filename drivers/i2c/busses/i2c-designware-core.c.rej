@@ -1,0 +1,15 @@
+--- drivers/i2c/busses/i2c-designware-core.c
++++ drivers/i2c/busses/i2c-designware-core.c
+@@ -381,9 +403,10 @@
+ 	dw_writel(dev, ic_con, DW_IC_CON);
+ 
+ 	/* Enable the adapter */
+-	dw_writel(dev, 1, DW_IC_ENABLE);
++	__i2c_dw_enable(dev, true);
+ 
+-	/* Enable interrupts */
++	/* Clear and enable interrupts */
++	i2c_dw_clear_int(dev);
+ 	dw_writel(dev, DW_IC_INTR_DEFAULT_MASK, DW_IC_INTR_MASK);
+ }
+ 

@@ -1,0 +1,348 @@
+--- kernel/time/timekeeping.c
++++ kernel/time/timekeeping.c
+@@ -297,12 +300,12 @@
+ 	s64 nsecs = 0;
+ 
+ 	do {
+-		seq = read_seqbegin(&tk->lock);
++		seq = read_seqcount_begin(&timekeeper_seq);
+ 
+ 		ts->tv_sec = tk->xtime_sec;
+ 		nsecs = timekeeping_get_ns(tk);
+ 
+-	} while (read_seqretry(&tk->lock, seq));
++	} while (read_seqcount_retry(&timekeeper_seq, seq));
+ 
+ 	ts->tv_nsec = 0;
+ 	timespec_add_ns(ts, nsecs);
+@@ -338,11 +341,11 @@
+ 	WARN_ON(timekeeping_suspended);
+ 
+ 	do {
+-		seq = read_seqbegin(&tk->lock);
++		seq = read_seqcount_begin(&timekeeper_seq);
+ 		secs = tk->xtime_sec + tk->wall_to_monotonic.tv_sec;
+ 		nsecs = timekeeping_get_ns(tk) + tk->wall_to_monotonic.tv_nsec;
+ 
+-	} while (read_seqretry(&tk->lock, seq));
++	} while (read_seqcount_retry(&timekeeper_seq, seq));
+ 	/*
+ 	 * Use ktime_set/ktime_add_ns to create a proper ktime on
+ 	 * 32-bit architectures without CONFIG_KTIME_SCALAR.
+@@ -536,7 +585,8 @@
+ 	if ((unsigned long)ts->tv_nsec >= NSEC_PER_SEC)
+ 		return -EINVAL;
+ 
+-	write_seqlock_irqsave(&tk->lock, flags);
++	raw_spin_lock_irqsave(&timekeeper_lock, flags);
++	write_seqcount_begin(&timekeeper_seq);
+ 
+ 	timekeeping_forward_now(tk);
+ 
+@@ -551,9 +601,10 @@
+ 	tk_set_wall_to_mono(tk, timespec_sub(tk->wall_to_monotonic, *ts));
+ 
+ error: /* even if we error out, we forwarded the time, so call update */
+-	timekeeping_update(tk, true);
++	timekeeping_update(tk, true, true);
+ 
+-	write_sequnlock_irqrestore(&tk->lock, flags);
++	write_seqcount_end(&timekeeper_seq);
++	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+ 
+ 	/* signal hrtimers about time change */
+ 	clock_was_set();
+@@ -621,7 +718,8 @@
+ 
+ 	new = (struct clocksource *) data;
+ 
+-	write_seqlock_irqsave(&tk->lock, flags);
++	raw_spin_lock_irqsave(&timekeeper_lock, flags);
++	write_seqcount_begin(&timekeeper_seq);
+ 
+ 	timekeeping_forward_now(tk);
+ 	if (!new->enable || new->enable(new) == 0) {
+@@ -630,9 +728,10 @@
+ 		if (old->disable)
+ 			old->disable(old);
+ 	}
+-	timekeeping_update(tk, true);
++	timekeeping_update(tk, true, true);
+ 
+-	write_sequnlock_irqrestore(&tk->lock, flags);
++	write_seqcount_end(&timekeeper_seq);
++	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+ 
+ 	return 0;
+ }
+@@ -682,11 +781,11 @@
+ 	s64 nsecs;
+ 
+ 	do {
+-		seq = read_seqbegin(&tk->lock);
++		seq = read_seqcount_begin(&timekeeper_seq);
+ 		nsecs = timekeeping_get_ns_raw(tk);
+ 		*ts = tk->raw_time;
+ 
+-	} while (read_seqretry(&tk->lock, seq));
++	} while (read_seqcount_retry(&timekeeper_seq, seq));
+ 
+ 	timespec_add_ns(ts, nsecs);
+ }
+@@ -702,11 +801,11 @@
+ 	int ret;
+ 
+ 	do {
+-		seq = read_seqbegin(&tk->lock);
++		seq = read_seqcount_begin(&timekeeper_seq);
+ 
+ 		ret = tk->clock->flags & CLOCK_SOURCE_VALID_FOR_HRES;
+ 
+-	} while (read_seqretry(&tk->lock, seq));
++	} while (read_seqcount_retry(&timekeeper_seq, seq));
+ 
+ 	return ret;
+ }
+@@ -721,11 +820,11 @@
+ 	u64 ret;
+ 
+ 	do {
+-		seq = read_seqbegin(&tk->lock);
++		seq = read_seqcount_begin(&timekeeper_seq);
+ 
+ 		ret = tk->clock->max_idle_ns;
+ 
+-	} while (read_seqretry(&tk->lock, seq));
++	} while (read_seqcount_retry(&timekeeper_seq, seq));
+ 
+ 	return ret;
+ }
+@@ -788,11 +887,10 @@
+ 		boot.tv_nsec = 0;
+ 	}
+ 
+-	seqlock_init(&tk->lock);
+-
++	raw_spin_lock_irqsave(&timekeeper_lock, flags);
++	write_seqcount_begin(&timekeeper_seq);
+ 	ntp_init();
+ 
+-	write_seqlock_irqsave(&tk->lock, flags);
+ 	clock = clocksource_default_clock();
+ 	if (clock->enable)
+ 		clock->enable(clock);
+@@ -811,7 +909,10 @@
+ 	tmp.tv_nsec = 0;
+ 	tk_set_sleep_time(tk, tmp);
+ 
+-	write_sequnlock_irqrestore(&tk->lock, flags);
++	memcpy(&shadow_timekeeper, &timekeeper, sizeof(timekeeper));
++
++	write_seqcount_end(&timekeeper_seq);
++	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+ }
+ 
+ /* time in seconds when suspend began */
+@@ -859,15 +960,17 @@
+ 	if (has_persistent_clock())
+ 		return;
+ 
+-	write_seqlock_irqsave(&tk->lock, flags);
++	raw_spin_lock_irqsave(&timekeeper_lock, flags);
++	write_seqcount_begin(&timekeeper_seq);
+ 
+ 	timekeeping_forward_now(tk);
+ 
+ 	__timekeeping_inject_sleeptime(tk, delta);
+ 
+-	timekeeping_update(tk, true);
++	timekeeping_update(tk, true, true);
+ 
+-	write_sequnlock_irqrestore(&tk->lock, flags);
++	write_seqcount_end(&timekeeper_seq);
++	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+ 
+ 	/* signal hrtimers about time change */
+ 	clock_was_set();
+@@ -883,26 +986,72 @@
+ static void timekeeping_resume(void)
+ {
+ 	struct timekeeper *tk = &timekeeper;
++	struct clocksource *clock = tk->clock;
+ 	unsigned long flags;
+-	struct timespec ts;
++	struct timespec ts_new, ts_delta;
++	cycle_t cycle_now, cycle_delta;
++	bool suspendtime_found = false;
+ 
+-	read_persistent_clock(&ts);
++	read_persistent_clock(&ts_new);
+ 
+ 	clockevents_resume();
+ 	clocksource_resume();
+ 
+-	write_seqlock_irqsave(&tk->lock, flags);
++	raw_spin_lock_irqsave(&timekeeper_lock, flags);
++	write_seqcount_begin(&timekeeper_seq);
++
++	/*
++	 * After system resumes, we need to calculate the suspended time and
++	 * compensate it for the OS time. There are 3 sources that could be
++	 * used: Nonstop clocksource during suspend, persistent clock and rtc
++	 * device.
++	 *
++	 * One specific platform may have 1 or 2 or all of them, and the
++	 * preference will be:
++	 *	suspend-nonstop clocksource -> persistent clock -> rtc
++	 * The less preferred source will only be tried if there is no better
++	 * usable source. The rtc part is handled separately in rtc core code.
++	 */
++	cycle_now = clock->read(clock);
++	if ((clock->flags & CLOCK_SOURCE_SUSPEND_NONSTOP) &&
++		cycle_now > clock->cycle_last) {
++		u64 num, max = ULLONG_MAX;
++		u32 mult = clock->mult;
++		u32 shift = clock->shift;
++		s64 nsec = 0;
++
++		cycle_delta = (cycle_now - clock->cycle_last) & clock->mask;
++
++		/*
++		 * "cycle_delta * mutl" may cause 64 bits overflow, if the
++		 * suspended time is too long. In that case we need do the
++		 * 64 bits math carefully
++		 */
++		do_div(max, mult);
++		if (cycle_delta > max) {
++			num = div64_u64(cycle_delta, max);
++			nsec = (((u64) max * mult) >> shift) * num;
++			cycle_delta -= num * max;
++		}
++		nsec += ((u64) cycle_delta * mult) >> shift;
+ 
+-	if (timespec_compare(&ts, &timekeeping_suspend_time) > 0) {
+-		ts = timespec_sub(ts, timekeeping_suspend_time);
+-		__timekeeping_inject_sleeptime(tk, &ts);
++		ts_delta = ns_to_timespec(nsec);
++		suspendtime_found = true;
++	} else if (timespec_compare(&ts_new, &timekeeping_suspend_time) > 0) {
++		ts_delta = timespec_sub(ts_new, timekeeping_suspend_time);
++		suspendtime_found = true;
+ 	}
+-	/* re-base the last cycle value */
+-	tk->clock->cycle_last = tk->clock->read(tk->clock);
++
++	if (suspendtime_found)
++		__timekeeping_inject_sleeptime(tk, &ts_delta);
++
++	/* Re-base the last cycle value */
++	tk->cycle_last = clock->cycle_last = cycle_now;
+ 	tk->ntp_error = 0;
+ 	timekeeping_suspended = 0;
+-	timekeeping_update(tk, false);
+-	write_sequnlock_irqrestore(&tk->lock, flags);
++	timekeeping_update(tk, false, true);
++	write_seqcount_end(&timekeeper_seq);
++	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+ 
+ 	touch_softlockup_watchdog();
+ 
+@@ -1223,15 +1384,16 @@
+ static cycle_t logarithmic_accumulation(struct timekeeper *tk, cycle_t offset,
+ 						u32 shift)
+ {
++	cycle_t interval = tk->cycle_interval << shift;
+ 	u64 raw_nsecs;
+ 
+ 	/* If the offset is smaller then a shifted interval, do nothing */
+-	if (offset < tk->cycle_interval<<shift)
++	if (offset < interval)
+ 		return offset;
+ 
+ 	/* Accumulate one shifted interval */
+-	offset -= tk->cycle_interval << shift;
+-	tk->clock->cycle_last += tk->cycle_interval << shift;
++	offset -= interval;
++	tk->cycle_last += interval;
+ 
+ 	tk->xtime_nsec += tk->xtime_interval << shift;
+ 	accumulate_nsecs_to_secs(tk);
+@@ -1288,27 +1450,28 @@
+ static void update_wall_time(void)
+ {
+ 	struct clocksource *clock;
+-	struct timekeeper *tk = &timekeeper;
++	struct timekeeper *real_tk = &timekeeper;
++	struct timekeeper *tk = &shadow_timekeeper;
+ 	cycle_t offset;
+ 	int shift = 0, maxshift;
+ 	unsigned long flags;
+ 
+-	write_seqlock_irqsave(&tk->lock, flags);
++	raw_spin_lock_irqsave(&timekeeper_lock, flags);
+ 
+ 	/* Make sure we're fully resumed: */
+ 	if (unlikely(timekeeping_suspended))
+ 		goto out;
+ 
+-	clock = tk->clock;
++	clock = real_tk->clock;
+ 
+ #ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
+-	offset = tk->cycle_interval;
++	offset = real_tk->cycle_interval;
+ #else
+ 	offset = (clock->read(clock) - clock->cycle_last) & clock->mask;
+ #endif
+ 
+ 	/* Check if there's really nothing to do */
+-	if (offset < tk->cycle_interval)
++	if (offset < real_tk->cycle_interval)
+ 		goto out;
+ 
+ 	/*
+@@ -1345,11 +1508,24 @@
+ 	 */
+ 	accumulate_nsecs_to_secs(tk);
+ 
+-	timekeeping_update(tk, false);
+-
++	write_seqcount_begin(&timekeeper_seq);
++	/* Update clock->cycle_last with the new value */
++	clock->cycle_last = tk->cycle_last;
++	/*
++	 * Update the real timekeeper.
++	 *
++	 * We could avoid this memcpy by switching pointers, but that
++	 * requires changes to all other timekeeper usage sites as
++	 * well, i.e. move the timekeeper pointer getter into the
++	 * spinlocked/seqcount protected sections. And we trade this
++	 * memcpy under the timekeeper_seq against one before we start
++	 * updating.
++	 */
++	memcpy(real_tk, tk, sizeof(*tk));
++	timekeeping_update(real_tk, false, false);
++	write_seqcount_end(&timekeeper_seq);
+ out:
+-	write_sequnlock_irqrestore(&tk->lock, flags);
+-
++	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+ }
+ 
+ /**
+@@ -1396,13 +1572,13 @@
+ 	WARN_ON(timekeeping_suspended);
+ 
+ 	do {
+-		seq = read_seqbegin(&tk->lock);
++		seq = read_seqcount_begin(&timekeeper_seq);
+ 		ts->tv_sec = tk->xtime_sec;
+ 		nsec = timekeeping_get_ns(tk);
+ 		tomono = tk->wall_to_monotonic;
+ 		sleep = tk->total_sleep_time;
+ 
+-	} while (read_seqretry(&tk->lock, seq));
++	} while (read_seqcount_retry(&timekeeper_seq, seq));
+ 
+ 	ts->tv_sec += tomono.tv_sec + sleep.tv_sec;
+ 	ts->tv_nsec = 0;

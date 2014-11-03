@@ -1,0 +1,12 @@
+--- lib/gcd.c
++++ lib/gcd.c
+@@ -9,6 +9,9 @@
+ 
+ 	if (a < b)
+ 		swap(a, b);
++
++	if (!b)
++		return a;
+ 	while ((r = a % b) != 0) {
+ 		a = b;
+ 		b = r;

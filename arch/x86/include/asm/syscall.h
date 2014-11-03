@@ -96,6 +96,12 @@ static inline int syscall_get_arch(struct task_struct *task,
 	return AUDIT_ARCH_I386;
 }
 
+static inline int syscall_get_arch(struct task_struct *task,
+				   struct pt_regs *regs)
+{
+	return AUDIT_ARCH_I386;
+}
+
 #else	 /* CONFIG_X86_64 */
 
 static inline void syscall_get_arguments(struct task_struct *task,

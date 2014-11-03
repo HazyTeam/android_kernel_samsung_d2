@@ -1,0 +1,12 @@
+--- arch/arm/include/asm/mach/map.h
++++ arch/arm/include/asm/mach/map.h
+@@ -9,6 +9,9 @@
+  *
+  *  Page table mapping constructs and function prototypes
+  */
++#ifndef __ASM_MACH_MAP_H
++#define __ASM_MACH_MAP_H
++
+ #include <asm/io.h>
+ 
+ struct map_desc {

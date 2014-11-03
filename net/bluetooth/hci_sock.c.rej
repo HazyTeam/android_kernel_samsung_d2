@@ -1,0 +1,21 @@
+--- net/bluetooth/hci_sock.c
++++ net/bluetooth/hci_sock.c
+@@ -1107,7 +1112,7 @@
+ 		goto error;
+ 	}
+ 
+-	err = bt_procfs_init(THIS_MODULE, &init_net, "hci", &hci_sk_list, NULL);
++	err = bt_procfs_init(&init_net, "hci", &hci_sk_list, NULL);
+ 	if (err < 0) {
+ 		BT_ERR("Failed to create HCI proc file");
+ 		bt_sock_unregister(BTPROTO_HCI);
+@@ -1126,8 +1131,6 @@
+ void hci_sock_cleanup(void)
+ {
+ 	bt_procfs_cleanup(&init_net, "hci");
+-	if (bt_sock_unregister(BTPROTO_HCI) < 0)
+-		BT_ERR("HCI socket unregistration failed");
+-
++	bt_sock_unregister(BTPROTO_HCI);
+ 	proto_unregister(&hci_sk_proto);
+ }

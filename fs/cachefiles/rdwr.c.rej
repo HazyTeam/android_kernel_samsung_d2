@@ -1,0 +1,16 @@
+--- fs/cachefiles/rdwr.c
++++ fs/cachefiles/rdwr.c
+@@ -917,10 +918,9 @@
+ 
+ 	/* write the page to the backing filesystem and let it store it in its
+ 	 * own time */
+-	dget(object->backer);
+-	mntget(cache->mnt);
+-	file = dentry_open(object->backer, cache->mnt, O_RDWR,
+-			   cache->cache_cred);
++	path.mnt = cache->mnt;
++	path.dentry = object->backer;
++	file = dentry_open(&path, O_RDWR | O_LARGEFILE, cache->cache_cred);
+ 	if (IS_ERR(file)) {
+ 		ret = PTR_ERR(file);
+ 	} else {

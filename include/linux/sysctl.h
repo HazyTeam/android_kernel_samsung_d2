@@ -1066,8 +1066,7 @@ struct ctl_table_root {
 	struct ctl_table_set default_set;
 	struct ctl_table_set *(*lookup)(struct ctl_table_root *root,
 					   struct nsproxy *namespaces);
-	int (*permissions)(struct ctl_table_root *root,
-			struct nsproxy *namespaces, struct ctl_table *table);
+	int (*permissions)(struct ctl_table_header *head, struct ctl_table *table);
 };
 
 /* struct ctl_path describes where in the hierarchy a table is added */
@@ -1122,7 +1121,5 @@ static inline void setup_sysctl_set(struct ctl_table_set *p,
 }
 
 #endif /* CONFIG_SYSCTL */
-
-#endif /* __KERNEL__ */
 
 #endif /* _LINUX_SYSCTL_H */

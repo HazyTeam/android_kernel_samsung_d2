@@ -1,0 +1,11 @@
+--- drivers/usb/gadget/config.c
++++ drivers/usb/gadget/config.c
+@@ -19,7 +19,7 @@
+ 
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
+-
++#include <linux/usb/composite.h>
+ 
+ /**
+  * usb_descriptor_fillbuf - fill buffer with descriptors

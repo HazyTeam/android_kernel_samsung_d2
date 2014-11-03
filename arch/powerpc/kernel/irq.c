@@ -122,8 +122,8 @@ static inline notrace int decrementer_check_overflow(void)
 }
 
 /* This is called whenever we are re-enabling interrupts
- * and returns either 0 (nothing to do) or 500/900 if there's
- * either an EE or a DEC to generate.
+ * and returns either 0 (nothing to do) or 500/900/280/a00/e80 if
+ * there's an EE, DEC or DBELL to generate.
  *
  * This is called in two contexts: From arch_local_irq_restore()
  * before soft-enabling interrupts, and from the exception exit
@@ -182,6 +182,13 @@ notrace unsigned int __check_irq_replay(void)
 	local_paca->irq_happened &= ~PACA_IRQ_DBELL;
 	if (happened & PACA_IRQ_DBELL)
 		return 0x280;
+#else
+	local_paca->irq_happened &= ~PACA_IRQ_DBELL;
+	if (happened & PACA_IRQ_DBELL) {
+		if (cpu_has_feature(CPU_FTR_HVMODE))
+			return 0xe80;
+		return 0xa00;
+	}
 #endif /* CONFIG_PPC_BOOK3E */
 
 	/* There should be nothing left ! */
@@ -284,6 +291,52 @@ void notrace restore_interrupts(void)
 		local_irq_enable();
 	} else
 		__hard_irq_enable();
+}
+
+/*
+ * This is a helper to use when about to go into idle low-power
+ * when the latter has the side effect of re-enabling interrupts
+ * (such as calling H_CEDE under pHyp).
+ *
+ * You call this function with interrupts soft-disabled (this is
+ * already the case when ppc_md.power_save is called). The function
+ * will return whether to enter power save or just return.
+ *
+ * In the former case, it will have notified lockdep of interrupts
+ * being re-enabled and generally sanitized the lazy irq state,
+ * and in the latter case it will leave with interrupts hard
+ * disabled and marked as such, so the local_irq_enable() call
+ * in cpu_idle() will properly re-enable everything.
+ */
+bool prep_irq_for_idle(void)
+{
+	/*
+	 * First we need to hard disable to ensure no interrupt
+	 * occurs before we effectively enter the low power state
+	 */
+	hard_irq_disable();
+
+	/*
+	 * If anything happened while we were soft-disabled,
+	 * we return now and do not enter the low power state.
+	 */
+	if (lazy_irq_pending())
+		return false;
+
+	/* Tell lockdep we are about to re-enable */
+	trace_hardirqs_on();
+
+	/*
+	 * Mark interrupts as soft-enabled and clear the
+	 * PACA_IRQ_HARD_DIS from the pending mask since we
+	 * are about to hard enable as well as a side effect
+	 * of entering the low power state.
+	 */
+	local_paca->irq_happened &= ~PACA_IRQ_HARD_DIS;
+	local_paca->soft_enabled = 1;
+
+	/* Tell the caller to enter the low power state */
+	return true;
 }
 
 /*
@@ -489,9 +542,9 @@ void do_IRQ(struct pt_regs *regs)
 	struct pt_regs *old_regs = set_irq_regs(regs);
 	unsigned int irq;
 
-	trace_irq_entry(regs);
-
 	irq_enter();
+
+	trace_irq_entry(regs);
 
 	check_stack_overflow();
 
@@ -511,10 +564,10 @@ void do_IRQ(struct pt_regs *regs)
 	else
 		__get_cpu_var(irq_stat).spurious_irqs++;
 
+	trace_irq_exit(regs);
+
 	irq_exit();
 	set_irq_regs(old_regs);
-
-	trace_irq_exit(regs);
 }
 
 void __init init_IRQ(void)
@@ -633,7 +686,7 @@ int irq_choose_cpu(const struct cpumask *mask)
 {
 	int cpuid;
 
-	if (cpumask_equal(mask, cpu_all_mask)) {
+	if (cpumask_equal(mask, cpu_online_mask)) {
 		static int irq_rover;
 		static DEFINE_RAW_SPINLOCK(irq_rover_lock);
 		unsigned long flags;

@@ -1,0 +1,19 @@
+--- drivers/i2c/busses/Kconfig
++++ drivers/i2c/busses/Kconfig
+@@ -106,13 +106,15 @@
+ 	    Panther Point (PCH)
+ 	    Lynx Point (PCH)
+ 	    Lynx Point-LP (PCH)
++	    Avoton (SOC)
++	    Wellsburg (PCH)
+ 
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called i2c-i801.
+ 
+ config I2C_ISCH
+ 	tristate "Intel SCH SMBus 1.0"
+-	depends on PCI
++	depends on PCI && GENERIC_HARDIRQS
+ 	select LPC_SCH
+ 	help
+ 	  Say Y here if you want to use SMBus controller on the Intel SCH

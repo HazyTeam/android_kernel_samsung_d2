@@ -1,0 +1,11 @@
+--- drivers/usb/serial/io_edgeport.c
++++ drivers/usb/serial/io_edgeport.c
+@@ -1784,7 +1702,7 @@
+ 						edge_serial->rxPort);
+ 					edge_tty_recv(edge_port->port, buffer,
+ 							rxLen);
+-					edge_port->icount.rx += rxLen;
++					edge_port->port->icount.rx += rxLen;
+ 				}
+ 				buffer += rxLen;
+ 			}

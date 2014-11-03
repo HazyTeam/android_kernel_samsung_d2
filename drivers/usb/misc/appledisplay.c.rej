@@ -1,0 +1,10 @@
+--- drivers/usb/misc/appledisplay.c
++++ drivers/usb/misc/appledisplay.c
+@@ -63,6 +63,7 @@
+ 	{ APPLEDISPLAY_DEVICE(0x9219) },
+ 	{ APPLEDISPLAY_DEVICE(0x921c) },
+ 	{ APPLEDISPLAY_DEVICE(0x921d) },
++	{ APPLEDISPLAY_DEVICE(0x9236) },
+ 
+ 	/* Terminating entry */
+ 	{ }

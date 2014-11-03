@@ -1,0 +1,11 @@
+--- sound/soc/omap/mcbsp.c
++++ sound/soc/omap/mcbsp.c
+@@ -745,7 +745,7 @@
+ {
+ 	const char *signal, *src;
+ 
+-	if (mcbsp->pdata->mux_signal)
++	if (!mcbsp->pdata->mux_signal)
+ 		return -EINVAL;
+ 
+ 	switch (mux) {

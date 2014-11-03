@@ -1,0 +1,11 @@
+--- net/mac80211/sta_info.c
++++ net/mac80211/sta_info.c
+@@ -884,7 +920,7 @@
+ 
+ void sta_info_stop(struct ieee80211_local *local)
+ {
+-	del_timer(&local->sta_cleanup);
++	del_timer_sync(&local->sta_cleanup);
+ 	sta_info_flush(local, NULL);
+ }
+ 

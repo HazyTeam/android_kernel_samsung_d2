@@ -1,0 +1,21 @@
+--- drivers/tty/tty_buffer.c
++++ drivers/tty/tty_buffer.c
+@@ -120,11 +121,14 @@
+ 	struct tty_bufhead *buf = &port->buf;
+ 	struct tty_buffer *thead;
+ 
+-	while ((thead = buf->head) != NULL) {
+-		buf->head = thead->next;
+-		tty_buffer_free(port, thead);
++	if (unlikely(buf->head == NULL))
++		return;
++	while ((thead = buf->head->next) != NULL) {
++		tty_buffer_free(port, buf->head);
++		buf->head = thead;
+ 	}
+-	buf->tail = NULL;
++	WARN_ON(buf->head != buf->tail);
++	buf->head->read = buf->head->commit;
+ }
+ 
+ /**

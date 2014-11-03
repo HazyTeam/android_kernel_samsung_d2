@@ -1,0 +1,20 @@
+--- drivers/net/wireless/ath/ath5k/base.c
++++ drivers/net/wireless/ath/ath5k/base.c
+@@ -849,7 +850,7 @@
+ 		return;
+ 	dma_unmap_single(ah->dev, bf->skbaddr, bf->skb->len,
+ 			DMA_TO_DEVICE);
+-	dev_kfree_skb_any(bf->skb);
++	ieee80211_free_txskb(ah->hw, bf->skb);
+ 	bf->skb = NULL;
+ 	bf->skbaddr = 0;
+ 	bf->desc->ds_data = 0;
+@@ -1565,7 +1555,7 @@
+ 	return;
+ 
+ drop_packet:
+-	dev_kfree_skb_any(skb);
++	ieee80211_free_txskb(hw, skb);
+ }
+ 
+ static void

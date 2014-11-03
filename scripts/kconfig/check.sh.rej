@@ -1,0 +1,10 @@
+--- scripts/kconfig/check.sh
++++ scripts/kconfig/check.sh
+@@ -1,6 +1,6 @@
+ #!/bin/sh
+ # Needed for systems without gettext
+-$* -xc -o /dev/null - > /dev/null 2>&1 << EOF
++$* -x c -o /dev/null - > /dev/null 2>&1 << EOF
+ #include <libintl.h>
+ int main()
+ {

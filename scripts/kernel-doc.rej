@@ -1,0 +1,12 @@
+--- scripts/kernel-doc
++++ scripts/kernel-doc
+@@ -2318,6 +2590,9 @@
+ 
+     $section_counter = 0;
+     while (<IN>) {
++	while (s/\\\s*$//) {
++	    $_ .= <IN>;
++	}
+ 	if ($state == 0) {
+ 	    if (/$doc_start/o) {
+ 		$state = 1;		# next line is always the function name

@@ -1,0 +1,50 @@
+--- fs/cifs/connect.c
++++ fs/cifs/connect.c
+@@ -1575,14 +1604,24 @@
+ 			}
+ 			break;
+ 		case Opt_blank_pass:
+-			vol->password = NULL;
+-			break;
+-		case Opt_pass:
+ 			/* passwords have to be handled differently
+ 			 * to allow the character used for deliminator
+ 			 * to be passed within them
+ 			 */
+ 
++			/*
++			 * Check if this is a case where the  password
++			 * starts with a delimiter
++			 */
++			tmp_end = strchr(data, '=');
++			tmp_end++;
++			if (!(tmp_end < end && tmp_end[1] == delim)) {
++				/* No it is not. Set the password to NULL */
++				vol->password = NULL;
++				break;
++			}
++			/* Yes it is. Drop down to Opt_pass below.*/
++		case Opt_pass:
+ 			/* Obtain the value string */
+ 			value = strchr(data, '=');
+ 			value++;
+@@ -1751,19 +1790,6 @@
+ 			 */
+ 			cFYI(1, "iocharset set to %s", string);
+ 			break;
+-		case Opt_sockopt:
+-			string = match_strdup(args);
+-			if (string == NULL)
+-				goto out_nomem;
+-
+-			if (strnicmp(string, "TCP_NODELAY", 11) == 0) {
+-				printk(KERN_WARNING "CIFS: the "
+-					"sockopt=TCP_NODELAY option has been "
+-					"deprecated and will be removed "
+-					"in 3.9\n");
+-				vol->sockopt_tcp_nodelay = 1;
+-			}
+-			break;
+ 		case Opt_netbiosname:
+ 			string = match_strdup(args);
+ 			if (string == NULL)

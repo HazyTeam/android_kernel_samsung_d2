@@ -1,0 +1,11 @@
+--- net/sctp/auth.c
++++ net/sctp/auth.c
+@@ -71,7 +71,7 @@
+ 		return;
+ 
+ 	if (atomic_dec_and_test(&key->refcnt)) {
+-		kfree(key);
++		kzfree(key);
+ 		SCTP_DBG_OBJCNT_DEC(keys);
+ 	}
+ }

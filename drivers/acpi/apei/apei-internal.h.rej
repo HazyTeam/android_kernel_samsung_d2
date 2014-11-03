@@ -1,0 +1,11 @@
+--- drivers/acpi/apei/apei-internal.h
++++ drivers/acpi/apei/apei-internal.h
+@@ -7,6 +7,8 @@
+ #define APEI_INTERNAL_H
+ 
+ #include <linux/cper.h>
++#include <linux/acpi.h>
++#include <linux/acpi_io.h>
+ 
+ struct apei_exec_context;
+ 

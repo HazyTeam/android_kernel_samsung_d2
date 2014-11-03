@@ -54,12 +54,15 @@
 #define L2CAP_MOVE_TIMEOUT		(4*HZ)  /*  4 seconds */
 #define L2CAP_MOVE_ERTX_TIMEOUT		(60*HZ) /* 60 seconds */
 
+#define L2CAP_A2MP_DEFAULT_MTU		670
+
 /* L2CAP socket address */
 struct sockaddr_l2 {
 	sa_family_t	l2_family;
 	__le16		l2_psm;
 	bdaddr_t	l2_bdaddr;
 	__le16		l2_cid;
+	__u8		l2_bdaddr_type;
 };
 
 /* L2CAP socket options */
@@ -248,6 +251,9 @@ struct l2cap_conf_rsp {
 #define L2CAP_CONF_UNKNOWN	0x0003
 #define L2CAP_CONF_PENDING	0x0004
 #define L2CAP_CONF_FLOW_SPEC_REJECT	0x0005
+
+/* configuration req/rsp continuation flag */
+#define L2CAP_CONF_FLAG_CONTINUATION	0x0001
 
 struct l2cap_conf_opt {
 	__u8       type;
@@ -515,6 +521,12 @@ struct l2cap_pinfo {
 	__u16		amp_move_reqseq;
 	__u16		amp_move_event;
 
+	__u8		remote_amp_id;
+	__u8		local_amp_id;
+	__u8		move_id;
+	__u8		move_state;
+	__u8		move_role;
+
 	__u16		next_tx_seq;
 	__u16		expected_ack_seq;
 	__u16		expected_tx_seq;
@@ -524,7 +536,6 @@ struct l2cap_pinfo {
 	__u32		frames_sent;
 	__u16		unacked_frames;
 	__u8		retry_count;
-	__u16		srej_queue_next;
 	__u16		sdu_len;
 	struct sk_buff	*sdu;
 	struct sk_buff	*sdu_last_frag;
@@ -661,12 +672,17 @@ struct l2cap_pinfo {
 				(pi)->tx_win_max + 1 - (y) + (x))
 #define __next_seq(x, pi) ((x + 1) & ((pi)->tx_win_max))
 
+static inline void l2cap_chan_no_defer(struct l2cap_chan *chan)
+{
+}
+
 extern bool disable_ertm;
 extern const struct proto_ops l2cap_sock_ops;
 extern struct bt_sock_list l2cap_sk_list;
 
 int l2cap_init_sockets(void);
 void l2cap_cleanup_sockets(void);
+bool l2cap_is_socket(struct socket *sock);
 
 u8 l2cap_get_ident(struct l2cap_conn *conn);
 void l2cap_send_cmd(struct l2cap_conn *conn, u8 ident, u8 code, u16 len, void *data);
@@ -719,5 +735,11 @@ void l2cap_amp_logical_complete(int result, struct hci_conn *ampcon,
 void l2cap_amp_logical_destroyed(struct hci_conn *ampcon);
 
 void l2cap_conn_del(struct hci_conn *hcon, int err, u8 is_process);
+
+void l2cap_conn_get(struct l2cap_conn *conn);
+void l2cap_conn_put(struct l2cap_conn *conn);
+
+int l2cap_register_user(struct l2cap_conn *conn, struct l2cap_user *user);
+void l2cap_unregister_user(struct l2cap_conn *conn, struct l2cap_user *user);
 
 #endif /* __L2CAP_H */

@@ -1,0 +1,10 @@
+--- drivers/usb/class/cdc-acm.c
++++ drivers/usb/class/cdc-acm.c
+@@ -593,7 +586,6 @@
+ 
+ 	dev_dbg(&acm->control->dev, "%s\n", __func__);
+ 
+-	tty_unregister_device(acm_tty_driver, acm->minor);
+ 	acm_release_minor(acm);
+ 	usb_put_intf(acm->control);
+ 	kfree(acm->country_codes);

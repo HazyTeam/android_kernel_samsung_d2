@@ -1,0 +1,13 @@
+--- drivers/staging/vt6656/wpa2.h
++++ drivers/staging/vt6656/wpa2.h
+@@ -45,8 +45,8 @@
+ } PMKIDInfo, *PPMKIDInfo;
+ 
+ typedef struct tagSPMKIDCache {
+-    unsigned long       BSSIDInfoCount;
+-    PMKIDInfo   BSSIDInfo[MAX_PMKID_CACHE];
++	u32 BSSIDInfoCount;
++	PMKIDInfo BSSIDInfo[MAX_PMKID_CACHE];
+ } SPMKIDCache, *PSPMKIDCache;
+ 
+ 

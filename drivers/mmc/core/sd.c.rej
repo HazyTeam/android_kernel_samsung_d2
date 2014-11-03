@@ -1,0 +1,19 @@
+--- drivers/mmc/core/sd.c
++++ drivers/mmc/core/sd.c
+@@ -969,16 +978,6 @@
+ 
+ 		/* Card is an ultra-high-speed card */
+ 		mmc_card_set_uhs(card);
+-
+-		/*
+-		 * Since initialization is now complete, enable preset
+-		 * value registers for UHS-I cards.
+-		 */
+-		if (host->ops->enable_preset_value) {
+-			mmc_host_clk_hold(card->host);
+-			host->ops->enable_preset_value(host, true);
+-			mmc_host_clk_release(card->host);
+-		}
+ 	} else {
+ 		/*
+ 		 * Attempt to change to high-speed (if supported)

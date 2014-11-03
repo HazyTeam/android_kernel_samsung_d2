@@ -1,0 +1,14 @@
+--- drivers/iommu/amd_iommu_init.c
++++ drivers/iommu/amd_iommu_init.c
+@@ -1876,11 +1876,6 @@
+ 	struct amd_iommu *iommu;
+ 	int ret;
+ 
+-	init_device_table_dma();
+-
+-	for_each_iommu(iommu)
+-		iommu_flush_all_caches(iommu);
+-
+ 	if (iommu_pass_through)
+ 		ret = amd_iommu_init_passthrough();
+ 	else

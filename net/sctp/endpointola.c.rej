@@ -1,0 +1,11 @@
+--- net/sctp/endpointola.c
++++ net/sctp/endpointola.c
+@@ -249,6 +249,8 @@
+ /* Final destructor for endpoint.  */
+ static void sctp_endpoint_destroy(struct sctp_endpoint *ep)
+ {
++	int i;
++
+ 	SCTP_ASSERT(ep->base.dead, "Endpoint is not dead", return);
+ 
+ 	/* Free up the HMAC transform. */

@@ -1,0 +1,10 @@
+--- fs/udf/namei.c
++++ fs/udf/namei.c
+@@ -1279,6 +1279,7 @@
+ 	*lenp = 3;
+ 	fid->udf.block = location.logicalBlockNum;
+ 	fid->udf.partref = location.partitionReferenceNum;
++	fid->udf.parent_partref = 0;
+ 	fid->udf.generation = inode->i_generation;
+ 
+ 	if (parent) {

@@ -1,0 +1,11 @@
+--- arch/s390/kernel/ptrace.c
++++ arch/s390/kernel/ptrace.c
+@@ -719,7 +719,7 @@
+ 	long ret = 0;
+ 
+ 	/* Do the secure computing check first. */
+-	secure_computing(regs->gprs[2]);
++	secure_computing_strict(regs->gprs[2]);
+ 
+ 	/*
+ 	 * The sysc_tracesys code in entry.S stored the system

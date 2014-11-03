@@ -1,0 +1,20 @@
+--- drivers/s390/net/qeth_l3_main.c
++++ drivers/s390/net/qeth_l3_main.c
+@@ -1758,6 +1756,8 @@
+ 	QETH_CARD_TEXT(card, 4, "frvaddr4");
+ 
+ 	netdev = __vlan_find_dev_deep(card->dev, vid);
++	if (!netdev)
++		return;
+ 	in_dev = in_dev_get(netdev);
+ 	if (!in_dev)
+ 		return;
+@@ -1786,6 +1786,8 @@
+ 	QETH_CARD_TEXT(card, 4, "frvaddr6");
+ 
+ 	netdev = __vlan_find_dev_deep(card->dev, vid);
++	if (!netdev)
++		return;
+ 	in6_dev = in6_dev_get(netdev);
+ 	if (!in6_dev)
+ 		return;

@@ -1,0 +1,345 @@
+--- drivers/staging/comedi/drivers/ni_labpc.c
++++ drivers/staging/comedi/drivers/ni_labpc.c
+@@ -904,76 +647,34 @@
+ 	} else
+ 		xfer = fifo_not_empty_transfer;
+ 	devpriv->current_transfer = xfer;
+-	mode = labpc_ai_scan_mode(cmd);
+ 
+-	/*  setup command6 register for 1200 boards */
+-	if (thisboard->register_layout == labpc_1200_layout) {
+-		/*  reference inputs to ground or common? */
+-		if (aref != AREF_GROUND)
+-			devpriv->command6_bits |= ADC_COMMON_BIT;
+-		else
+-			devpriv->command6_bits &= ~ADC_COMMON_BIT;
+-		/*  bipolar or unipolar range? */
+-		if (thisboard->ai_range_is_unipolar[range])
+-			devpriv->command6_bits |= ADC_UNIP_BIT;
+-		else
+-			devpriv->command6_bits &= ~ADC_UNIP_BIT;
+-		/*  interrupt on fifo half full? */
+-		if (xfer == fifo_half_full_transfer)
+-			devpriv->command6_bits |= ADC_FHF_INTR_EN_BIT;
+-		else
+-			devpriv->command6_bits &= ~ADC_FHF_INTR_EN_BIT;
+-		/*  enable interrupt on counter a1 terminal count? */
+-		if (cmd->stop_src == TRIG_EXT)
+-			devpriv->command6_bits |= A1_INTR_EN_BIT;
+-		else
+-			devpriv->command6_bits &= ~A1_INTR_EN_BIT;
+-		/*  are we scanning up or down through channels? */
+-		if (mode == MODE_MULT_CHAN_UP)
+-			devpriv->command6_bits |= ADC_SCAN_UP_BIT;
+-		else
+-			devpriv->command6_bits &= ~ADC_SCAN_UP_BIT;
+-		/*  write to register */
+-		devpriv->write_byte(devpriv->command6_bits,
+-				    dev->iobase + COMMAND6_REG);
+-	}
++	labpc_ai_set_chan_and_gain(dev, mode, chan, range, aref);
++
++	labpc_setup_cmd6_reg(dev, s, mode, xfer, range, aref,
++			     (cmd->stop_src == TRIG_EXT));
+ 
+-	/* setup channel list, etc (command1 register) */
+-	devpriv->command1_bits = 0;
+-	if (mode == MODE_MULT_CHAN_UP)
+-		channel = CR_CHAN(cmd->chanlist[cmd->chanlist_len - 1]);
+-	else
+-		channel = CR_CHAN(cmd->chanlist[0]);
+-	/* munge channel bits for differential / scan disabled mode */
+-	if ((mode == MODE_SINGLE_CHAN || mode == MODE_SINGLE_CHAN_INTERVAL) &&
+-	    aref == AREF_DIFF)
+-		channel *= 2;
+-	devpriv->command1_bits |= ADC_CHAN_BITS(channel);
+-	devpriv->command1_bits |= thisboard->ai_range_code[range];
+-	devpriv->write_byte(devpriv->command1_bits, dev->iobase + COMMAND1_REG);
+ 	/* manual says to set scan enable bit on second pass */
+ 	if (mode == MODE_MULT_CHAN_UP || mode == MODE_MULT_CHAN_DOWN) {
+-		devpriv->command1_bits |= ADC_SCAN_EN_BIT;
++		devpriv->cmd1 |= CMD1_SCANEN;
+ 		/* need a brief delay before enabling scan, or scan
+ 		 * list will get screwed when you switch
+ 		 * between scan up to scan down mode - dunno why */
+ 		udelay(1);
+-		devpriv->write_byte(devpriv->command1_bits,
+-				    dev->iobase + COMMAND1_REG);
++		devpriv->write_byte(devpriv->cmd1, dev->iobase + CMD1_REG);
+ 	}
+ 
+ 	devpriv->write_byte(cmd->chanlist_len,
+ 			    dev->iobase + INTERVAL_COUNT_REG);
+ 	/*  load count */
+-	devpriv->write_byte(INTERVAL_LOAD_BITS,
+-			    dev->iobase + INTERVAL_LOAD_REG);
++	devpriv->write_byte(0x1, dev->iobase + INTERVAL_STROBE_REG);
+ 
+-	if (cmd->convert_src == TRIG_TIMER || cmd->scan_begin_src == TRIG_TIMER) {
++	if (cmd->convert_src == TRIG_TIMER ||
++	    cmd->scan_begin_src == TRIG_TIMER) {
+ 		/*  set up pacing */
+ 		labpc_adc_timing(dev, cmd, mode);
+ 		/*  load counter b0 in mode 3 */
+ 		ret = labpc_counter_load(dev, dev->iobase + COUNTER_B_BASE_REG,
+-					 0, devpriv->divisor_b0, 3);
++					 0, devpriv->divisor_b0, I8254_MODE3);
+ 		if (ret < 0) {
+ 			comedi_error(dev, "error loading counter b0");
+ 			return -1;
+@@ -983,20 +684,23 @@
+ 	if (labpc_ai_convert_period(cmd, mode)) {
+ 		/*  load counter a0 in mode 2 */
+ 		ret = labpc_counter_load(dev, dev->iobase + COUNTER_A_BASE_REG,
+-					 0, devpriv->divisor_a0, 2);
+-		if (ret < 0) {
+-			comedi_error(dev, "error loading counter a0");
+-			return -1;
+-		}
+-	} else
+-		devpriv->write_byte(INIT_A0_BITS,
+-				    dev->iobase + COUNTER_A_CONTROL_REG);
++					 0, devpriv->divisor_a0, I8254_MODE2);
++	} else {
++		/* initialize pacer counter to prevent any problems */
++		ret = labpc_counter_set_mode(dev,
++					     dev->iobase + COUNTER_A_BASE_REG,
++					     0, I8254_MODE2);
++	}
++	if (ret) {
++		comedi_error(dev, "error loading counter a0");
++		return ret;
++	}
+ 
+ 	/*  set up scan pacing */
+ 	if (labpc_ai_scan_period(cmd, mode)) {
+ 		/*  load counter b1 in mode 2 */
+ 		ret = labpc_counter_load(dev, dev->iobase + COUNTER_B_BASE_REG,
+-					 1, devpriv->divisor_b1, 2);
++					 1, devpriv->divisor_b1, I8254_MODE2);
+ 		if (ret < 0) {
+ 			comedi_error(dev, "error loading counter b1");
+ 			return -1;
+@@ -1027,197 +732,54 @@
+ 		enable_dma(devpriv->dma_chan);
+ 		release_dma_lock(irq_flags);
+ 		/*  enable board's dma */
+-		devpriv->command3_bits |= DMA_EN_BIT | DMATC_INTR_EN_BIT;
++		devpriv->cmd3 |= (CMD3_DMAEN | CMD3_DMATCINTEN);
+ 	} else
+-		devpriv->command3_bits &= ~DMA_EN_BIT & ~DMATC_INTR_EN_BIT;
++		devpriv->cmd3 &= ~(CMD3_DMAEN | CMD3_DMATCINTEN);
+ #endif
+ 
+ 	/*  enable error interrupts */
+-	devpriv->command3_bits |= ERR_INTR_EN_BIT;
++	devpriv->cmd3 |= CMD3_ERRINTEN;
+ 	/*  enable fifo not empty interrupt? */
+ 	if (xfer == fifo_not_empty_transfer)
+-		devpriv->command3_bits |= ADC_FNE_INTR_EN_BIT;
++		devpriv->cmd3 |= CMD3_FIFOINTEN;
+ 	else
+-		devpriv->command3_bits &= ~ADC_FNE_INTR_EN_BIT;
+-	devpriv->write_byte(devpriv->command3_bits, dev->iobase + COMMAND3_REG);
++		devpriv->cmd3 &= ~CMD3_FIFOINTEN;
++	devpriv->write_byte(devpriv->cmd3, dev->iobase + CMD3_REG);
+ 
+-	/*  setup any external triggering/pacing (command4 register) */
+-	devpriv->command4_bits = 0;
++	/*  setup any external triggering/pacing (cmd4 register) */
++	devpriv->cmd4 = 0;
+ 	if (cmd->convert_src != TRIG_EXT)
+-		devpriv->command4_bits |= EXT_CONVERT_DISABLE_BIT;
++		devpriv->cmd4 |= CMD4_ECLKRCV;
+ 	/* XXX should discard first scan when using interval scanning
+ 	 * since manual says it is not synced with scan clock */
+-	if (labpc_use_continuous_mode(cmd, mode) == 0) {
+-		devpriv->command4_bits |= INTERVAL_SCAN_EN_BIT;
++	if (!labpc_use_continuous_mode(cmd, mode)) {
++		devpriv->cmd4 |= CMD4_INTSCAN;
+ 		if (cmd->scan_begin_src == TRIG_EXT)
+-			devpriv->command4_bits |= EXT_SCAN_EN_BIT;
++			devpriv->cmd4 |= CMD4_EOIRCV;
+ 	}
+ 	/*  single-ended/differential */
+ 	if (aref == AREF_DIFF)
+-		devpriv->command4_bits |= ADC_DIFF_BIT;
+-	devpriv->write_byte(devpriv->command4_bits, dev->iobase + COMMAND4_REG);
++		devpriv->cmd4 |= CMD4_SEDIFF;
++	devpriv->write_byte(devpriv->cmd4, dev->iobase + CMD4_REG);
+ 
+ 	/*  startup acquisition */
+ 
+-	/*  command2 reg */
+-	/*  use 2 cascaded counters for pacing */
+ 	spin_lock_irqsave(&dev->spinlock, flags);
+-	devpriv->command2_bits |= CASCADE_BIT;
+-	switch (cmd->start_src) {
+-	case TRIG_EXT:
+-		devpriv->command2_bits |= HWTRIG_BIT;
+-		devpriv->command2_bits &= ~PRETRIG_BIT & ~SWTRIG_BIT;
+-		break;
+-	case TRIG_NOW:
+-		devpriv->command2_bits |= SWTRIG_BIT;
+-		devpriv->command2_bits &= ~PRETRIG_BIT & ~HWTRIG_BIT;
+-		break;
+-	default:
+-		comedi_error(dev, "bug with start_src");
+-		spin_unlock_irqrestore(&dev->spinlock, flags);
+-		return -1;
+-		break;
+-	}
+-	switch (cmd->stop_src) {
+-	case TRIG_EXT:
+-		devpriv->command2_bits |= HWTRIG_BIT | PRETRIG_BIT;
+-		break;
+-	case TRIG_COUNT:
+-	case TRIG_NONE:
+-		break;
+-	default:
+-		comedi_error(dev, "bug with stop_src");
+-		spin_unlock_irqrestore(&dev->spinlock, flags);
+-		return -1;
+-	}
+-	devpriv->write_byte(devpriv->command2_bits, dev->iobase + COMMAND2_REG);
+-	spin_unlock_irqrestore(&dev->spinlock, flags);
+-
+-	return 0;
+-}
+-
+-/* interrupt service routine */
+-static irqreturn_t labpc_interrupt(int irq, void *d)
+-{
+-	struct comedi_device *dev = d;
+-	struct labpc_private *devpriv = dev->private;
+-	struct comedi_subdevice *s = dev->read_subdev;
+-	struct comedi_async *async;
+-	struct comedi_cmd *cmd;
+-
+-	if (dev->attached == 0) {
+-		comedi_error(dev, "premature interrupt");
+-		return IRQ_HANDLED;
+-	}
+-
+-	async = s->async;
+-	cmd = &async->cmd;
+-	async->events = 0;
+ 
+-	/* read board status */
+-	devpriv->status1_bits = devpriv->read_byte(dev->iobase + STATUS1_REG);
+-	if (thisboard->register_layout == labpc_1200_layout)
+-		devpriv->status2_bits =
+-		    devpriv->read_byte(dev->iobase + STATUS2_REG);
+-
+-	if ((devpriv->status1_bits & (DMATC_BIT | TIMER_BIT | OVERFLOW_BIT |
+-				      OVERRUN_BIT | DATA_AVAIL_BIT)) == 0
+-	    && (devpriv->status2_bits & A1_TC_BIT) == 0
+-	    && (devpriv->status2_bits & FNHF_BIT)) {
+-		return IRQ_NONE;
+-	}
++	/* use 2 cascaded counters for pacing */
++	devpriv->cmd2 |= CMD2_TBSEL;
+ 
+-	if (devpriv->status1_bits & OVERRUN_BIT) {
+-		/* clear error interrupt */
+-		devpriv->write_byte(0x1, dev->iobase + ADC_CLEAR_REG);
+-		async->events |= COMEDI_CB_ERROR | COMEDI_CB_EOA;
+-		comedi_event(dev, s);
+-		comedi_error(dev, "overrun");
+-		return IRQ_HANDLED;
+-	}
+-
+-#ifdef CONFIG_ISA_DMA_API
+-	if (devpriv->current_transfer == isa_dma_transfer) {
+-		/*
+-		 * if a dma terminal count of external stop trigger
+-		 * has occurred
+-		 */
+-		if (devpriv->status1_bits & DMATC_BIT ||
+-		    (thisboard->register_layout == labpc_1200_layout
+-		     && devpriv->status2_bits & A1_TC_BIT)) {
+-			handle_isa_dma(dev);
+-		}
+-	} else
+-#endif
+-		labpc_drain_fifo(dev);
+-
+-	if (devpriv->status1_bits & TIMER_BIT) {
+-		comedi_error(dev, "handled timer interrupt?");
+-		/*  clear it */
+-		devpriv->write_byte(0x1, dev->iobase + TIMER_CLEAR_REG);
+-	}
+-
+-	if (devpriv->status1_bits & OVERFLOW_BIT) {
+-		/*  clear error interrupt */
+-		devpriv->write_byte(0x1, dev->iobase + ADC_CLEAR_REG);
+-		async->events |= COMEDI_CB_ERROR | COMEDI_CB_EOA;
+-		comedi_event(dev, s);
+-		comedi_error(dev, "overflow");
+-		return IRQ_HANDLED;
+-	}
+-	/*  handle external stop trigger */
+-	if (cmd->stop_src == TRIG_EXT) {
+-		if (devpriv->status2_bits & A1_TC_BIT) {
+-			labpc_drain_dregs(dev);
+-			labpc_cancel(dev, s);
+-			async->events |= COMEDI_CB_EOA;
+-		}
+-	}
+-
+-	/* TRIG_COUNT end of acquisition */
+-	if (cmd->stop_src == TRIG_COUNT) {
+-		if (devpriv->count == 0) {
+-			labpc_cancel(dev, s);
+-			async->events |= COMEDI_CB_EOA;
+-		}
+-	}
+-
+-	comedi_event(dev, s);
+-	return IRQ_HANDLED;
+-}
+-
+-/* read all available samples from ai fifo */
+-static int labpc_drain_fifo(struct comedi_device *dev)
+-{
+-	struct labpc_private *devpriv = dev->private;
+-	unsigned int lsb, msb;
+-	short data;
+-	struct comedi_async *async = dev->read_subdev->async;
+-	const int timeout = 10000;
+-	unsigned int i;
++	devpriv->cmd2 &= ~(CMD2_SWTRIG | CMD2_HWTRIG | CMD2_PRETRIG);
++	if (cmd->start_src == TRIG_EXT)
++		devpriv->cmd2 |= CMD2_HWTRIG;
++	else
++		devpriv->cmd2 |= CMD2_SWTRIG;
++	if (cmd->stop_src == TRIG_EXT)
++		devpriv->cmd2 |= (CMD2_HWTRIG | CMD2_PRETRIG);
+ 
+-	devpriv->status1_bits = devpriv->read_byte(dev->iobase + STATUS1_REG);
++	devpriv->write_byte(devpriv->cmd2, dev->iobase + CMD2_REG);
+ 
+-	for (i = 0; (devpriv->status1_bits & DATA_AVAIL_BIT) && i < timeout;
+-	     i++) {
+-		/*  quit if we have all the data we want */
+-		if (async->cmd.stop_src == TRIG_COUNT) {
+-			if (devpriv->count == 0)
+-				break;
+-			devpriv->count--;
+-		}
+-		lsb = devpriv->read_byte(dev->iobase + ADC_FIFO_REG);
+-		msb = devpriv->read_byte(dev->iobase + ADC_FIFO_REG);
+-		data = (msb << 8) | lsb;
+-		cfc_write_to_buffer(dev->read_subdev, data);
+-		devpriv->status1_bits =
+-		    devpriv->read_byte(dev->iobase + STATUS1_REG);
+-	}
+-	if (i == timeout) {
+-		comedi_error(dev, "ai timeout, fifo never empties");
+-		async->events |= COMEDI_CB_ERROR | COMEDI_CB_EOA;
+-		return -1;
+-	}
++	spin_unlock_irqrestore(&dev->spinlock, flags);
+ 
+ 	return 0;
+ }

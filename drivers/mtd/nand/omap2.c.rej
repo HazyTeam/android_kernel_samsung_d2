@@ -1,0 +1,22 @@
+--- drivers/mtd/nand/omap2.c
++++ drivers/mtd/nand/omap2.c
+@@ -1505,13 +1629,16 @@
+ 	if (info->dma)
+ 		dma_release_channel(info->dma);
+ 
+-	if (info->gpmc_irq)
+-		free_irq(info->gpmc_irq, info);
++	if (info->gpmc_irq_count > 0)
++		free_irq(info->gpmc_irq_count, info);
++	if (info->gpmc_irq_fifo > 0)
++		free_irq(info->gpmc_irq_fifo, info);
+ 
+ 	/* Release NAND device, its internal structures and partitions */
+ 	nand_release(&info->mtd);
+ 	iounmap(info->nand.IO_ADDR_R);
+-	kfree(&info->mtd);
++	release_mem_region(info->phys_base, NAND_IO_SIZE);
++	kfree(info);
+ 	return 0;
+ }
+ 

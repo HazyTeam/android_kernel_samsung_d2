@@ -1,0 +1,11 @@
+--- fs/cifs/transport.c
++++ fs/cifs/transport.c
+@@ -662,6 +777,8 @@
+ 	struct mid_q_entry *midQ;
+ 	char *buf = iov[0].iov_base;
+ 	unsigned int credits = 1;
++	struct smb_rqst rqst = { .rq_iov = iov,
++				 .rq_nvec = n_vec };
+ 
+ 	timeout = flags & CIFS_TIMEOUT_MASK;
+ 	optype = flags & CIFS_OP_MASK;

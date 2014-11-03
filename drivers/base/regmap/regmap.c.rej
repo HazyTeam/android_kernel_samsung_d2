@@ -1,0 +1,18 @@
+--- drivers/base/regmap/regmap.c
++++ drivers/base/regmap/regmap.c
+@@ -117,11 +156,14 @@
+ 	if (map->precious_reg)
+ 		return map->precious_reg(map->dev, reg);
+ 
++	if (map->precious_table)
++		return _regmap_check_range_table(map, reg, map->precious_table);
++
+ 	return false;
+ }
+ 
+ static bool regmap_volatile_range(struct regmap *map, unsigned int reg,
+-	unsigned int num)
++	size_t num)
+ {
+ 	unsigned int i;
+ 

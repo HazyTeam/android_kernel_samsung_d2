@@ -1,0 +1,24 @@
+--- drivers/staging/vt6656/main_usb.c
++++ drivers/staging/vt6656/main_usb.c
+@@ -669,20 +694,16 @@
+ 	if (device->flags & DEVICE_FLAGS_OPENED)
+ 		device_close(device->dev);
+ 
+-	usb_put_dev(interface_to_usbdev(intf));
+-
+ 	return 0;
+ }
+ 
+ static int vt6656_resume(struct usb_interface *intf)
+ {
+-	PSDevice device = usb_get_intfdata(intf);
++	struct vnt_private *device = usb_get_intfdata(intf);
+ 
+ 	if (!device || !device->dev)
+ 		return -ENODEV;
+ 
+-	usb_get_dev(interface_to_usbdev(intf));
+-
+ 	if (!(device->flags & DEVICE_FLAGS_OPENED))
+ 		device_open(device->dev);
+ 

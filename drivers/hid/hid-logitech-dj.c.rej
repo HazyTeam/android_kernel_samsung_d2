@@ -1,0 +1,13 @@
+--- drivers/hid/hid-logitech-dj.c
++++ drivers/hid/hid-logitech-dj.c
+@@ -444,10 +403,6 @@
+ 	struct dj_report *dj_report;
+ 	int retval;
+ 
+-	/* no need to protect djrcv_dev->querying_devices */
+-	if (djrcv_dev->querying_devices)
+-		return 0;
+-
+ 	dj_report = kzalloc(sizeof(struct dj_report), GFP_KERNEL);
+ 	if (!dj_report)
+ 		return -ENOMEM;

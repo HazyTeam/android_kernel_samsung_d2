@@ -1,0 +1,17 @@
+--- net/mac80211/iface.c
++++ net/mac80211/iface.c
+@@ -846,14 +868,9 @@
+ 		if (local->monitors == 0) {
+ 			local->hw.conf.flags &= ~IEEE80211_CONF_MONITOR;
+ 			hw_reconf_flags |= IEEE80211_CONF_CHANGE_MONITOR;
+-			ieee80211_del_virtual_monitor(local);
+ 		}
+ 
+ 		ieee80211_adjust_monitor_flags(sdata, -1);
+-		ieee80211_configure_filter(local);
+-		mutex_lock(&local->mtx);
+-		ieee80211_recalc_idle(local);
+-		mutex_unlock(&local->mtx);
+ 		break;
+ 	case NL80211_IFTYPE_P2P_DEVICE:
+ 		/* relies on synchronize_rcu() below */

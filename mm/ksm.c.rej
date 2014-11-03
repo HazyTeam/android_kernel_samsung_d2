@@ -1,0 +1,12 @@
+--- mm/ksm.c
++++ mm/ksm.c
+@@ -2387,6 +2783,9 @@
+ 	&pages_unshared_attr.attr,
+ 	&pages_volatile_attr.attr,
+ 	&full_scans_attr.attr,
++#ifdef CONFIG_NUMA
++	&merge_across_nodes_attr.attr,
++#endif
+ 	NULL,
+ };
+ 

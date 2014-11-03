@@ -1,0 +1,10 @@
+--- net/mac80211/mesh.c
++++ net/mac80211/mesh.c
+@@ -622,6 +623,7 @@
+ 
+ 	del_timer_sync(&sdata->u.mesh.housekeeping_timer);
+ 	del_timer_sync(&sdata->u.mesh.mesh_path_root_timer);
++	del_timer_sync(&sdata->u.mesh.mesh_path_timer);
+ 	/*
+ 	 * If the timer fired while we waited for it, it will have
+ 	 * requeued the work. Now the work will be running again

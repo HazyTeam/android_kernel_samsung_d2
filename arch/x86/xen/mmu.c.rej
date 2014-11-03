@@ -1,0 +1,10 @@
+--- arch/x86/xen/mmu.c
++++ arch/x86/xen/mmu.c
+@@ -2200,6 +2210,7 @@
+ 	.lazy_mode = {
+ 		.enter = paravirt_enter_lazy_mmu,
+ 		.leave = xen_leave_lazy_mmu,
++		.flush = paravirt_flush_lazy_mmu,
+ 	},
+ 
+ 	.set_fixmap = xen_set_fixmap,

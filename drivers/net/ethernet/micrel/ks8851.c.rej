@@ -1,0 +1,56 @@
+--- drivers/net/ethernet/micrel/ks8851.c
++++ drivers/net/ethernet/micrel/ks8851.c
+@@ -1364,37 +1364,37 @@
+ 
+ /* driver bus management functions */
+ 
+-#ifdef CONFIG_PM
+-static int ks8851_suspend(struct spi_device *spi, pm_message_t state)
++#ifdef CONFIG_PM_SLEEP
++
++static int ks8851_suspend(struct device *dev)
+ {
+-	struct ks8851_net *ks = dev_get_drvdata(&spi->dev);
+-	struct net_device *dev = ks->netdev;
++	struct ks8851_net *ks = dev_get_drvdata(dev);
++	struct net_device *netdev = ks->netdev;
+ 
+-	if (netif_running(dev)) {
+-		netif_device_detach(dev);
+-		ks8851_net_stop(dev);
++	if (netif_running(netdev)) {
++		netif_device_detach(netdev);
++		ks8851_net_stop(netdev);
+ 	}
+ 
+ 	return 0;
+ }
+ 
+-static int ks8851_resume(struct spi_device *spi)
++static int ks8851_resume(struct device *dev)
+ {
+-	struct ks8851_net *ks = dev_get_drvdata(&spi->dev);
+-	struct net_device *dev = ks->netdev;
++	struct ks8851_net *ks = dev_get_drvdata(dev);
++	struct net_device *netdev = ks->netdev;
+ 
+-	if (netif_running(dev)) {
+-		ks8851_net_open(dev);
+-		netif_device_attach(dev);
++	if (netif_running(netdev)) {
++		ks8851_net_open(netdev);
++		netif_device_attach(netdev);
+ 	}
+ 
+ 	return 0;
+ }
+-#else
+-#define ks8851_suspend NULL
+-#define ks8851_resume NULL
+ #endif
+ 
++static SIMPLE_DEV_PM_OPS(ks8851_pm_ops, ks8851_suspend, ks8851_resume);
++
+ static int ks8851_probe(struct spi_device *spi)
+ {
+ 	struct net_device *ndev;

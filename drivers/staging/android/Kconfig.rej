@@ -1,0 +1,18 @@
+--- drivers/staging/android/Kconfig
++++ drivers/staging/android/Kconfig
+@@ -61,13 +84,13 @@
+ 	bool "Android Low Memory Killer"
+ 	default N
+ 	---help---
+-	  Register processes to be killed when memory is low
++	  Registers processes to be killed when memory is low
+ 
+ config ANDROID_INTF_ALARM_DEV
+ 	bool "Android alarm driver"
+ 	depends on RTC_CLASS
+ 	default n
+-	help
++	---help---
+ 	  Provides non-wakeup and rtc backed wakeup alarms based on rtc or
+ 	  elapsed realtime, and a non-wakeup alarm on the monotonic clock.
+ 	  Also exports the alarm interface to user-space.

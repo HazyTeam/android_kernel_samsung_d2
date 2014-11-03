@@ -1,0 +1,9 @@
+--- arch/arm/mach-dove/include/mach/bridge-regs.h
++++ arch/arm/mach-dove/include/mach/bridge-regs.h
+@@ -50,5 +50,6 @@
+ #define POWER_MANAGEMENT	(BRIDGE_VIRT_BASE | 0x011c)
+ 
+ #define TIMER_VIRT_BASE		(BRIDGE_VIRT_BASE | 0x0300)
++#define TIMER_PHYS_BASE         (BRIDGE_PHYS_BASE | 0x0300)
+ 
+ #endif

@@ -1,0 +1,31 @@
+--- fs/cifs/cifsacl.c
++++ fs/cifs/cifsacl.c
+@@ -218,13 +217,13 @@
+ 	sidkey = request_key(&cifs_idmap_key_type, desc, "");
+ 	if (IS_ERR(sidkey)) {
+ 		rc = -EINVAL;
+-		cFYI(1, "%s: Can't map %cid %u to a SID", __func__,
+-			sidtype == SIDOWNER ? 'u' : 'g', cid);
++		cifs_dbg(FYI, "%s: Can't map %cid %u to a SID\n",
++			 __func__, sidtype == SIDOWNER ? 'u' : 'g', cid);
+ 		goto out_revert_creds;
+ 	} else if (sidkey->datalen < CIFS_SID_BASE_SIZE) {
+ 		rc = -EIO;
+-		cFYI(1, "%s: Downcall contained malformed key "
+-			"(datalen=%hu)", __func__, sidkey->datalen);
++		cifs_dbg(FYI, "%s: Downcall contained malformed key (datalen=%hu)\n",
++			 __func__, sidkey->datalen);
+ 		goto invalidate_key;
+ 	}
+ 
+@@ -240,8 +239,8 @@
+ 	ksid_size = CIFS_SID_BASE_SIZE + (ksid->num_subauth * sizeof(__le32));
+ 	if (ksid_size > sidkey->datalen) {
+ 		rc = -EIO;
+-		cFYI(1, "%s: Downcall contained malformed key (datalen=%hu, "
+-			"ksid_size=%u)", __func__, sidkey->datalen, ksid_size);
++		cifs_dbg(FYI, "%s: Downcall contained malformed key (datalen=%hu, ksid_size=%u)\n",
++			 __func__, sidkey->datalen, ksid_size);
+ 		goto invalidate_key;
+ 	}
+ 

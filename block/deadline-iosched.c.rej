@@ -1,0 +1,11 @@
+--- block/deadline-iosched.c
++++ block/deadline-iosched.c
+@@ -230,7 +230,7 @@
+ 	/*
+ 	 * rq is expired!
+ 	 */
+-	if (time_after(jiffies, rq_fifo_time(rq)))
++	if (time_after_eq(jiffies, rq_fifo_time(rq)))
+ 		return 1;
+ 
+ 	return 0;

@@ -1,0 +1,45 @@
+--- drivers/media/media-device.c
++++ drivers/media/media-device.c
+@@ -128,35 +132,31 @@
+ 	upad->flags = kpad->flags;
+ }
+ 
+-static long media_device_enum_links(struct media_device *mdev,
+-				    struct media_links_enum __user *ulinks)
++static long __media_device_enum_links(struct media_device *mdev,
++				      struct media_links_enum *links)
+ {
+ 	struct media_entity *entity;
+-	struct media_links_enum links;
+ 
+-	if (copy_from_user(&links, ulinks, sizeof(links)))
+-		return -EFAULT;
+-
+-	entity = find_entity(mdev, links.entity);
++	entity = find_entity(mdev, links->entity);
+ 	if (entity == NULL)
+ 		return -EINVAL;
+ 
+-	if (links.pads) {
++	if (links->pads) {
+ 		unsigned int p;
+ 
+ 		for (p = 0; p < entity->num_pads; p++) {
+ 			struct media_pad_desc pad;
+ 			media_device_kpad_to_upad(&entity->pads[p], &pad);
+-			if (copy_to_user(&links.pads[p], &pad, sizeof(pad)))
++			if (copy_to_user(&links->pads[p], &pad, sizeof(pad)))
+ 				return -EFAULT;
+ 		}
+ 	}
+ 
+-	if (links.links) {
++	if (links->links) {
+ 		struct media_link_desc __user *ulink;
+ 		unsigned int l;
+ 
+-		for (l = 0, ulink = links.links; l < entity->num_links; l++) {
++		for (l = 0, ulink = links->links; l < entity->num_links; l++) {
+ 			struct media_link_desc link;
+ 
+ 			/* Ignore backlinks. */

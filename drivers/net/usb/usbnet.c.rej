@@ -1,0 +1,42 @@
+--- drivers/net/usb/usbnet.c
++++ drivers/net/usb/usbnet.c
+@@ -736,7 +753,8 @@
+ 	dev->flags = 0;
+ 	del_timer_sync (&dev->delay);
+ 	tasklet_kill (&dev->bh);
+-	if (info->manage_power)
++	if (info->manage_power &&
++	    !test_and_clear_bit(EVENT_NO_RUNTIME_PM, &dev->flags))
+ 		info->manage_power(dev, 0);
+ 	else
+ 		usb_autopm_put_interface(dev->intf);
+@@ -807,18 +825,23 @@
+ 		   (dev->driver_info->flags & FLAG_FRAMING_AX) ? "ASIX" :
+ 		   "simple");
+ 
++	/* reset rx error state */
++	dev->pkt_cnt = 0;
++	dev->pkt_err = 0;
++	clear_bit(EVENT_RX_KILL, &dev->flags);
++
+ 	// delay posting reads until we're fully open
+ 	tasklet_schedule (&dev->bh);
+ 	if (info->manage_power) {
+ 		retval = info->manage_power(dev, 1);
+-		if (retval < 0)
+-			goto done_manage_power_error;
+-		usb_autopm_put_interface(dev->intf);
++		if (retval < 0) {
++			retval = 0;
++			set_bit(EVENT_NO_RUNTIME_PM, &dev->flags);
++		} else {
++			usb_autopm_put_interface(dev->intf);
++		}
+ 	}
+ 	return retval;
+-
+-done_manage_power_error:
+-	clear_bit(EVENT_DEV_OPEN, &dev->flags);
+ done:
+ 	usb_autopm_put_interface(dev->intf);
+ done_nopm:

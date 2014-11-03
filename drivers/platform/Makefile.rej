@@ -1,0 +1,7 @@
+--- drivers/platform/Makefile
++++ drivers/platform/Makefile
+@@ -4,3 +4,4 @@
+ 
+ obj-$(CONFIG_X86)		+= x86/
+ obj-$(CONFIG_OLPC)		+= olpc/
++obj-$(CONFIG_GOLDFISH)		+= goldfish/

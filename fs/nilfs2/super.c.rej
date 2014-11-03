@@ -1,0 +1,10 @@
+--- fs/nilfs2/super.c
++++ fs/nilfs2/super.c
+@@ -967,6 +962,7 @@
+ 	ret = nilfs_get_root_dentry(s, root, root_dentry);
+ 	nilfs_put_root(root);
+  out:
++	mutex_unlock(&nilfs->ns_snapshot_mount_mutex);
+ 	return ret;
+ }
+ 

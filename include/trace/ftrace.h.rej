@@ -1,0 +1,12 @@
+--- include/trace/ftrace.h
++++ include/trace/ftrace.h
+@@ -545,8 +545,7 @@
+ 	{ assign; }							\
+ 									\
+ 	if (!filter_current_check_discard(buffer, event_call, entry, event)) \
+-		trace_nowake_buffer_unlock_commit(buffer,		\
+-						  event, irq_flags, pc); \
++		trace_buffer_unlock_commit(buffer, event, irq_flags, pc); \
+ }
+ /*
+  * The ftrace_test_probe is compiled out, it is only here as a build time check

@@ -1,0 +1,84 @@
+--- drivers/usb/gadget/composite.c
++++ drivers/usb/gadget/composite.c
+@@ -910,6 +960,7 @@
+ 		void *buf, u16 language, int id)
+ {
+ 	struct usb_composite_driver	*composite = cdev->driver;
++	struct usb_gadget_string_container *uc;
+ 	struct usb_configuration	*c;
+ 	struct usb_function		*f;
+ 	int				len;
+@@ -1525,19 +1703,21 @@
+ 				struct usb_configuration, list);
+ 		remove_config(cdev, c);
+ 	}
+-	if (cdev->driver->unbind)
++	if (cdev->driver->unbind && unbind_driver)
+ 		cdev->driver->unbind(cdev);
+ 
+-	if (cdev->req) {
+-		kfree(cdev->req->buf);
+-		usb_ep_free_request(gadget->ep0, cdev->req);
+-	}
+-	device_remove_file(&gadget->dev, &dev_attr_suspended);
++	composite_dev_cleanup(cdev);
++
+ 	kfree(cdev->def_manufacturer);
+ 	kfree(cdev);
+ 	set_gadget_data(gadget, NULL);
+ }
+ 
++static void composite_unbind(struct usb_gadget *gadget)
++{
++	__composite_unbind(gadget, true);
++}
++
+ static void update_unchanged_dev_desc(struct usb_device_descriptor *new,
+ 		const struct usb_device_descriptor *old)
+ {
+@@ -1576,34 +1756,25 @@
+ 		new->iProduct = iProduct;
+ }
+ 
+-static struct usb_composite_driver *to_cdriver(struct usb_gadget_driver *gdrv)
++int composite_dev_prepare(struct usb_composite_driver *composite,
++		struct usb_composite_dev *cdev)
+ {
+-	return container_of(gdrv, struct usb_composite_driver, gadget_driver);
+-}
+-
+-static int composite_bind(struct usb_gadget *gadget,
+-		struct usb_gadget_driver *gdriver)
+-{
+-	struct usb_composite_dev	*cdev;
+-	struct usb_composite_driver	*composite = to_cdriver(gdriver);
+-	int				status = -ENOMEM;
+-
+-	cdev = kzalloc(sizeof *cdev, GFP_KERNEL);
+-	if (!cdev)
+-		return status;
+-
+-	spin_lock_init(&cdev->lock);
+-	cdev->gadget = gadget;
+-	set_gadget_data(gadget, cdev);
+-	INIT_LIST_HEAD(&cdev->configs);
++	struct usb_gadget *gadget = cdev->gadget;
++	int ret = -ENOMEM;
+ 
+ 	/* preallocate control response and buffer */
+ 	cdev->req = usb_ep_alloc_request(gadget->ep0, GFP_KERNEL);
+ 	if (!cdev->req)
+-		goto fail;
++		return -ENOMEM;
++
+ 	cdev->req->buf = kmalloc(USB_COMP_EP0_BUFSIZ, GFP_KERNEL);
+ 	if (!cdev->req->buf)
+ 		goto fail;
++
++	ret = device_create_file(&gadget->dev, &dev_attr_suspended);
++	if (ret)
++		goto fail_dev;
++
+ 	cdev->req->complete = composite_setup_complete;
+ 	gadget->ep0->driver_data = cdev;
+ 

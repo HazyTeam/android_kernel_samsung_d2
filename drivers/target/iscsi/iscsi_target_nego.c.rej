@@ -1,0 +1,11 @@
+--- drivers/target/iscsi/iscsi_target_nego.c
++++ drivers/target/iscsi/iscsi_target_nego.c
+@@ -619,7 +611,7 @@
+ 			SENDER_INITIATOR|SENDER_RECEIVER,
+ 			login->req_buf,
+ 			payload_length,
+-			conn->param_list);
++			conn);
+ 	if (ret < 0)
+ 		return -1;
+ 

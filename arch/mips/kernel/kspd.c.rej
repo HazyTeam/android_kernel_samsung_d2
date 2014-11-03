@@ -1,0 +1,11 @@
+--- arch/mips/kernel/kspd.c
++++ arch/mips/kernel/kspd.c
+@@ -323,7 +323,7 @@
+ 	fdt = files_fdtable(files);
+ 	for (;;) {
+ 		unsigned long set;
+-		i = j * __NFDBITS;
++		i = j * BITS_PER_LONG;
+ 		if (i >= fdt->max_fds)
+ 			break;
+ 		set = fdt->open_fds[j++];

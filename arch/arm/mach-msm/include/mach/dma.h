@@ -18,7 +18,6 @@
 #define __ASM_ARCH_MSM_DMA_H
 
 #include <linux/list.h>
-#include <mach/msm_iomap.h>
 
 #if defined(CONFIG_ARCH_FSM9XXX)
 #include <mach/dma-fsm9xxx.h>

@@ -1,0 +1,11 @@
+--- drivers/gpu/drm/drm_usb.c
++++ drivers/gpu/drm/drm_usb.c
+@@ -18,7 +18,7 @@
+ 
+ 	usbdev = interface_to_usbdev(interface);
+ 	dev->usbdev = usbdev;
+-	dev->dev = &usbdev->dev;
++	dev->dev = &interface->dev;
+ 
+ 	mutex_lock(&drm_global_mutex);
+ 

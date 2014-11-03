@@ -1,0 +1,11 @@
+--- net/xfrm/xfrm_policy.c
++++ net/xfrm/xfrm_policy.c
+@@ -1764,7 +1765,7 @@
+ 
+ 	if (!afinfo) {
+ 		dst_release(dst_orig);
+-		ret = ERR_PTR(-EINVAL);
++		return ERR_PTR(-EINVAL);
+ 	} else {
+ 		ret = afinfo->blackhole_route(net, dst_orig);
+ 	}

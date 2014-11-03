@@ -1,0 +1,20 @@
+--- net/8021q/vlan.c
++++ net/8021q/vlan.c
+@@ -86,15 +86,10 @@
+ 
+ 	grp = &vlan_info->grp;
+ 
+-	/* Take it out of our own structures, but be sure to interlock with
+-	 * HW accelerating devices or SW vlan input packet processing if
+-	 * VLAN is not 0 (leave it there for 802.1p).
+-	 */
+-	if (vlan_id)
+-		vlan_vid_del(real_dev, vlan_id);
+-
+ 	grp->nr_vlan_devs--;
+ 
++	if (vlan->flags & VLAN_FLAG_MVRP)
++		vlan_mvrp_request_leave(dev);
+ 	if (vlan->flags & VLAN_FLAG_GVRP)
+ 		vlan_gvrp_request_leave(dev);
+ 

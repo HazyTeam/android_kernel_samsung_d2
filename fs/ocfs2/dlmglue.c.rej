@@ -1,0 +1,14 @@
+--- fs/ocfs2/dlmglue.c
++++ fs/ocfs2/dlmglue.c
+@@ -2554,8 +2555,10 @@
+ 
+ 		ocfs2_complete_lock_res_refresh(lockres, status);
+ 
+-		if (status < 0)
++		if (status < 0) {
++			ocfs2_cluster_unlock(osb, lockres, level);
+ 			mlog_errno(status);
++		}
+ 		ocfs2_track_lock_refresh(lockres);
+ 	}
+ bail:

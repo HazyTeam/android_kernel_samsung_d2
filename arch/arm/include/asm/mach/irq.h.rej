@@ -1,0 +1,11 @@
+--- arch/arm/include/asm/mach/irq.h
++++ arch/arm/include/asm/mach/irq.h
+@@ -17,7 +17,7 @@
+ /*
+  * This is internal.  Do not use it.
+  */
+-extern void init_FIQ(void);
++extern void init_FIQ(int);
+ extern int show_fiq_list(struct seq_file *, int);
+ 
+ #ifdef CONFIG_MULTI_IRQ_HANDLER

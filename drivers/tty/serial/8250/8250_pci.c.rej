@@ -1,0 +1,54 @@
+--- drivers/tty/serial/8250/8250_pci.c
++++ drivers/tty/serial/8250/8250_pci.c
+@@ -1554,6 +1801,7 @@
+ #define PCI_DEVICE_ID_PLX_CRONYX_OMEGA	0xc001
+ #define PCI_DEVICE_ID_INTEL_PATSBURG_KT 0x1d3d
+ #define PCI_VENDOR_ID_WCH		0x4348
++#define PCI_DEVICE_ID_WCH_CH352_2S	0x3253
+ #define PCI_DEVICE_ID_WCH_CH353_4S	0x3453
+ #define PCI_DEVICE_ID_WCH_CH353_2S1PF	0x5046
+ #define PCI_DEVICE_ID_WCH_CH353_2S1P	0x7053
+@@ -1565,9 +1813,13 @@
+ #define PCI_DEVICE_ID_COMMTECH_4222PCIE	0x0022
+ #define PCI_DEVICE_ID_BROADCOM_TRUMANAGE 0x160a
+ 
++#define PCI_VENDOR_ID_SUNIX		0x1fd4
++#define PCI_DEVICE_ID_SUNIX_1999	0x1999
++
+ 
+ /* Unknown vendors/cards - this should not be in linux/pci_ids.h */
+ #define PCI_SUBDEVICE_ID_UNKNOWN_0x1584	0x1584
++#define PCI_SUBDEVICE_ID_UNKNOWN_0x1588	0x1588
+ 
+ /*
+  * Master list of serial port init/setup/exit quirks.
+@@ -1849,15 +2111,6 @@
+ 	},
+ 	{
+ 		.vendor		= PCI_VENDOR_ID_PLX,
+-		.device		= PCI_DEVICE_ID_PLX_9050,
+-		.subvendor	= PCI_VENDOR_ID_PLX,
+-		.subdevice	= PCI_SUBDEVICE_ID_UNKNOWN_0x1584,
+-		.init		= pci_plx9050_init,
+-		.setup		= pci_default_setup,
+-		.exit		= pci_plx9050_exit,
+-	},
+-	{
+-		.vendor		= PCI_VENDOR_ID_PLX,
+ 		.device		= PCI_DEVICE_ID_PLX_ROMULUS,
+ 		.subvendor	= PCI_VENDOR_ID_PLX,
+ 		.subdevice	= PCI_DEVICE_ID_PLX_ROMULUS,
+@@ -3738,7 +4016,12 @@
+ 	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
+ 		PCI_VENDOR_ID_PLX,
+ 		PCI_SUBDEVICE_ID_UNKNOWN_0x1584, 0, 0,
+-		pbn_b0_4_115200 },
++		pbn_b2_4_115200 },
++	/* Unknown card - subdevice 0x1588 */
++	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
++		PCI_VENDOR_ID_PLX,
++		PCI_SUBDEVICE_ID_UNKNOWN_0x1588, 0, 0,
++		pbn_b2_8_115200 },
+ 	{	PCI_VENDOR_ID_PLX, PCI_DEVICE_ID_PLX_9050,
+ 		PCI_SUBVENDOR_ID_KEYSPAN,
+ 		PCI_SUBDEVICE_ID_KEYSPAN_SX2, 0, 0,

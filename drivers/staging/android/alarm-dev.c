@@ -406,6 +406,25 @@ static enum alarmtimer_restart devalarm_alarmhandler(struct alarm *alrm,
 }
 
 
+
+static enum hrtimer_restart devalarm_hrthandler(struct hrtimer *hrt)
+{
+	struct devalarm *devalrm = container_of(hrt, struct devalarm, u.hrt);
+
+	devalarm_triggered(devalrm);
+	return HRTIMER_NORESTART;
+}
+
+static enum alarmtimer_restart devalarm_alarmhandler(struct alarm *alrm,
+							ktime_t now)
+{
+	struct devalarm *devalrm = container_of(alrm, struct devalarm, u.alrm);
+
+	devalarm_triggered(devalrm);
+	return ALARMTIMER_NORESTART;
+}
+
+
 static const struct file_operations alarm_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = alarm_ioctl,

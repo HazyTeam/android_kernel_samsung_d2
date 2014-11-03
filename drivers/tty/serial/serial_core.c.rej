@@ -1,0 +1,23 @@
+--- drivers/tty/serial/serial_core.c
++++ drivers/tty/serial/serial_core.c
+@@ -1941,6 +1941,8 @@
+ 		mutex_unlock(&port->mutex);
+ 		return 0;
+ 	}
++	put_device(tty_dev);
++
+ 	if (console_suspend_enabled || !uart_console(uport))
+ 		uport->suspended = 1;
+ 
+@@ -2006,9 +2008,11 @@
+ 			disable_irq_wake(uport->irq);
+ 			uport->irq_wake = 0;
+ 		}
++		put_device(tty_dev);
+ 		mutex_unlock(&port->mutex);
+ 		return 0;
+ 	}
++	put_device(tty_dev);
+ 	uport->suspended = 0;
+ 
+ 	/*

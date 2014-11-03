@@ -1,0 +1,10 @@
+--- arch/powerpc/kvm/emulate.c
++++ arch/powerpc/kvm/emulate.c
+@@ -38,6 +38,7 @@
+ 
+ #define OP_31_XOP_TRAP      4
+ #define OP_31_XOP_LWZX      23
++#define OP_31_XOP_DCBST     54
+ #define OP_31_XOP_TRAP_64   68
+ #define OP_31_XOP_DCBF      86
+ #define OP_31_XOP_LBZX      87

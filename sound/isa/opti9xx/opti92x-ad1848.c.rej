@@ -1,0 +1,11 @@
+--- sound/isa/opti9xx/opti92x-ad1848.c
++++ sound/isa/opti9xx/opti92x-ad1848.c
+@@ -1171,7 +1171,7 @@
+ 	.name		= "opti9xx",
+ 	.id_table	= snd_opti9xx_pnpids,
+ 	.probe		= snd_opti9xx_pnp_probe,
+-	.remove		= __devexit_p(snd_opti9xx_pnp_remove),
++	.remove		= snd_opti9xx_pnp_remove,
+ #ifdef CONFIG_PM
+ 	.suspend	= snd_opti9xx_pnp_suspend,
+ 	.resume		= snd_opti9xx_pnp_resume,

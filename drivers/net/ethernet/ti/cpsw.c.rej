@@ -1,0 +1,17 @@
+--- drivers/net/ethernet/ti/cpsw.c
++++ drivers/net/ethernet/ti/cpsw.c
+@@ -432,9 +490,12 @@
+ 	struct net_device	*ndev = skb->dev;
+ 	struct cpsw_priv	*priv = netdev_priv(ndev);
+ 
++	/* Check whether the queue is stopped due to stalled tx dma, if the
++	 * queue is stopped then start the queue as we have free desc for tx
++	 */
+ 	if (unlikely(netif_queue_stopped(ndev)))
+-		netif_start_queue(ndev);
+-	cpts_tx_timestamp(&priv->cpts, skb);
++		netif_wake_queue(ndev);
++	cpts_tx_timestamp(priv->cpts, skb);
+ 	priv->stats.tx_packets++;
+ 	priv->stats.tx_bytes += len;
+ 	dev_kfree_skb_any(skb);

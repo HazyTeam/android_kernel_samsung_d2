@@ -1,0 +1,50 @@
+--- mm/slab.c
++++ mm/slab.c
+@@ -1591,36 +1469,35 @@
+ 
+ 		ptr = kmalloc(sizeof(struct arraycache_init), GFP_NOWAIT);
+ 
+-		BUG_ON(cpu_cache_get(malloc_sizes[INDEX_AC].cs_cachep)
++		BUG_ON(cpu_cache_get(kmalloc_caches[INDEX_AC])
+ 		       != &initarray_generic.cache);
+-		memcpy(ptr, cpu_cache_get(malloc_sizes[INDEX_AC].cs_cachep),
++		memcpy(ptr, cpu_cache_get(kmalloc_caches[INDEX_AC]),
+ 		       sizeof(struct arraycache_init));
+ 		/*
+ 		 * Do not assume that spinlocks can be initialized via memcpy:
+ 		 */
+ 		spin_lock_init(&ptr->lock);
+ 
+-		malloc_sizes[INDEX_AC].cs_cachep->array[smp_processor_id()] =
+-		    ptr;
++		kmalloc_caches[INDEX_AC]->array[smp_processor_id()] = ptr;
+ 	}
+-	/* 5) Replace the bootstrap kmem_list3's */
++	/* 5) Replace the bootstrap kmem_cache_node */
+ 	{
+ 		int nid;
+ 
+ 		for_each_online_node(nid) {
+-			init_list(kmem_cache, &initkmem_list3[CACHE_CACHE + nid], nid);
++			init_list(kmem_cache, &init_kmem_cache_node[CACHE_CACHE + nid], nid);
+ 
+-			init_list(malloc_sizes[INDEX_AC].cs_cachep,
+-				  &initkmem_list3[SIZE_AC + nid], nid);
++			init_list(kmalloc_caches[INDEX_AC],
++				  &init_kmem_cache_node[SIZE_AC + nid], nid);
+ 
+-			if (INDEX_AC != INDEX_L3) {
+-				init_list(malloc_sizes[INDEX_L3].cs_cachep,
+-					  &initkmem_list3[SIZE_L3 + nid], nid);
++			if (INDEX_AC != INDEX_NODE) {
++				init_list(kmalloc_caches[INDEX_NODE],
++					  &init_kmem_cache_node[SIZE_NODE + nid], nid);
+ 			}
+ 		}
+ 	}
+ 
+-	slab_state = UP;
++	create_kmalloc_caches(ARCH_KMALLOC_FLAGS);
+ }
+ 
+ void __init kmem_cache_init_late(void)

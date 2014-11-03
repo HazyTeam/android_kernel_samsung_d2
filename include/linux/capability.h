@@ -9,82 +9,11 @@
  *
  * ftp://www.kernel.org/pub/linux/libs/security/linux-privs/kernel-2.6/
  */
-
 #ifndef _LINUX_CAPABILITY_H
 #define _LINUX_CAPABILITY_H
 
-#include <linux/types.h>
+#include <uapi/linux/capability.h>
 
-struct task_struct;
-
-/* User-level do most of the mapping between kernel and user
-   capabilities based on the version tag given by the kernel. The
-   kernel might be somewhat backwards compatible, but don't bet on
-   it. */
-
-/* Note, cap_t, is defined by POSIX (draft) to be an "opaque" pointer to
-   a set of three capability sets.  The transposition of 3*the
-   following structure to such a composite is better handled in a user
-   library since the draft standard requires the use of malloc/free
-   etc.. */
-
-#define _LINUX_CAPABILITY_VERSION_1  0x19980330
-#define _LINUX_CAPABILITY_U32S_1     1
-
-#define _LINUX_CAPABILITY_VERSION_2  0x20071026  /* deprecated - use v3 */
-#define _LINUX_CAPABILITY_U32S_2     2
-
-#define _LINUX_CAPABILITY_VERSION_3  0x20080522
-#define _LINUX_CAPABILITY_U32S_3     2
-
-typedef struct __user_cap_header_struct {
-	__u32 version;
-	int pid;
-} __user *cap_user_header_t;
-
-typedef struct __user_cap_data_struct {
-        __u32 effective;
-        __u32 permitted;
-        __u32 inheritable;
-} __user *cap_user_data_t;
-
-
-#define VFS_CAP_REVISION_MASK	0xFF000000
-#define VFS_CAP_REVISION_SHIFT	24
-#define VFS_CAP_FLAGS_MASK	~VFS_CAP_REVISION_MASK
-#define VFS_CAP_FLAGS_EFFECTIVE	0x000001
-
-#define VFS_CAP_REVISION_1	0x01000000
-#define VFS_CAP_U32_1           1
-#define XATTR_CAPS_SZ_1         (sizeof(__le32)*(1 + 2*VFS_CAP_U32_1))
-
-#define VFS_CAP_REVISION_2	0x02000000
-#define VFS_CAP_U32_2           2
-#define XATTR_CAPS_SZ_2         (sizeof(__le32)*(1 + 2*VFS_CAP_U32_2))
-
-#define XATTR_CAPS_SZ           XATTR_CAPS_SZ_2
-#define VFS_CAP_U32             VFS_CAP_U32_2
-#define VFS_CAP_REVISION	VFS_CAP_REVISION_2
-
-struct vfs_cap_data {
-	__le32 magic_etc;            /* Little endian */
-	struct {
-		__le32 permitted;    /* Little endian */
-		__le32 inheritable;  /* Little endian */
-	} data[VFS_CAP_U32];
-};
-
-#ifndef __KERNEL__
-
-/*
- * Backwardly compatible definition for source code - trapped in a
- * 32-bit world. If you find you need this, please consider using
- * libcap to untrap yourself...
- */
-#define _LINUX_CAPABILITY_VERSION  _LINUX_CAPABILITY_VERSION_1
-#define _LINUX_CAPABILITY_U32S     _LINUX_CAPABILITY_U32S_1
-
-#else
 
 #define _KERNEL_CAPABILITY_VERSION _LINUX_CAPABILITY_VERSION_3
 #define _KERNEL_CAPABILITY_U32S    _LINUX_CAPABILITY_U32S_3
@@ -377,6 +306,8 @@ struct cpu_vfs_cap_data {
 
 #ifdef __KERNEL__
 
+struct file;
+struct inode;
 struct dentry;
 struct user_namespace;
 
@@ -551,10 +482,10 @@ extern bool has_ns_capability_noaudit(struct task_struct *t,
 extern bool capable(int cap);
 extern bool ns_capable(struct user_namespace *ns, int cap);
 extern bool nsown_capable(int cap);
+extern bool inode_capable(const struct inode *inode, int cap);
+extern bool file_ns_capable(const struct file *file, struct user_namespace *ns, int cap);
 
 /* audit system wants to get cap info from files as well */
 extern int get_vfs_caps_from_disk(const struct dentry *dentry, struct cpu_vfs_cap_data *cpu_caps);
-
-#endif /* __KERNEL__ */
 
 #endif /* !_LINUX_CAPABILITY_H */

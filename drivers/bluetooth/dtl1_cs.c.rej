@@ -1,0 +1,10 @@
+--- drivers/bluetooth/dtl1_cs.c
++++ drivers/bluetooth/dtl1_cs.c
+@@ -569,7 +569,6 @@
+ 
+ 	dtl1_close(info);
+ 	pcmcia_disable_device(link);
+-	kfree(info);
+ }
+ 
+ static int dtl1_confcheck(struct pcmcia_device *p_dev, void *priv_data)

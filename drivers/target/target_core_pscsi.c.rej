@@ -1,0 +1,13 @@
+--- drivers/target/target_core_pscsi.c
++++ drivers/target/target_core_pscsi.c
+@@ -947,10 +954,7 @@
+ 				bio = NULL;
+ 			}
+ 
+-			page++;
+-			len -= bytes;
+ 			data_len -= bytes;
+-			off = 0;
+ 		}
+ 	}
+ 

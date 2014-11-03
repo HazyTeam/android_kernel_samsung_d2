@@ -1,0 +1,26 @@
+--- fs/ext4/balloc.c
++++ fs/ext4/balloc.c
+@@ -522,15 +545,21 @@
+ 	/* Check whether we have space after accounting for current
+ 	 * dirty clusters & root reserved clusters.
+ 	 */
+-	if (free_clusters >= ((root_clusters + nclusters) + dirty_clusters))
++	if (free_clusters >= (rsv + nclusters + dirty_clusters))
+ 		return 1;
+ 
+ 	/* Hm, nope.  Are (enough) root reserved clusters available? */
+ 	if (uid_eq(sbi->s_resuid, current_fsuid()) ||
+ 	    (!gid_eq(sbi->s_resgid, GLOBAL_ROOT_GID) && in_group_p(sbi->s_resgid)) ||
+ 	    capable(CAP_SYS_RESOURCE) ||
+-		(flags & EXT4_MB_USE_ROOT_BLOCKS)) {
++	    (flags & EXT4_MB_USE_ROOT_BLOCKS)) {
+ 
++		if (free_clusters >= (nclusters + dirty_clusters +
++				      resv_clusters))
++			return 1;
++	}
++	/* No free blocks. Let's see if we can dip into reserved pool */
++	if (flags & EXT4_MB_USE_RESERVED) {
+ 		if (free_clusters >= (nclusters + dirty_clusters))
+ 			return 1;
+ 	}

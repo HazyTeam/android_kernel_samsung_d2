@@ -1,0 +1,23 @@
+--- drivers/staging/android/binder.h
++++ drivers/staging/android/binder.h
+@@ -53,17 +53,17 @@
+ 
+ 	/* 8 bytes of data. */
+ 	union {
+-		void		*binder;	/* local object */
++		void __user	*binder;	/* local object */
+ 		signed long	handle;		/* remote object */
+ 	};
+ 
+ 	/* extra data associated with local object */
+-	void			*cookie;
++	void __user		*cookie;
+ };
+ 
+ /*
+  * On 64-bit platforms where user code may run in 32-bits the driver must
+- * translate the buffer (and local binder) addresses apropriately.
++ * translate the buffer (and local binder) addresses appropriately.
+  */
+ 
+ struct binder_write_read {

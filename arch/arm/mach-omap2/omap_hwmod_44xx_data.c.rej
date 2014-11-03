@@ -1,0 +1,109 @@
+--- arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -3800,7 +3803,7 @@
+ 	.class		= &omap44xx_wd_timer_hwmod_class,
+ 	.clkdm_name	= "l4_wkup_clkdm",
+ 	.mpu_irqs	= omap44xx_wd_timer2_irqs,
+-	.main_clk	= "wd_timer2_fck",
++	.main_clk	= "sys_32k_ck",
+ 	.prcm = {
+ 		.omap4 = {
+ 			.clkctrl_offs = OMAP4_CM_WKUP_WDT2_CLKCTRL_OFFSET,
+@@ -3821,7 +3824,7 @@
+ 	.class		= &omap44xx_wd_timer_hwmod_class,
+ 	.clkdm_name	= "abe_clkdm",
+ 	.mpu_irqs	= omap44xx_wd_timer3_irqs,
+-	.main_clk	= "wd_timer3_fck",
++	.main_clk	= "sys_32k_ck",
+ 	.prcm = {
+ 		.omap4 = {
+ 			.clkctrl_offs = OMAP4_CM1_ABE_WDT3_CLKCTRL_OFFSET,
+@@ -4252,6 +4255,27 @@
+ 
+ static struct omap_hwmod_addr_space omap44xx_aess_addrs[] = {
+ 	{
++		.name		= "dmem",
++		.pa_start	= 0x40180000,
++		.pa_end		= 0x4018ffff
++	},
++	{
++		.name		= "cmem",
++		.pa_start	= 0x401a0000,
++		.pa_end		= 0x401a1fff
++	},
++	{
++		.name		= "smem",
++		.pa_start	= 0x401c0000,
++		.pa_end		= 0x401c5fff
++	},
++	{
++		.name		= "pmem",
++		.pa_start	= 0x401e0000,
++		.pa_end		= 0x401e1fff
++	},
++	{
++		.name		= "mpu",
+ 		.pa_start	= 0x401f1000,
+ 		.pa_end		= 0x401f13ff,
+ 		.flags		= ADDR_TYPE_RT
+@@ -4270,6 +4294,27 @@
+ 
+ static struct omap_hwmod_addr_space omap44xx_aess_dma_addrs[] = {
+ 	{
++		.name		= "dmem_dma",
++		.pa_start	= 0x49080000,
++		.pa_end		= 0x4908ffff
++	},
++	{
++		.name		= "cmem_dma",
++		.pa_start	= 0x490a0000,
++		.pa_end		= 0x490a1fff
++	},
++	{
++		.name		= "smem_dma",
++		.pa_start	= 0x490c0000,
++		.pa_end		= 0x490c5fff
++	},
++	{
++		.name		= "pmem_dma",
++		.pa_start	= 0x490e0000,
++		.pa_end		= 0x490e1fff
++	},
++	{
++		.name		= "dma",
+ 		.pa_start	= 0x490f1000,
+ 		.pa_end		= 0x490f13ff,
+ 		.flags		= ADDR_TYPE_RT
+@@ -6159,12 +6204,6 @@
+ 		.pa_end		= 0x4a0ab7ff,
+ 		.flags		= ADDR_TYPE_RT
+ 	},
+-	{
+-		/* XXX: Remove this once control module driver is in place */
+-		.pa_start	= 0x4a00233c,
+-		.pa_end		= 0x4a00233f,
+-		.flags		= ADDR_TYPE_RT
+-	},
+ 	{ }
+ };
+ 
+@@ -6285,7 +6324,7 @@
+ 	&omap44xx_l3_main_1__l3_main_3,
+ 	&omap44xx_l3_main_2__l3_main_3,
+ 	&omap44xx_l4_cfg__l3_main_3,
+-	/* &omap44xx_aess__l4_abe, */
++	&omap44xx_aess__l4_abe,
+ 	&omap44xx_dsp__l4_abe,
+ 	&omap44xx_l3_main_1__l4_abe,
+ 	&omap44xx_mpu__l4_abe,
+@@ -6294,8 +6333,8 @@
+ 	&omap44xx_l4_cfg__l4_wkup,
+ 	&omap44xx_mpu__mpu_private,
+ 	&omap44xx_l4_cfg__ocp_wp_noc,
+-	/* &omap44xx_l4_abe__aess, */
+-	/* &omap44xx_l4_abe__aess_dma, */
++	&omap44xx_l4_abe__aess,
++	&omap44xx_l4_abe__aess_dma,
+ 	&omap44xx_l3_main_2__c2c,
+ 	&omap44xx_l4_wkup__counter_32k,
+ 	&omap44xx_l4_cfg__ctrl_module_core,

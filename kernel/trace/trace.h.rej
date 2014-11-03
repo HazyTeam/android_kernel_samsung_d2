@@ -1,0 +1,15 @@
+--- kernel/trace/trace.h
++++ kernel/trace/trace.h
+@@ -363,9 +437,10 @@
+ 	struct tracer		*next;
+ 	struct tracer_flags	*flags;
+ 	bool			print_max;
+-	bool			use_max_tr;
+-	bool			allocated_snapshot;
+ 	bool			enabled;
++#ifdef CONFIG_TRACER_MAX_TRACE
++	bool			use_max_tr;
++#endif
+ };
+ 
+ 

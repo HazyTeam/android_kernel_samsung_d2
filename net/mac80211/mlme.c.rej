@@ -1,0 +1,35 @@
+--- net/mac80211/mlme.c
++++ net/mac80211/mlme.c
+@@ -289,6 +289,8 @@
+ 	} else {
+ 		/* 40 MHz (and 80 MHz) must be supported for VHT */
+ 		ret = IEEE80211_STA_DISABLE_VHT;
++		/* also mark 40 MHz disabled */
++		ret |= IEEE80211_STA_DISABLE_40MHZ;
+ 		goto out;
+ 	}
+ 
+@@ -303,12 +305,6 @@
+ 					       channel->band);
+ 	vht_chandef.center_freq2 = 0;
+ 
+-	if (vht_oper->center_freq_seg2_idx)
+-		vht_chandef.center_freq2 =
+-			ieee80211_channel_to_frequency(
+-				vht_oper->center_freq_seg2_idx,
+-				channel->band);
+-
+ 	switch (vht_oper->chan_width) {
+ 	case IEEE80211_VHT_CHANWIDTH_USE_HT:
+ 		vht_chandef.width = chandef->width;
+@@ -321,6 +317,10 @@
+ 		break;
+ 	case IEEE80211_VHT_CHANWIDTH_80P80MHZ:
+ 		vht_chandef.width = NL80211_CHAN_WIDTH_80P80;
++		vht_chandef.center_freq2 =
++			ieee80211_channel_to_frequency(
++				vht_oper->center_freq_seg2_idx,
++				channel->band);
+ 		break;
+ 	default:
+ 		if (verbose)

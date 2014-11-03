@@ -22,7 +22,7 @@
 #include "pm.h"
 #include "spm.h"
 
-extern volatile int pen_release;
+#include "common.h"
 
 struct msm_hotplug_device {
 	struct completion cpu_killed;

@@ -1,0 +1,12 @@
+--- drivers/gpu/drm/radeon/radeon_cursor.c
++++ drivers/gpu/drm/radeon/radeon_cursor.c
+@@ -241,7 +242,8 @@
+ 		y = 0;
+ 	}
+ 
+-	if (ASIC_IS_AVIVO(rdev)) {
++	/* fixed on DCE6 and newer */
++	if (ASIC_IS_AVIVO(rdev) && !ASIC_IS_DCE6(rdev)) {
+ 		int i = 0;
+ 		struct drm_crtc *crtc_p;
+ 

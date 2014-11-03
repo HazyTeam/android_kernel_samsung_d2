@@ -1,0 +1,18 @@
+--- drivers/gpu/drm/radeon/rv770d.h
++++ drivers/gpu/drm/radeon/rv770d.h
+@@ -177,6 +180,7 @@
+ #define	MC_VM_MD_L1_TLB0_CNTL				0x2654
+ #define	MC_VM_MD_L1_TLB1_CNTL				0x2658
+ #define	MC_VM_MD_L1_TLB2_CNTL				0x265C
++#define	MC_VM_MD_L1_TLB3_CNTL				0x2698
+ #define	MC_VM_SYSTEM_APERTURE_DEFAULT_ADDR		0x203C
+ #define	MC_VM_SYSTEM_APERTURE_HIGH_ADDR			0x2038
+ #define	MC_VM_SYSTEM_APERTURE_LOW_ADDR			0x2034
+@@ -210,6 +214,7 @@
+ #define	SCRATCH_UMSK					0x8540
+ #define	SCRATCH_ADDR					0x8544
+ 
++#define	SMX_SAR_CTL0					0xA008
+ #define	SMX_DC_CTL0					0xA020
+ #define		USE_HASH_FUNCTION				(1 << 0)
+ #define		CACHE_DEPTH(x)					((x) << 1)

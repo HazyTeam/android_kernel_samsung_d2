@@ -1,0 +1,51 @@
+--- arch/x86/kernel/setup.c
++++ arch/x86/kernel/setup.c
+@@ -1091,41 +1201,22 @@
+ 	setup_bios_corruption_check();
+ #endif
+ 
++#ifdef CONFIG_X86_32
+ 	printk(KERN_DEBUG "initial memory mapped: [mem 0x00000000-%#010lx]\n",
+ 			(max_pfn_mapped<<PAGE_SHIFT) - 1);
++#endif
+ 
+-	setup_real_mode();
++	reserve_real_mode();
+ 
+ 	trim_platform_memory_ranges();
++	trim_low_memory_range();
+ 
+-	init_gbpages();
+-
+-	/* max_pfn_mapped is updated here */
+-	max_low_pfn_mapped = init_memory_mapping(0, max_low_pfn<<PAGE_SHIFT);
+-	max_pfn_mapped = max_low_pfn_mapped;
+-
+-#ifdef CONFIG_X86_64
+-	if (max_pfn > max_low_pfn) {
+-		int i;
+-		unsigned long start, end;
+-		unsigned long start_pfn, end_pfn;
++	init_mem_mapping();
+ 
+-		for_each_mem_pfn_range(i, MAX_NUMNODES, &start_pfn, &end_pfn,
+-							 NULL) {
++	early_trap_pf_init();
+ 
+-			end = PFN_PHYS(end_pfn);
+-			if (end <= (1UL<<32))
+-				continue;
+-
+-			start = PFN_PHYS(start_pfn);
+-			max_pfn_mapped = init_memory_mapping(
+-						max((1UL<<32), start), end);
+-		}
++	setup_real_mode();
+ 
+-		/* can we preseve max_low_pfn ?*/
+-		max_low_pfn = max_pfn;
+-	}
+-#endif
+ 	memblock.current_limit = get_max_mapped();
+ 	dma_contiguous_reserve(0);
+ 

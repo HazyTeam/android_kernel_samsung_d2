@@ -1,0 +1,10 @@
+--- drivers/mmc/core/mmc_ops.c
++++ drivers/mmc/core/mmc_ops.c
+@@ -363,6 +363,7 @@
+ 	return mmc_send_cxd_data(card, card->host, MMC_SEND_EXT_CSD,
+ 			ext_csd, 512);
+ }
++EXPORT_SYMBOL_GPL(mmc_send_ext_csd);
+ 
+ int mmc_spi_read_ocr(struct mmc_host *host, int highcap, u32 *ocrp)
+ {

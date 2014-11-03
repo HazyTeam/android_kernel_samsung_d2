@@ -1,0 +1,10 @@
+--- drivers/net/wireless/rt2x00/rt2400pci.c
++++ drivers/net/wireless/rt2x00/rt2400pci.c
+@@ -1611,6 +1611,7 @@
+ static int rt2400pci_probe_hw(struct rt2x00_dev *rt2x00dev)
+ {
+ 	int retval;
++	u32 reg;
+ 
+ 	/*
+ 	 * Allocate eeprom data.

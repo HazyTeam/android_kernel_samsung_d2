@@ -1,0 +1,10 @@
+--- fs/nfs/objlayout/objio_osd.c
++++ fs/nfs/objlayout/objio_osd.c
+@@ -647,6 +647,7 @@
+ 	.flags                   = PNFS_LAYOUTRET_ON_SETATTR |
+ 				   PNFS_LAYOUTRET_ON_ERROR,
+ 
++	.owner		       	 = THIS_MODULE,
+ 	.alloc_layout_hdr        = objlayout_alloc_layout_hdr,
+ 	.free_layout_hdr         = objlayout_free_layout_hdr,
+ 

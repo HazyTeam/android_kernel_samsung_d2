@@ -1,0 +1,11 @@
+--- net/wireless/reg.c
++++ net/wireless/reg.c
+@@ -855,7 +855,7 @@
+ 			return;
+ 
+ 		REG_DBG_PRINT("Disabling freq %d MHz\n", chan->center_freq);
+-		chan->flags = IEEE80211_CHAN_DISABLED;
++		chan->flags |= IEEE80211_CHAN_DISABLED;
+ 		return;
+ 	}
+ 

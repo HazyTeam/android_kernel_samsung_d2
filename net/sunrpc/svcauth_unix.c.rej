@@ -1,0 +1,30 @@
+--- net/sunrpc/svcauth_unix.c
++++ net/sunrpc/svcauth_unix.c
+@@ -465,23 +465,19 @@
+ 	char tuid[20];
+ 	struct unix_gid *ug = container_of(h, struct unix_gid, h);
+ 
+-	snprintf(tuid, 20, "%u", ug->uid);
++	snprintf(tuid, 20, "%u", from_kuid(&init_user_ns, ug->uid));
+ 	qword_add(bpp, blen, tuid);
+ 	(*bpp)[-1] = '\n';
+ }
+ 
+-static int unix_gid_upcall(struct cache_detail *cd, struct cache_head *h)
+-{
+-	return sunrpc_cache_pipe_upcall(cd, h, unix_gid_request);
+-}
+-
+-static struct unix_gid *unix_gid_lookup(struct cache_detail *cd, uid_t uid);
++static struct unix_gid *unix_gid_lookup(struct cache_detail *cd, kuid_t uid);
+ 
+ static int unix_gid_parse(struct cache_detail *cd,
+ 			char *mesg, int mlen)
+ {
+ 	/* uid expiry Ngid gid0 gid1 ... gidN-1 */
+-	int uid;
++	int id;
++	kuid_t uid;
+ 	int gids;
+ 	int rv;
+ 	int i;

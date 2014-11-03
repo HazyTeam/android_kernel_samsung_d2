@@ -106,6 +106,9 @@ static struct smp_channel_params{
 	__le16 cid;
 } smp_chn_params;
 
+static void l2cap_tx(struct l2cap_chan *chan, struct l2cap_ctrl *control,
+		    struct sk_buff_head *skbs, u8 event);
+
 /* ---- L2CAP channels ---- */
 static struct sock *__l2cap_get_chan_by_dcid(struct l2cap_chan_list *l, u16 cid)
 {
@@ -789,8 +792,8 @@ static void l2cap_do_start(struct sock *sk)
 		mod_timer(&conn->info_timer, jiffies +
 					msecs_to_jiffies(L2CAP_INFO_TIMEOUT));
 
-		l2cap_send_cmd(conn, conn->info_ident,
-					L2CAP_INFO_REQ, sizeof(req), &req);
+		l2cap_send_cmd(conn, conn->info_ident, L2CAP_INFO_REQ,
+			       sizeof(req), &req);
 	}
 }
 
@@ -1157,10 +1160,17 @@ static struct l2cap_conn *l2cap_conn_add(struct hci_conn *hcon, u8 status)
 
 	BT_DBG("hcon %p conn %p", hcon, conn);
 
-	if (hcon->hdev->le_mtu && hcon->type == LE_LINK)
-		conn->mtu = hcon->hdev->le_mtu;
-	else
+	switch (hcon->type) {
+	case LE_LINK:
+		if (hcon->hdev->le_mtu) {
+			conn->mtu = hcon->hdev->le_mtu;
+			break;
+		}
+		/* fall through */
+	default:
 		conn->mtu = hcon->hdev->acl_mtu;
+		break;
+	}
 
 	conn->src = &hcon->hdev->bdaddr;
 	conn->dst = &hcon->dst;
@@ -1238,6 +1248,26 @@ static inline void l2cap_chan_add(struct l2cap_conn *conn, struct sock *sk)
 	__l2cap_chan_add(conn, sk);
 	write_unlock_bh(&l->lock);
 }
+
+static void l2cap_conn_free(struct kref *ref)
+{
+	struct l2cap_conn *conn = container_of(ref, struct l2cap_conn, ref);
+
+	hci_conn_put(conn->hcon);
+	kfree(conn);
+}
+
+void l2cap_conn_get(struct l2cap_conn *conn)
+{
+	kref_get(&conn->ref);
+}
+EXPORT_SYMBOL(l2cap_conn_get);
+
+void l2cap_conn_put(struct l2cap_conn *conn)
+{
+	kref_put(&conn->ref, l2cap_conn_free);
+}
+EXPORT_SYMBOL(l2cap_conn_put);
 
 /* ---- Socket interface ---- */
 
@@ -1321,6 +1351,18 @@ int l2cap_do_connect(struct sock *sk)
 			err = -ENOMEM;
 			goto done;
 		}
+	}
+
+	if (hcon->type == LE_LINK) {
+		err = 0;
+
+		if (!list_empty(&conn->chan_l)) {
+			err = -EBUSY;
+			hci_conn_drop(hcon);
+		}
+
+		if (err)
+			goto done;
 	}
 
 	/* Update source addr of the socket */
@@ -1698,6 +1740,9 @@ static inline int l2cap_skbuff_fromiovec(struct sock *sk, struct msghdr *msg,
 		len  -= count;
 
 		final = *frag;
+
+		skb->len += (*frag)->len;
+		skb->data_len += (*frag)->len;
 
 		frag = &(*frag)->next;
 	}
@@ -2838,6 +2883,9 @@ static struct sk_buff *l2cap_build_cmd(struct l2cap_conn *conn,
 	BT_DBG("conn %p, code 0x%2.2x, ident 0x%2.2x, len %d",
 			conn, code, ident, dlen);
 
+	if (conn->mtu < L2CAP_HDR_SIZE + L2CAP_CMD_HDR_SIZE)
+		return NULL;
+
 	len = L2CAP_HDR_SIZE + L2CAP_CMD_HDR_SIZE + dlen;
 	count = min_t(unsigned int, mtu, len);
 
@@ -3171,6 +3219,9 @@ static int l2cap_aggregate(struct hci_chan *chan, struct l2cap_pinfo *pi)
 	struct hci_ext_fs tx_fs;
 	struct hci_ext_fs rx_fs;
 
+	/* This flag is cleared in l2cap_chan_ready() */
+	set_bit(CONF_NOT_COMPLETE, &chan->conf_state);
+
 	BT_DBG("chan %p", chan);
 
 	if (((chan->tx_fs.max_sdu == 0xFFFF) ||
@@ -3450,6 +3501,13 @@ static int l2cap_build_amp_reconf_req(struct sock *sk, void *data)
 		if (L2CAP_DEFAULT_MAX_PDU_SIZE > pi->imtu)
 			rfc.max_pdu_size = cpu_to_le16(pi->imtu);
 
+		break;
+
+	case L2CAP_CHAN_CONN_FIX_A2MP:
+		chan->scid = L2CAP_CID_A2MP;
+		chan->dcid = L2CAP_CID_A2MP;
+		chan->omtu = L2CAP_A2MP_DEFAULT_MTU;
+		chan->imtu = L2CAP_A2MP_DEFAULT_MTU;
 		break;
 
 	default:
@@ -4271,6 +4329,9 @@ static inline int l2cap_connect_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hd
 	struct sock *sk;
 	u8 req[128];
 
+	if (cmd_len < sizeof(*rsp))
+		return -EPROTO;
+
 	scid   = __le16_to_cpu(rsp->scid);
 	dcid   = __le16_to_cpu(rsp->dcid);
 	result = __le16_to_cpu(rsp->result);
@@ -4346,6 +4407,9 @@ static inline int l2cap_config_req(struct l2cap_conn *conn, struct l2cap_cmd_hdr
 	struct sock *sk;
 	int len;
 	u8 amp_move_reconf = 0;
+
+	if (cmd_len < sizeof(*req))
+		return -EPROTO;
 
 	dcid  = __le16_to_cpu(req->dcid);
 	flags = __le16_to_cpu(req->flags);
@@ -4597,6 +4661,9 @@ static inline int l2cap_disconnect_req(struct l2cap_conn *conn, struct l2cap_cmd
 	struct l2cap_disconn_rsp rsp;
 	u16 dcid, scid;
 	struct sock *sk;
+
+	if (cmd_len != sizeof(*req))
+		return -EPROTO;
 
 	scid = __le16_to_cpu(req->scid);
 	dcid = __le16_to_cpu(req->dcid);
@@ -5251,7 +5318,6 @@ static inline int l2cap_move_channel_confirm_rsp(struct l2cap_conn *conn,
 
 	release_sock(sk);
 
-	return 0;
 }
 
 static void l2cap_amp_signal_worker(struct work_struct *work)
@@ -5793,15 +5859,15 @@ static inline int l2cap_bredr_sig_cmd(struct l2cap_conn *conn,
 		break;
 
 	case L2CAP_CONF_RSP:
-		err = l2cap_config_rsp(conn, cmd, data);
+		err = l2cap_config_rsp(conn, cmd, cmd_len, data);
 		break;
 
 	case L2CAP_DISCONN_REQ:
-		err = l2cap_disconnect_req(conn, cmd, data);
+		err = l2cap_disconnect_req(conn, cmd, cmd_len, data);
 		break;
 
 	case L2CAP_DISCONN_RSP:
-		err = l2cap_disconnect_rsp(conn, cmd, data);
+		err = l2cap_disconnect_rsp(conn, cmd, cmd_len, data);
 		break;
 
 	case L2CAP_ECHO_REQ:
@@ -5812,11 +5878,11 @@ static inline int l2cap_bredr_sig_cmd(struct l2cap_conn *conn,
 		break;
 
 	case L2CAP_INFO_REQ:
-		err = l2cap_information_req(conn, cmd, data);
+		err = l2cap_information_req(conn, cmd, cmd_len, data);
 		break;
 
 	case L2CAP_INFO_RSP:
-		err = l2cap_information_rsp(conn, cmd, data);
+		err = l2cap_information_rsp(conn, cmd, cmd_len, data);
 		break;
 
 	case L2CAP_CREATE_CHAN_REQ:
@@ -5839,7 +5905,7 @@ static inline int l2cap_bredr_sig_cmd(struct l2cap_conn *conn,
 		break;
 	}
 
-	return err;
+	return 0;
 }
 
 static inline int l2cap_le_sig_cmd(struct l2cap_conn *conn,
@@ -5997,9 +6063,9 @@ static void l2cap_ertm_resend(struct sock *sk)
 			/* Cloned sk_buffs are read-only, so we need a
 			 * writeable copy
 			 */
-			tx_skb = skb_copy(skb, GFP_ATOMIC);
+			tx_skb = skb_copy(skb, GFP_KERNEL);
 		} else {
-			tx_skb = skb_clone(skb, GFP_ATOMIC);
+			tx_skb = skb_clone(skb, GFP_KERNEL);
 		}
 
 		if (!tx_skb) {
@@ -6324,6 +6390,7 @@ static void l2cap_ertm_handle_srej(struct sock *sk,
 			}
 		}
 	}
+	chan->ack_win = chan->tx_win;
 }
 
 static void l2cap_ertm_handle_rej(struct sock *sk,
@@ -7077,6 +7144,12 @@ static int l2cap_ertm_rx(struct sock *sk, struct bt_l2cap_control *control,
 					err = l2cap_answer_move_poll(sk);
 			}
 			break;
+		case L2CAP_RX_STATE_WAIT_P:
+			err = l2cap_rx_state_wait_p(chan, control, skb, event);
+			break;
+		case L2CAP_RX_STATE_WAIT_F:
+			err = l2cap_rx_state_wait_f(chan, control, skb, event);
+			break;
 		default:
 			/* shut it down */
 			break;
@@ -7421,13 +7494,13 @@ static void l2cap_recv_frame(struct l2cap_conn *conn, struct sk_buff *skb)
 		break;
 
 	case L2CAP_CID_CONN_LESS:
-		psm = get_unaligned_le16(skb->data);
-		skb_pull(skb, 2);
+		psm = get_unaligned((__le16 *) skb->data);
+		skb_pull(skb, L2CAP_PSMLEN_SIZE);
 		l2cap_conless_channel(conn, psm, skb);
 		break;
 
 	case L2CAP_CID_LE_DATA:
-		l2cap_att_channel(conn, cid, skb);
+		l2cap_att_channel(conn, skb);
 		break;
 
 	case L2CAP_CID_SMP:
@@ -7500,7 +7573,7 @@ static int l2cap_connect_ind(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 type)
 	if (type != ACL_LINK)
 		return 0;
 
-	BT_DBG("hdev %s, bdaddr %s", hdev->name, batostr(bdaddr));
+	BT_DBG("hdev %s, bdaddr %pMR", hdev->name, bdaddr);
 
 	/* Find listening sockets and check their link_mode */
 	read_lock(&l2cap_sk_list.lock);
@@ -7534,7 +7607,7 @@ static int l2cap_connect_cfm(struct hci_conn *hcon, u8 status)
 		return -EINVAL;
 
 	if (!status) {
-		conn = l2cap_conn_add(hcon, status);
+		conn = l2cap_conn_add(hcon);
 		if (conn)
 			l2cap_conn_ready(conn);
 	} else
@@ -7597,7 +7670,7 @@ static int l2cap_security_cfm(struct hci_conn *hcon, u8 status, u8 encrypt)
 
 	l = &conn->chan_list;
 
-	BT_DBG("conn %p", conn);
+	BT_DBG("conn %p status 0x%2.2x encrypt %u", conn, status, encrypt);
 
 	read_lock(&l->lock);
 
@@ -7699,12 +7772,18 @@ static int l2cap_security_cfm(struct hci_conn *hcon, u8 status, u8 encrypt)
 static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 flags)
 {
 	struct l2cap_conn *conn = hcon->l2cap_data;
+	struct l2cap_hdr *hdr;
+	int len;
+
+	/* For AMP controller do not create l2cap conn */
+	if (!conn && hcon->hdev->dev_type != HCI_BREDR)
+		goto drop;
 
 	if (!conn && hcon->hdev->dev_type != HCI_BREDR)
 		goto drop;
 
 	if (!conn)
-		conn = l2cap_conn_add(hcon, 0);
+		conn = l2cap_conn_add(hcon);
 
 	if (!conn)
 		goto drop;
@@ -7751,20 +7830,22 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 
 		if (skb->len > len) {
 			BT_ERR("Frame is too long (len %d, expected len %d)",
-				skb->len, len);
+			       skb->len, len);
 			l2cap_conn_unreliable(conn, ECOMM);
 			goto drop;
 		}
 
 		/* Allocate skb for the complete frame (with header) */
-		conn->rx_skb = bt_skb_alloc(len, GFP_ATOMIC);
+		conn->rx_skb = bt_skb_alloc(len, GFP_KERNEL);
 		if (!conn->rx_skb)
 			goto drop;
 
 		skb_copy_from_linear_data(skb, skb_put(conn->rx_skb, skb->len),
-								skb->len);
+					  skb->len);
 		conn->rx_len = len - skb->len;
-	} else {
+		break;
+
+	case ACL_CONT:
 		BT_DBG("Cont: frag len %d (expecting %d)", skb->len, conn->rx_len);
 
 		if (!conn->rx_len) {
@@ -7775,7 +7856,7 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 
 		if (skb->len > conn->rx_len) {
 			BT_ERR("Fragment is too long (len %d, expected %d)",
-					skb->len, conn->rx_len);
+			       skb->len, conn->rx_len);
 			kfree_skb(conn->rx_skb);
 			conn->rx_skb = NULL;
 			conn->rx_len = 0;
@@ -7784,7 +7865,7 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 		}
 
 		skb_copy_from_linear_data(skb, skb_put(conn->rx_skb, skb->len),
-								skb->len);
+					  skb->len);
 		conn->rx_len -= skb->len;
 
 		if (!conn->rx_len) {
@@ -7792,6 +7873,7 @@ static int l2cap_recv_acldata(struct hci_conn *hcon, struct sk_buff *skb, u16 fl
 			l2cap_recv_frame(conn, conn->rx_skb);
 			conn->rx_skb = NULL;
 		}
+		break;
 	}
 
 drop:
@@ -8036,8 +8118,8 @@ int __init l2cap_init(void)
 	}
 
 	if (bt_debugfs) {
-		l2cap_debugfs = debugfs_create_file("l2cap", 0444,
-					bt_debugfs, NULL, &l2cap_debugfs_fops);
+		l2cap_debugfs = debugfs_create_file("l2cap", 0444, bt_debugfs,
+						    NULL, &l2cap_debugfs_fops);
 		if (!l2cap_debugfs)
 			BT_ERR("Failed to create L2CAP debug file");
 	}

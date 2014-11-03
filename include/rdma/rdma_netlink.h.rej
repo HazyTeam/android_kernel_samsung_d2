@@ -1,0 +1,10 @@
+--- include/rdma/rdma_netlink.h
++++ include/rdma/rdma_netlink.h
+@@ -39,6 +39,7 @@
+ 
+ struct ibnl_client_cbs {
+ 	int (*dump)(struct sk_buff *skb, struct netlink_callback *nlcb);
++	struct module *module;
+ };
+ 
+ int ibnl_init(void);

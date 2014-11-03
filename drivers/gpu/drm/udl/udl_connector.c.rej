@@ -1,0 +1,13 @@
+--- drivers/gpu/drm/udl/udl_connector.c
++++ drivers/gpu/drm/udl/udl_connector.c
+@@ -61,6 +61,10 @@
+ 	int ret;
+ 
+ 	edid = (struct edid *)udl_get_edid(udl);
++	if (!edid) {
++		drm_mode_connector_update_edid_property(connector, NULL);
++		return 0;
++	}
+ 
+ 	/*
+ 	 * We only read the main block, but if the monitor reports extension

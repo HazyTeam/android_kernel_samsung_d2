@@ -1,0 +1,28 @@
+--- fs/nfs/idmap.c
++++ fs/nfs/idmap.c
+@@ -55,18 +55,19 @@
+ static const struct cred *id_resolver_cache;
+ static struct key_type key_type_id_resolver_legacy;
+ 
+-struct idmap {
+-	struct rpc_pipe		*idmap_pipe;
+-	struct key_construction	*idmap_key_cons;
+-	struct mutex		idmap_mutex;
+-};
+-
+ struct idmap_legacy_upcalldata {
+ 	struct rpc_pipe_msg pipe_msg;
+ 	struct idmap_msg idmap_msg;
++	struct key_construction	*key_cons;
+ 	struct idmap *idmap;
+ };
+ 
++struct idmap {
++	struct rpc_pipe		*idmap_pipe;
++	struct idmap_legacy_upcalldata *idmap_upcall_data;
++	struct mutex		idmap_mutex;
++};
++
+ /**
+  * nfs_fattr_init_names - initialise the nfs_fattr owner_name/group_name fields
+  * @fattr: fully initialised struct nfs_fattr

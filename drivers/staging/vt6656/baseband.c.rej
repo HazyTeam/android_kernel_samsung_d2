@@ -1,0 +1,19 @@
+--- drivers/staging/vt6656/baseband.c
++++ drivers/staging/vt6656/baseband.c
+@@ -936,11 +909,11 @@
+ int BBbVT3184Init(struct vnt_private *pDevice)
+ {
+ 	int ntStatus;
+-    WORD                    wLength;
+-    PBYTE                   pbyAddr;
+-    PBYTE                   pbyAgc;
+-    WORD                    wLengthAgc;
+-    BYTE                    abyArray[256];
++    u16                    wLength;
++    u8 *                   pbyAddr;
++    u8 *                   pbyAgc;
++    u16                    wLengthAgc;
++    u8                    abyArray[256];
+ 
+     ntStatus = CONTROLnsRequestIn(pDevice,
+                                   MESSAGE_TYPE_READ,

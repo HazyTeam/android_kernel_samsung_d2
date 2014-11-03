@@ -1,0 +1,23 @@
+--- net/ipv4/esp4.c
++++ net/ipv4/esp4.c
+@@ -139,8 +139,6 @@
+ 
+ 	/* skb is pure payload to encrypt */
+ 
+-	err = -ENOMEM;
+-
+ 	esp = x->data;
+ 	aead = esp->aead;
+ 	alen = crypto_aead_authsize(aead);
+@@ -176,8 +174,10 @@
+ 	}
+ 
+ 	tmp = esp_alloc_tmp(aead, nfrags + sglists, seqhilen);
+-	if (!tmp)
++	if (!tmp) {
++		err = -ENOMEM;
+ 		goto error;
++	}
+ 
+ 	seqhi = esp_tmp_seqhi(tmp);
+ 	iv = esp_tmp_iv(aead, tmp, seqhilen);

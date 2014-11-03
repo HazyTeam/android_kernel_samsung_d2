@@ -1,0 +1,19 @@
+--- drivers/video/backlight/atmel-pwm-bl.c
++++ drivers/video/backlight/atmel-pwm-bl.c
+@@ -208,15 +206,12 @@
+ {
+ 	struct atmel_pwm_bl *pwmbl = platform_get_drvdata(pdev);
+ 
+-	if (pwmbl->gpio_on != -1) {
++	if (pwmbl->gpio_on != -1)
+ 		gpio_set_value(pwmbl->gpio_on, 0);
+-		gpio_free(pwmbl->gpio_on);
+-	}
+ 	pwm_channel_disable(&pwmbl->pwmc);
+ 	pwm_channel_free(&pwmbl->pwmc);
+ 	backlight_device_unregister(pwmbl->bldev);
+ 	platform_set_drvdata(pdev, NULL);
+-	kfree(pwmbl);
+ 
+ 	return 0;
+ }

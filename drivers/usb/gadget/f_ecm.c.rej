@@ -1,0 +1,84 @@
+--- drivers/usb/gadget/f_ecm.c
++++ drivers/usb/gadget/f_ecm.c
+@@ -91,7 +91,7 @@
+  * encapsulated commands (vendor-specific, using control-OUT).
+  */
+ 
+-#define LOG2_STATUS_INTERVAL_MSEC	5	/* 1 << 5 == 32 msec */
++#define ECM_STATUS_INTERVAL_MS		32
+ #define ECM_STATUS_BYTECOUNT		16	/* 8 byte header + data */
+ 
+ 
+@@ -192,7 +192,7 @@
+ 	.bEndpointAddress =	USB_DIR_IN,
+ 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
+ 	.wMaxPacketSize =	cpu_to_le16(ECM_STATUS_BYTECOUNT),
+-	.bInterval =		1 << LOG2_STATUS_INTERVAL_MSEC,
++	.bInterval =		ECM_STATUS_INTERVAL_MS,
+ };
+ 
+ static struct usb_endpoint_descriptor fs_ecm_in_desc = {
+@@ -288,7 +288,7 @@
+ 	.bEndpointAddress =	USB_DIR_IN,
+ 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
+ 	.wMaxPacketSize =	cpu_to_le16(ECM_STATUS_BYTECOUNT),
+-	.bInterval =		LOG2_STATUS_INTERVAL_MSEC + 4,
++	.bInterval =		USB_MS_TO_HS_INTERVAL(ECM_STATUS_INTERVAL_MS),
+ };
+ 
+ static struct usb_ss_ep_comp_descriptor ss_ecm_intr_comp_desc = {
+@@ -786,9 +764,9 @@
+ 	/* we might as well release our claims on endpoints */
+ 	if (ecm->notify)
+ 		ecm->notify->driver_data = NULL;
+-	if (ecm->port.out_ep->desc)
++	if (ecm->port.out_ep)
+ 		ecm->port.out_ep->driver_data = NULL;
+-	if (ecm->port.in_ep->desc)
++	if (ecm->port.in_ep)
+ 		ecm->port.in_ep->driver_data = NULL;
+ 
+ 	ERROR(cdev, "%s: can't bind, err %d\n", f->name, status);
+@@ -832,36 +805,15 @@
+ 	if (!can_support_ecm(c->cdev->gadget) || !ethaddr)
+ 		return -EINVAL;
+ 
+-	/* maybe allocate device-global string IDs */
+ 	if (ecm_string_defs[0].id == 0) {
+-
+-		/* control interface label */
+-		status = usb_string_id(c->cdev);
+-		if (status < 0)
+-			return status;
+-		ecm_string_defs[0].id = status;
+-		ecm_control_intf.iInterface = status;
+-
+-		/* data interface label */
+-		status = usb_string_id(c->cdev);
+-		if (status < 0)
++		status = usb_string_ids_tab(c->cdev, ecm_string_defs);
++		if (status)
+ 			return status;
+-		ecm_string_defs[2].id = status;
+-		ecm_data_intf.iInterface = status;
+ 
+-		/* MAC address */
+-		status = usb_string_id(c->cdev);
+-		if (status < 0)
+-			return status;
+-		ecm_string_defs[1].id = status;
+-		ecm_desc.iMACAddress = status;
+-
+-		/* IAD label */
+-		status = usb_string_id(c->cdev);
+-		if (status < 0)
+-			return status;
+-		ecm_string_defs[3].id = status;
+-		ecm_iad_descriptor.iFunction = status;
++		ecm_control_intf.iInterface = ecm_string_defs[0].id;
++		ecm_data_intf.iInterface = ecm_string_defs[2].id;
++		ecm_desc.iMACAddress = ecm_string_defs[1].id;
++		ecm_iad_descriptor.iFunction = ecm_string_defs[3].id;
+ 	}
+ 
+ 	/* allocate and initialize one new instance */

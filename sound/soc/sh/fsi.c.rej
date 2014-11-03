@@ -1,0 +1,10 @@
+--- sound/soc/sh/fsi.c
++++ sound/soc/sh/fsi.c
+@@ -2005,7 +2008,6 @@
+ 	}
+ 
+ 	/* master setting */
+-	master->irq		= irq;
+ 	master->core		= core;
+ 	spin_lock_init(&master->lock);
+ 

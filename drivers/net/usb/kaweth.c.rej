@@ -1,0 +1,11 @@
+--- drivers/net/usb/kaweth.c
++++ drivers/net/usb/kaweth.c
+@@ -1314,7 +1314,7 @@
+         int retv;
+         int length = 0; /* shut up GCC */
+ 
+-        urb = usb_alloc_urb(0, GFP_NOIO);
++	urb = usb_alloc_urb(0, GFP_ATOMIC);
+         if (!urb)
+                 return -ENOMEM;
+ 

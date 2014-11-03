@@ -1,0 +1,10 @@
+--- drivers/bluetooth/bpa10x.c
++++ drivers/bluetooth/bpa10x.c
+@@ -497,7 +494,6 @@
+ 	hci_free_dev(data->hdev);
+ 	kfree_skb(data->rx_skb[0]);
+ 	kfree_skb(data->rx_skb[1]);
+-	kfree(data);
+ }
+ 
+ static struct usb_driver bpa10x_driver = {

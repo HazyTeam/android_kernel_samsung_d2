@@ -1,0 +1,14 @@
+--- drivers/net/wireless/b43/main.h
++++ drivers/net/wireless/b43/main.h
+@@ -137,9 +137,8 @@
+ 
+ 
+ struct b43_request_fw_context;
+-int b43_do_request_fw(struct b43_request_fw_context *ctx,
+-		      const char *name,
+-		      struct b43_firmware_file *fw);
++int b43_do_request_fw(struct b43_request_fw_context *ctx, const char *name,
++		      struct b43_firmware_file *fw, bool async);
+ void b43_do_release_fw(struct b43_firmware_file *fw);
+ 
+ #endif /* B43_MAIN_H_ */

@@ -1,0 +1,15 @@
+--- net/bluetooth/rfcomm/sock.c
++++ net/bluetooth/rfcomm/sock.c
+@@ -969,11 +968,10 @@
+ static int rfcomm_sock_debugfs_show(struct seq_file *f, void *p)
+ {
+ 	struct sock *sk;
+-	struct hlist_node *node;
+ 
+ 	read_lock(&rfcomm_sk_list.lock);
+ 
+-	sk_for_each(sk, node, &rfcomm_sk_list.head) {
++	sk_for_each(sk, &rfcomm_sk_list.head) {
+ 		seq_printf(f, "%pMR %pMR %d %d\n",
+ 			   &bt_sk(sk)->src, &bt_sk(sk)->dst,
+ 			   sk->sk_state, rfcomm_pi(sk)->channel);

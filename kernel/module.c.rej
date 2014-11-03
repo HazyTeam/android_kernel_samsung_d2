@@ -1,0 +1,37 @@
+--- kernel/module.c
++++ kernel/module.c
+@@ -3284,21 +3332,11 @@
+ 
+ 	dynamic_debug_setup(info->debug, info->num_debug);
+ 
+-	mutex_lock(&module_mutex);
+-	/* Find duplicate symbols (must be called under lock). */
+-	err = verify_export_symbols(mod);
+-	if (err < 0)
++	/* Finally it's fully formed, ready to start executing. */
++	err = complete_formation(mod, info);
++	if (err)
+ 		goto ddebug_cleanup;
+ 
+-	/* This relies on module_mutex for list integrity. */
+-	module_bug_finalize(info->hdr, info->sechdrs, mod);
+-
+-	/* Mark state as coming so strong_try_module_get() ignores us,
+-	 * but kallsyms etc. can see us. */
+-	mod->state = MODULE_STATE_COMING;
+-
+-	mutex_unlock(&module_mutex);
+-
+ 	/* Module is ready to execute: parsing args may do that. */
+ 	err = parse_args(mod->name, mod->args, mod->kp, mod->num_kp,
+ 			 -32768, 32767, &ddebug_dyndbg_module_param_cb);
+@@ -3322,8 +3360,8 @@
+ 	/* module_bug_cleanup needs module_mutex protection */
+ 	mutex_lock(&module_mutex);
+ 	module_bug_cleanup(mod);
+- ddebug_cleanup:
+ 	mutex_unlock(&module_mutex);
++ ddebug_cleanup:
+ 	dynamic_debug_remove(info->debug);
+ 	synchronize_sched();
+ 	kfree(mod->args);

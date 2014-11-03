@@ -1,0 +1,10 @@
+--- include/video/atmel_lcdc.h
++++ include/video/atmel_lcdc.h
+@@ -61,6 +60,7 @@
+ 	void (*atmel_lcdfb_power_control)(int on);
+ 	struct fb_monspecs	*default_monspecs;
+ 	u32			pseudo_palette[16];
++	bool			have_intensity_bit;
+ };
+ 
+ #define ATMEL_LCDC_DMABADDR1	0x00

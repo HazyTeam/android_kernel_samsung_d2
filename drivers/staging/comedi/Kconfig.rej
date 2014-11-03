@@ -1,0 +1,53 @@
+--- drivers/staging/comedi/Kconfig
++++ drivers/staging/comedi/Kconfig
+@@ -542,11 +542,7 @@
+ 	bool "Comedi PCI drivers"
+ 	depends on PCI
+ 	---help---
+-	  Enable comedi PCI drivers to be built
+-
+-	  Note that the answer to this question won't directly affect the
+-	  kernel: saying N will just cause the configurator to skip all
+-	  the questions about PCI comedi drivers.
++	  Enable support for comedi PCI drivers.
+ 
+ if COMEDI_PCI_DRIVERS
+ 
+@@ -567,6 +563,13 @@
+ 	  To compile this driver as a module, choose M here: the module will
+ 	  be called 8255_pci.
+ 
++config COMEDI_ADDI_WATCHDOG
++	tristate
++	---help---
++	  Provides support for the watchdog subdevice found on many ADDI-DATA
++	  boards. This module will be automatically selected when needed. The
++	  module will be called addi_watchdog.
++
+ config COMEDI_ADDI_APCI_035
+ 	tristate "ADDI-DATA APCI_035 support"
+ 	---help---
+@@ -593,6 +596,7 @@
+ 
+ config COMEDI_ADDI_APCI_1516
+ 	tristate "ADDI-DATA APCI-1016/1516/2016 support"
++	select COMEDI_ADDI_WATCHDOG
+ 	---help---
+ 	  Enable support for ADDI-DATA APCI-1016, APCI-1516 and APCI-2016 boards.
+ 	  These are 16 channel, optically isolated, digital I/O boards. The 1516
+@@ -619,6 +623,7 @@
+ 
+ config COMEDI_ADDI_APCI_2032
+ 	tristate "ADDI-DATA APCI_2032 support"
++	select COMEDI_ADDI_WATCHDOG
+ 	---help---
+ 	  Enable support for ADDI-DATA APCI_2032 cards
+ 
+@@ -627,6 +632,7 @@
+ 
+ config COMEDI_ADDI_APCI_2200
+ 	tristate "ADDI-DATA APCI_2200 support"
++	select COMEDI_ADDI_WATCHDOG
+ 	---help---
+ 	  Enable support for ADDI-DATA APCI_2200 cards
+ 

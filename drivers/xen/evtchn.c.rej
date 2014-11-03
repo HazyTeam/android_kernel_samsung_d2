@@ -1,0 +1,39 @@
+--- drivers/xen/evtchn.c
++++ drivers/xen/evtchn.c
+@@ -269,6 +269,14 @@
+ 				       u->name, (void *)(unsigned long)port);
+ 	if (rc >= 0)
+ 		rc = evtchn_make_refcounted(port);
++	else {
++		/* bind failed, should close the port now */
++		struct evtchn_close close;
++		close.port = port;
++		if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close) != 0)
++			BUG();
++		set_port_user(port, NULL);
++	}
+ 
+ 	return rc;
+ }
+@@ -277,6 +285,8 @@
+ {
+ 	int irq = irq_from_evtchn(port);
+ 
++	BUG_ON(irq < 0);
++
+ 	unbind_from_irqhandler(irq, (void *)(unsigned long)port);
+ 
+ 	set_port_user(port, NULL);
+@@ -534,10 +544,10 @@
+ 
+ 	spin_lock_init(&port_user_lock);
+ 
+-	/* Create '/dev/misc/evtchn'. */
++	/* Create '/dev/xen/evtchn'. */
+ 	err = misc_register(&evtchn_miscdev);
+ 	if (err != 0) {
+-		printk(KERN_ALERT "Could not register /dev/misc/evtchn\n");
++		printk(KERN_ERR "Could not register /dev/xen/evtchn\n");
+ 		return err;
+ 	}
+ 

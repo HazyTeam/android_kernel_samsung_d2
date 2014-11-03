@@ -1,0 +1,11 @@
+--- fs/ocfs2/extent_map.c
++++ fs/ocfs2/extent_map.c
+@@ -790,7 +790,7 @@
+ 						 &hole_size, &rec, &is_last);
+ 		if (ret) {
+ 			mlog_errno(ret);
+-			goto out;
++			goto out_unlock;
+ 		}
+ 
+ 		if (rec.e_blkno == 0ULL) {

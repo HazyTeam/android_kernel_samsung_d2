@@ -1,0 +1,10 @@
+--- net/atm/common.c
++++ net/atm/common.c
+@@ -812,6 +812,7 @@
+ 
+ 		if (!vcc->dev || !test_bit(ATM_VF_ADDR, &vcc->flags))
+ 			return -ENOTCONN;
++		memset(&pvc, 0, sizeof(pvc));
+ 		pvc.sap_family = AF_ATMPVC;
+ 		pvc.sap_addr.itf = vcc->dev->number;
+ 		pvc.sap_addr.vpi = vcc->vpi;

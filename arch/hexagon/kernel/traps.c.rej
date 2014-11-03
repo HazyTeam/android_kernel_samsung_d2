@@ -1,0 +1,11 @@
+--- arch/hexagon/kernel/traps.c
++++ arch/hexagon/kernel/traps.c
+@@ -1,7 +1,7 @@
+ /*
+  * Kernel traps/events for Hexagon processor
+  *
+- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
++ * Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and

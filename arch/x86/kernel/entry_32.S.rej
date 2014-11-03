@@ -1,0 +1,10 @@
+--- arch/x86/kernel/entry_32.S
++++ arch/x86/kernel/entry_32.S
+@@ -1065,7 +1046,6 @@
+ 	lea 16(%esp),%esp
+ 	CFI_ADJUST_CFA_OFFSET -16
+ 	jz 5f
+-	addl $16,%esp
+ 	jmp iret_exc
+ 5:	pushl_cfi $-1 /* orig_ax = -1 => not a system call */
+ 	SAVE_ALL

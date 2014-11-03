@@ -1,0 +1,11 @@
+--- drivers/net/wireless/rtl818x/rtl8187/leds.c
++++ drivers/net/wireless/rtl818x/rtl8187/leds.c
+@@ -117,7 +117,7 @@
+ 			radio_on = true;
+ 		} else if (radio_on) {
+ 			radio_on = false;
+-			cancel_delayed_work_sync(&priv->led_on);
++			cancel_delayed_work(&priv->led_on);
+ 			ieee80211_queue_delayed_work(hw, &priv->led_off, 0);
+ 		}
+ 	} else if (radio_on) {

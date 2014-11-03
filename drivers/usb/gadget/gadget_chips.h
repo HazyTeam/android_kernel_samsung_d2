@@ -15,6 +15,8 @@
 #ifndef __GADGET_CHIPS_H
 #define __GADGET_CHIPS_H
 
+#include <linux/usb/gadget.h>
+
 /*
  * NOTICE: the entries below are alphabetical and should be kept
  * that way.
@@ -38,6 +40,7 @@
 #define gadget_is_goku(g)		(!strcmp("goku_udc", (g)->name))
 #define gadget_is_imx(g)		(!strcmp("imx_udc", (g)->name))
 #define gadget_is_langwell(g)		(!strcmp("langwell_udc", (g)->name))
+#define gadget_is_lpc32xx(g)		(!strcmp("lpc32xx_udc", (g)->name))
 #define gadget_is_m66592(g)		(!strcmp("m66592_udc", (g)->name))
 #define gadget_is_msm72k(g)		(!strcmp("msm72k_udc", (g)->name))
 #define gadget_is_musbhdrc(g)		(!strcmp("musb-hdrc", (g)->name))

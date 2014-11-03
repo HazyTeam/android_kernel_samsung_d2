@@ -1,0 +1,23 @@
+--- include/linux/kallsyms.h
++++ include/linux/kallsyms.h
+@@ -36,6 +36,7 @@
+ 
+ /* Look up a kernel symbol and return it in a text buffer. */
+ extern int sprint_symbol(char *buffer, unsigned long address);
++extern int sprint_symbol_no_offset(char *buffer, unsigned long address);
+ extern int sprint_backtrace(char *buffer, unsigned long address);
+ 
+ /* Look up a kernel symbol and print it to the kernel messages. */
+@@ -80,6 +81,12 @@
+ 	return 0;
+ }
+ 
++static inline int sprint_symbol_no_offset(char *buffer, unsigned long addr)
++{
++	*buffer = '\0';
++	return 0;
++}
++
+ static inline int sprint_backtrace(char *buffer, unsigned long addr)
+ {
+ 	*buffer = '\0';

@@ -1,0 +1,11 @@
+--- drivers/scsi/virtio_scsi.c
++++ drivers/scsi/virtio_scsi.c
+@@ -331,7 +464,7 @@
+ 	int i;
+ 
+ 	for_each_sg(table->sgl, sg_elem, table->nents, i)
+-		sg_set_buf(&sg[idx++], sg_virt(sg_elem), sg_elem->length);
++		sg[idx++] = *sg_elem;
+ 
+ 	*p_idx = idx;
+ }

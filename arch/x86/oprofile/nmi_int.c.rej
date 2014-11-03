@@ -1,0 +1,11 @@
+--- arch/x86/oprofile/nmi_int.c
++++ arch/x86/oprofile/nmi_int.c
+@@ -55,7 +55,7 @@
+ 	val |= counter_config->extra;
+ 	event &= model->event_mask ? model->event_mask : 0xFF;
+ 	val |= event & 0xFF;
+-	val |= (event & 0x0F00) << 24;
++	val |= (u64)(event & 0x0F00) << 24;
+ 
+ 	return val;
+ }

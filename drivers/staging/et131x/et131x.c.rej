@@ -1,0 +1,125 @@
+--- drivers/staging/et131x/et131x.c
++++ drivers/staging/et131x/et131x.c
+@@ -1503,7 +1478,7 @@
+ 				      u8 *value)
+ {
+ 	u16 reg;
+-	u16 mask = 0x0001 << bitnum;
++	u16 mask = 1 << bitnum;
+ 
+ 	/* Read the requested register */
+ 	et131x_mii_read(adapter, regnum, &reg);
+@@ -3768,60 +3735,54 @@
+ 	struct et131x_adapter *adapter = netdev_priv(netdev);
+ 	struct  phy_device *phydev = adapter->phydev;
+ 
+-	if (netif_carrier_ok(netdev)) {
+-		adapter->boot_coma = 20;
+-
+-		if (phydev && phydev->speed == SPEED_10) {
+-			/*
+-			 * NOTE - Is there a way to query this without
+-			 * TruePHY?
+-			 * && TRU_QueryCoreType(adapter->hTruePhy, 0)==
+-			 * EMI_TRUEPHY_A13O) {
+-			 */
+-			u16 register18;
+-
+-			et131x_mii_read(adapter, PHY_MPHY_CONTROL_REG,
+-					 &register18);
+-			et131x_mii_write(adapter, PHY_MPHY_CONTROL_REG,
+-					 register18 | 0x4);
+-			et131x_mii_write(adapter, PHY_INDEX_REG,
+-					 register18 | 0x8402);
+-			et131x_mii_write(adapter, PHY_DATA_REG,
+-					 register18 | 511);
+-			et131x_mii_write(adapter, PHY_MPHY_CONTROL_REG,
+-					 register18);
+-		}
+-
+-		et1310_config_flow_control(adapter);
+-
+-		if (phydev && phydev->speed == SPEED_1000 &&
+-				adapter->registry_jumbo_packet > 2048) {
+-			u16 reg;
+-
+-			et131x_mii_read(adapter, PHY_CONFIG, &reg);
+-			reg &= ~ET_PHY_CONFIG_TX_FIFO_DEPTH;
+-			reg |= ET_PHY_CONFIG_FIFO_DEPTH_32;
+-			et131x_mii_write(adapter, PHY_CONFIG, reg);
+-		}
+-
+-		et131x_set_rx_dma_timer(adapter);
+-		et1310_config_mac_regs2(adapter);
+-	}
+-
+ 	if (phydev && phydev->link != adapter->link) {
+-		/*
+-		 * Check to see if we are in coma mode and if
++		/* Check to see if we are in coma mode and if
+ 		 * so, disable it because we will not be able
+ 		 * to read PHY values until we are out.
+ 		 */
+ 		if (et1310_in_phy_coma(adapter))
+ 			et1310_disable_phy_coma(adapter);
+ 
++		adapter->link = phydev->link;
++		phy_print_status(phydev);
++
+ 		if (phydev->link) {
+ 			adapter->boot_coma = 20;
++			if (phydev && phydev->speed == SPEED_10) {
++				/* NOTE - Is there a way to query this without
++				 * TruePHY?
++				 * && TRU_QueryCoreType(adapter->hTruePhy, 0)==
++				 * EMI_TRUEPHY_A13O) {
++				 */
++				u16 register18;
++
++				et131x_mii_read(adapter, PHY_MPHY_CONTROL_REG,
++						 &register18);
++				et131x_mii_write(adapter, PHY_MPHY_CONTROL_REG,
++						 register18 | 0x4);
++				et131x_mii_write(adapter, PHY_INDEX_REG,
++						 register18 | 0x8402);
++				et131x_mii_write(adapter, PHY_DATA_REG,
++						 register18 | 511);
++				et131x_mii_write(adapter, PHY_MPHY_CONTROL_REG,
++						 register18);
++			}
++
++			et1310_config_flow_control(adapter);
++
++			if (phydev && phydev->speed == SPEED_1000 &&
++					adapter->registry_jumbo_packet > 2048) {
++				u16 reg;
++
++				et131x_mii_read(adapter, PHY_CONFIG, &reg);
++				reg &= ~ET_PHY_CONFIG_TX_FIFO_DEPTH;
++				reg |= ET_PHY_CONFIG_FIFO_DEPTH_32;
++				et131x_mii_write(adapter, PHY_CONFIG, reg);
++			}
++
++			et131x_set_rx_dma_timer(adapter);
++			et1310_config_mac_regs2(adapter);
+ 		} else {
+-			dev_warn(&adapter->pdev->dev,
+-			    "Link down - cable problem ?\n");
+ 			adapter->boot_coma = 0;
+ 
+ 			if (phydev->speed == SPEED_10) {
+@@ -4895,11 +4821,10 @@
+ 	adapter->mii_bus->read = et131x_mdio_read;
+ 	adapter->mii_bus->write = et131x_mdio_write;
+ 	adapter->mii_bus->reset = et131x_mdio_reset;
+-	adapter->mii_bus->irq = kmalloc(sizeof(int)*PHY_MAX_ADDR, GFP_KERNEL);
+-	if (!adapter->mii_bus->irq) {
+-		dev_err(&pdev->dev, "mii_bus irq allocation failed\n");
++	adapter->mii_bus->irq = kmalloc_array(PHY_MAX_ADDR, sizeof(int),
++					      GFP_KERNEL);
++	if (!adapter->mii_bus->irq)
+ 		goto err_mdio_free;
+-	}
+ 
+ 	for (ii = 0; ii < PHY_MAX_ADDR; ii++)
+ 		adapter->mii_bus->irq[ii] = PHY_POLL;

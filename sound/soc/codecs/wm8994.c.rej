@@ -1,0 +1,19 @@
+--- sound/soc/codecs/wm8994.c
++++ sound/soc/codecs/wm8994.c
+@@ -2887,6 +2933,7 @@
+ 		default:
+ 			return 0;
+ 		}
++		break;
+ 	default:
+ 		return 0;
+ 	}
+@@ -3948,7 +4000,7 @@
+ 		wm8994->hubs.dcs_readback_mode = 1;
+ 		wm8994->hubs.hp_startup_mode = 1;
+ 
+-		switch (wm8994->revision) {
++		switch (control->revision) {
+ 		case 0:
+ 			break;
+ 		default:

@@ -39,6 +39,31 @@ static int dev_update_qos_constraint(struct device *dev, void *data)
 	return 0;
 }
 
+static int dev_update_qos_constraint(struct device *dev, void *data)
+{
+	s64 *constraint_ns_p = data;
+	s32 constraint_ns = -1;
+
+	if (dev->power.subsys_data && dev->power.subsys_data->domain_data)
+		constraint_ns = dev_gpd_data(dev)->td.effective_constraint_ns;
+
+	if (constraint_ns < 0) {
+		constraint_ns = dev_pm_qos_read_value(dev);
+		constraint_ns *= NSEC_PER_USEC;
+	}
+	if (constraint_ns == 0)
+		return 0;
+
+	/*
+	 * constraint_ns cannot be negative here, because the device has been
+	 * suspended.
+	 */
+	if (constraint_ns < *constraint_ns_p || *constraint_ns_p == 0)
+		*constraint_ns_p = constraint_ns;
+
+	return 0;
+}
+
 /**
  * default_stop_ok - Default PM domain governor routine for stopping devices.
  * @dev: Device to check.
@@ -167,6 +192,7 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
 			min_off_time_ns = sd_max_off_ns;
 	}
 
+	min_off_time_ns = -1;
 	/*
 	 * Check if the devices in the domain can be off enough time.
 	 */

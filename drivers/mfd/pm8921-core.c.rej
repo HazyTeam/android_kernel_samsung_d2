@@ -1,0 +1,11 @@
+--- drivers/mfd/pm8921-core.c
++++ drivers/mfd/pm8921-core.c
+@@ -80,7 +80,7 @@
+ 	.pmic_read_irq_stat	= pm8921_read_irq_stat,
+ };
+ 
+-static int __devinit pm8921_add_subdevices(const struct pm8921_platform_data
++static int pm8921_add_subdevices(const struct pm8921_platform_data
+ 					   *pdata,
+ 					   struct pm8921 *pmic,
+ 					   u32 rev)

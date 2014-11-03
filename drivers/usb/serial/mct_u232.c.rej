@@ -1,0 +1,40 @@
+--- drivers/usb/serial/mct_u232.c
++++ drivers/usb/serial/mct_u232.c
+@@ -375,22 +368,6 @@
+  * Driver's tty interface functions
+  */
+ 
+-static int mct_u232_startup(struct usb_serial *serial)
+-{
+-	struct usb_serial_port *port, *rport;
+-
+-	/* Puh, that's dirty */
+-	port = serial->port[0];
+-	rport = serial->port[1];
+-	/* No unlinking, it wasn't submitted yet. */
+-	usb_free_urb(port->read_urb);
+-	port->read_urb = rport->interrupt_in_urb;
+-	rport->interrupt_in_urb = NULL;
+-	port->read_urb->context = port;
+-
+-	return 0;
+-} /* mct_u232_startup */
+-
+ static int mct_u232_port_probe(struct usb_serial_port *port)
+ {
+ 	struct mct_u232_private *priv;
+@@ -506,11 +487,9 @@
+ 
+ static void mct_u232_close(struct usb_serial_port *port)
+ {
+-	/*
+-	 * Must kill the read urb as it is actually an interrupt urb, which
+-	 * generic close thus fails to kill.
+-	 */
+-	usb_kill_urb(port->read_urb);
++	struct mct_u232_private *priv = usb_get_serial_port_data(port);
++
++	usb_kill_urb(priv->read_urb);
+ 	usb_kill_urb(port->interrupt_in_urb);
+ 
+ 	usb_serial_generic_close(port);

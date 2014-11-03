@@ -1,0 +1,12 @@
+--- arch/arm/mach-orion5x/common.c
++++ arch/arm/mach-orion5x/common.c
+@@ -109,7 +109,8 @@
+ {
+ 	orion_ge00_init(eth_data,
+ 			ORION5X_ETH_PHYS_BASE, IRQ_ORION5X_ETH_SUM,
+-			IRQ_ORION5X_ETH_ERR);
++			IRQ_ORION5X_ETH_ERR,
++			MV643XX_TX_CSUM_DEFAULT_LIMIT);
+ }
+ 
+ 

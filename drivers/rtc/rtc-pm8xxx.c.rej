@@ -1,0 +1,11 @@
+--- drivers/rtc/rtc-pm8xxx.c
++++ drivers/rtc/rtc-pm8xxx.c
+@@ -524,7 +524,7 @@
+ 
+ static struct platform_driver pm8xxx_rtc_driver = {
+ 	.probe		= pm8xxx_rtc_probe,
+-	.remove		= __devexit_p(pm8xxx_rtc_remove),
++	.remove		= pm8xxx_rtc_remove,
+ 	.driver	= {
+ 		.name	= PM8XXX_RTC_DEV_NAME,
+ 		.owner	= THIS_MODULE,

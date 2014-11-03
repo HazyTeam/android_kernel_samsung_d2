@@ -21,15 +21,10 @@
 
 */
 
-#define _GNU_SOURCE
-
-#define __NO_VERSION__
-#include "comedi_fops.h"
 #include <linux/device.h>
 #include <linux/module.h>
-#include <linux/pci.h>
-#include <linux/usb.h>
 #include <linux/errno.h>
+#include <linux/kconfig.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/fcntl.h>
@@ -42,19 +37,67 @@
 #include <linux/cdev.h>
 #include <linux/dma-mapping.h>
 #include <linux/io.h>
+#include <linux/interrupt.h>
 
 #include "comedidev.h"
-#include "internal.h"
-
-static int postconfig(struct comedi_device *dev);
-static int insn_rw_emulate_bits(struct comedi_device *dev,
-				struct comedi_subdevice *s,
-				struct comedi_insn *insn, unsigned int *data);
-static void *comedi_recognize(struct comedi_driver *driv, const char *name);
-static void comedi_report_boards(struct comedi_driver *driv);
-static int poll_invalid(struct comedi_device *dev, struct comedi_subdevice *s);
+#include "comedi_internal.h"
 
 struct comedi_driver *comedi_drivers;
+
+int comedi_set_hw_dev(struct comedi_device *dev, struct device *hw_dev)
+{
+	if (hw_dev == dev->hw_dev)
+		return 0;
+	if (dev->hw_dev != NULL)
+		return -EEXIST;
+	dev->hw_dev = get_device(hw_dev);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(comedi_set_hw_dev);
+
+static void comedi_clear_hw_dev(struct comedi_device *dev)
+{
+	put_device(dev->hw_dev);
+	dev->hw_dev = NULL;
+}
+
+int comedi_alloc_subdevices(struct comedi_device *dev, int num_subdevices)
+{
+	struct comedi_subdevice *s;
+	int i;
+
+	if (num_subdevices < 1)
+		return -EINVAL;
+
+	s = kcalloc(num_subdevices, sizeof(*s), GFP_KERNEL);
+	if (!s)
+		return -ENOMEM;
+	dev->subdevices = s;
+	dev->n_subdevices = num_subdevices;
+
+	for (i = 0; i < num_subdevices; ++i) {
+		s = &dev->subdevices[i];
+		s->device = dev;
+		s->index = i;
+		s->async_dma_dir = DMA_NONE;
+		spin_lock_init(&s->spin_lock);
+		s->minor = -1;
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(comedi_alloc_subdevices);
+
+void comedi_spriv_free(struct comedi_device *dev, int subdev_num)
+{
+	struct comedi_subdevice *s;
+
+	if (dev->subdevices && subdev_num < dev->n_subdevices) {
+		s = &dev->subdevices[subdev_num];
+		kfree(s->private);
+		s->private = NULL;
+	}
+}
+EXPORT_SYMBOL_GPL(comedi_spriv_free);
 
 static void cleanup_device(struct comedi_device *dev)
 {
@@ -63,7 +106,7 @@ static void cleanup_device(struct comedi_device *dev)
 
 	if (dev->subdevices) {
 		for (i = 0; i < dev->n_subdevices; i++) {
-			s = dev->subdevices + i;
+			s = &dev->subdevices[i];
 			comedi_free_subdevice_minor(s);
 			if (s->async) {
 				comedi_buf_alloc(dev, s, 0);
@@ -80,259 +123,22 @@ static void cleanup_device(struct comedi_device *dev)
 	dev->board_name = NULL;
 	dev->board_ptr = NULL;
 	dev->iobase = 0;
+	dev->iolen = 0;
+	dev->ioenabled = false;
 	dev->irq = 0;
 	dev->read_subdev = NULL;
 	dev->write_subdev = NULL;
 	dev->open = NULL;
 	dev->close = NULL;
-	comedi_set_hw_dev(dev, NULL);
-}
-
-static void __comedi_device_detach(struct comedi_device *dev)
-{
-	dev->attached = 0;
-	if (dev->driver)
-		dev->driver->detach(dev);
-	else
-		printk(KERN_WARNING
-		       "BUG: dev->driver=NULL in comedi_device_detach()\n");
-	cleanup_device(dev);
+	comedi_clear_hw_dev(dev);
 }
 
 void comedi_device_detach(struct comedi_device *dev)
 {
-	if (!dev->attached)
-		return;
-	__comedi_device_detach(dev);
-}
-
-int comedi_device_attach(struct comedi_device *dev, struct comedi_devconfig *it)
-{
-	struct comedi_driver *driv;
-	int ret;
-
-	if (dev->attached)
-		return -EBUSY;
-
-	for (driv = comedi_drivers; driv; driv = driv->next) {
-		if (!try_module_get(driv->module)) {
-			printk(KERN_INFO "comedi: failed to increment module count, skipping\n");
-			continue;
-		}
-		if (driv->num_names) {
-			dev->board_ptr = comedi_recognize(driv, it->board_name);
-			if (dev->board_ptr == NULL) {
-				module_put(driv->module);
-				continue;
-			}
-		} else {
-			if (strcmp(driv->driver_name, it->board_name)) {
-				module_put(driv->module);
-				continue;
-			}
-		}
-		/* initialize dev->driver here so
-		 * comedi_error() can be called from attach */
-		dev->driver = driv;
-		ret = driv->attach(dev, it);
-		if (ret < 0) {
-			module_put(dev->driver->module);
-			__comedi_device_detach(dev);
-			return ret;
-		}
-		goto attached;
-	}
-
-	/*  recognize has failed if we get here */
-	/*  report valid board names before returning error */
-	for (driv = comedi_drivers; driv; driv = driv->next) {
-		if (!try_module_get(driv->module)) {
-			printk(KERN_INFO
-			       "comedi: failed to increment module count\n");
-			continue;
-		}
-		comedi_report_boards(driv);
-		module_put(driv->module);
-	}
-	return -EIO;
-
-attached:
-	/* do a little post-config cleanup */
-	ret = postconfig(dev);
-	module_put(dev->driver->module);
-	if (ret < 0) {
-		__comedi_device_detach(dev);
-		return ret;
-	}
-
-	if (!dev->board_name) {
-		printk(KERN_WARNING "BUG: dev->board_name=<%p>\n",
-		       dev->board_name);
-		dev->board_name = "BUG";
-	}
-	smp_wmb();
-	dev->attached = 1;
-
-	return 0;
-}
-
-int comedi_driver_register(struct comedi_driver *driver)
-{
-	driver->next = comedi_drivers;
-	comedi_drivers = driver;
-
-	return 0;
-}
-EXPORT_SYMBOL(comedi_driver_register);
-
-int comedi_driver_unregister(struct comedi_driver *driver)
-{
-	struct comedi_driver *prev;
-	int i;
-
-	/* check for devices using this driver */
-	for (i = 0; i < COMEDI_NUM_BOARD_MINORS; i++) {
-		struct comedi_device_file_info *dev_file_info =
-		    comedi_get_device_file_info(i);
-		struct comedi_device *dev;
-
-		if (dev_file_info == NULL)
-			continue;
-		dev = dev_file_info->device;
-
-		mutex_lock(&dev->mutex);
-		if (dev->attached && dev->driver == driver) {
-			if (dev->use_count)
-				printk(KERN_WARNING "BUG! detaching device with use_count=%d\n",
-						dev->use_count);
-			comedi_device_detach(dev);
-		}
-		mutex_unlock(&dev->mutex);
-	}
-
-	if (comedi_drivers == driver) {
-		comedi_drivers = driver->next;
-		return 0;
-	}
-
-	for (prev = comedi_drivers; prev->next; prev = prev->next) {
-		if (prev->next == driver) {
-			prev->next = driver->next;
-			return 0;
-		}
-	}
-	return -EINVAL;
-}
-EXPORT_SYMBOL(comedi_driver_unregister);
-
-static int postconfig(struct comedi_device *dev)
-{
-	int i;
-	struct comedi_subdevice *s;
-	struct comedi_async *async = NULL;
-	int ret;
-
-	for (i = 0; i < dev->n_subdevices; i++) {
-		s = dev->subdevices + i;
-
-		if (s->type == COMEDI_SUBD_UNUSED)
-			continue;
-
-		if (s->len_chanlist == 0)
-			s->len_chanlist = 1;
-
-		if (s->do_cmd) {
-			BUG_ON((s->subdev_flags & (SDF_CMD_READ |
-						   SDF_CMD_WRITE)) == 0);
-			BUG_ON(!s->do_cmdtest);
-
-			async =
-			    kzalloc(sizeof(struct comedi_async), GFP_KERNEL);
-			if (async == NULL) {
-				printk(KERN_INFO
-				       "failed to allocate async struct\n");
-				return -ENOMEM;
-			}
-			init_waitqueue_head(&async->wait_head);
-			async->subdevice = s;
-			s->async = async;
-
-#define DEFAULT_BUF_MAXSIZE (64*1024)
-#define DEFAULT_BUF_SIZE (64*1024)
-
-			async->max_bufsize = DEFAULT_BUF_MAXSIZE;
-
-			async->prealloc_buf = NULL;
-			async->prealloc_bufsz = 0;
-			if (comedi_buf_alloc(dev, s, DEFAULT_BUF_SIZE) < 0) {
-				printk(KERN_INFO "Buffer allocation failed\n");
-				return -ENOMEM;
-			}
-			if (s->buf_change) {
-				ret = s->buf_change(dev, s, DEFAULT_BUF_SIZE);
-				if (ret < 0)
-					return ret;
-			}
-			comedi_alloc_subdevice_minor(dev, s);
-		}
-
-		if (!s->range_table && !s->range_table_list)
-			s->range_table = &range_unknown;
-
-		if (!s->insn_read && s->insn_bits)
-			s->insn_read = insn_rw_emulate_bits;
-		if (!s->insn_write && s->insn_bits)
-			s->insn_write = insn_rw_emulate_bits;
-
-		if (!s->insn_read)
-			s->insn_read = insn_inval;
-		if (!s->insn_write)
-			s->insn_write = insn_inval;
-		if (!s->insn_bits)
-			s->insn_bits = insn_inval;
-		if (!s->insn_config)
-			s->insn_config = insn_inval;
-
-		if (!s->poll)
-			s->poll = poll_invalid;
-	}
-
-	return 0;
-}
-
-/* generic recognize function for drivers
- * that register their supported board names */
-static void *comedi_recognize(struct comedi_driver *driv, const char *name)
-{
-	unsigned i;
-	const char *const *name_ptr = driv->board_name;
-	for (i = 0; i < driv->num_names; i++) {
-		if (strcmp(*name_ptr, name) == 0)
-			return (void *)name_ptr;
-		name_ptr =
-		    (const char *const *)((const char *)name_ptr +
-					  driv->offset);
-	}
-
-	return NULL;
-}
-
-static void comedi_report_boards(struct comedi_driver *driv)
-{
-	unsigned int i;
-	const char *const *name_ptr;
-
-	printk(KERN_INFO "comedi: valid board names for %s driver are:\n",
-	       driv->driver_name);
-
-	name_ptr = driv->board_name;
-	for (i = 0; i < driv->num_names; i++) {
-		printk(KERN_INFO " %s\n", *name_ptr);
-		name_ptr = (const char **)((char *)name_ptr + driv->offset);
-	}
-
-	if (driv->num_names == 0)
-		printk(KERN_INFO " %s\n", driv->driver_name);
+	dev->attached = false;
+	if (dev->driver)
+		dev->driver->detach(dev);
+	cleanup_device(dev);
 }
 
 static int poll_invalid(struct comedi_device *dev, struct comedi_subdevice *s)
@@ -363,7 +169,6 @@ static int insn_rw_emulate_bits(struct comedi_device *dev,
 	new_insn.insn = INSN_BITS;
 	new_insn.chanspec = base_bitfield_channel;
 	new_insn.n = 2;
-	new_insn.data = new_data;
 	new_insn.subdev = insn->subdev;
 
 	if (insn->insn == INSN_WRITE) {
@@ -384,37 +189,214 @@ static int insn_rw_emulate_bits(struct comedi_device *dev,
 	return 1;
 }
 
-static inline unsigned long uvirt_to_kva(pgd_t *pgd, unsigned long adr)
+static int __comedi_device_postconfig_async(struct comedi_device *dev,
+					    struct comedi_subdevice *s)
 {
-	unsigned long ret = 0UL;
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-	pud_t *pud;
+	struct comedi_async *async;
+	unsigned int buf_size;
+	int ret;
 
-	if (!pgd_none(*pgd)) {
-		pud = pud_offset(pgd, adr);
-		pmd = pmd_offset(pud, adr);
-		if (!pmd_none(*pmd)) {
-			ptep = pte_offset_kernel(pmd, adr);
-			pte = *ptep;
-			if (pte_present(pte)) {
-				ret = (unsigned long)
-				    page_address(pte_page(pte));
-				ret |= (adr & (PAGE_SIZE - 1));
-			}
-		}
+	if ((s->subdev_flags & (SDF_CMD_READ | SDF_CMD_WRITE)) == 0) {
+		dev_warn(dev->class_dev,
+			 "async subdevices must support SDF_CMD_READ or SDF_CMD_WRITE\n");
+		return -EINVAL;
 	}
-	return ret;
+	if (!s->do_cmdtest) {
+		dev_warn(dev->class_dev,
+			 "async subdevices must have a do_cmdtest() function\n");
+		return -EINVAL;
+	}
+
+	async = kzalloc(sizeof(*async), GFP_KERNEL);
+	if (!async)
+		return -ENOMEM;
+
+	init_waitqueue_head(&async->wait_head);
+	async->subdevice = s;
+	s->async = async;
+
+	async->max_bufsize = comedi_default_buf_maxsize_kb * 1024;
+	buf_size = comedi_default_buf_size_kb * 1024;
+	if (buf_size > async->max_bufsize)
+		buf_size = async->max_bufsize;
+
+	if (comedi_buf_alloc(dev, s, buf_size) < 0) {
+		dev_warn(dev->class_dev, "Buffer allocation failed\n");
+		return -ENOMEM;
+	}
+	if (s->buf_change) {
+		ret = s->buf_change(dev, s, buf_size);
+		if (ret < 0)
+			return ret;
+	}
+
+	comedi_alloc_subdevice_minor(s);
+
+	return 0;
 }
 
-static inline unsigned long kvirt_to_kva(unsigned long adr)
+static int __comedi_device_postconfig(struct comedi_device *dev)
 {
-	unsigned long va, kva;
+	struct comedi_subdevice *s;
+	int ret;
+	int i;
 
-	va = adr;
-	kva = uvirt_to_kva(pgd_offset_k(va), va);
+	for (i = 0; i < dev->n_subdevices; i++) {
+		s = &dev->subdevices[i];
 
-	return kva;
+		if (s->type == COMEDI_SUBD_UNUSED)
+			continue;
+
+		if (s->len_chanlist == 0)
+			s->len_chanlist = 1;
+
+		if (s->do_cmd) {
+			ret = __comedi_device_postconfig_async(dev, s);
+			if (ret)
+				return ret;
+		}
+
+		if (!s->range_table && !s->range_table_list)
+			s->range_table = &range_unknown;
+
+		if (!s->insn_read && s->insn_bits)
+			s->insn_read = insn_rw_emulate_bits;
+		if (!s->insn_write && s->insn_bits)
+			s->insn_write = insn_rw_emulate_bits;
+
+		if (!s->insn_read)
+			s->insn_read = insn_inval;
+		if (!s->insn_write)
+			s->insn_write = insn_inval;
+		if (!s->insn_bits)
+			s->insn_bits = insn_inval;
+		if (!s->insn_config)
+			s->insn_config = insn_inval;
+
+		if (!s->poll)
+			s->poll = poll_invalid;
+	}
+
+	return 0;
+}
+
+/* do a little post-config cleanup */
+static int comedi_device_postconfig(struct comedi_device *dev)
+{
+	int ret;
+
+	ret = __comedi_device_postconfig(dev);
+	if (ret < 0)
+		return ret;
+	smp_wmb();
+	dev->attached = true;
+	return 0;
+}
+
+/*
+ * Generic recognize function for drivers that register their supported
+ * board names.
+ *
+ * 'driv->board_name' points to a 'const char *' member within the
+ * zeroth element of an array of some private board information
+ * structure, say 'struct foo_board' containing a member 'const char
+ * *board_name' that is initialized to point to a board name string that
+ * is one of the candidates matched against this function's 'name'
+ * parameter.
+ *
+ * 'driv->offset' is the size of the private board information
+ * structure, say 'sizeof(struct foo_board)', and 'driv->num_names' is
+ * the length of the array of private board information structures.
+ *
+ * If one of the board names in the array of private board information
+ * structures matches the name supplied to this function, the function
+ * returns a pointer to the pointer to the board name, otherwise it
+ * returns NULL.  The return value ends up in the 'board_ptr' member of
+ * a 'struct comedi_device' that the low-level comedi driver's
+ * 'attach()' hook can convert to a point to a particular element of its
+ * array of private board information structures by subtracting the
+ * offset of the member that points to the board name.  (No subtraction
+ * is required if the board name pointer is the first member of the
+ * private board information structure, which is generally the case.)
+ */
+static void *comedi_recognize(struct comedi_driver *driv, const char *name)
+{
+	char **name_ptr = (char **)driv->board_name;
+	int i;
+
+	for (i = 0; i < driv->num_names; i++) {
+		if (strcmp(*name_ptr, name) == 0)
+			return name_ptr;
+		name_ptr = (void *)name_ptr + driv->offset;
+	}
+
+	return NULL;
+}
+
+static void comedi_report_boards(struct comedi_driver *driv)
+{
+	unsigned int i;
+	const char *const *name_ptr;
+
+	pr_info("comedi: valid board names for %s driver are:\n",
+		driv->driver_name);
+
+	name_ptr = driv->board_name;
+	for (i = 0; i < driv->num_names; i++) {
+		pr_info(" %s\n", *name_ptr);
+		name_ptr = (const char **)((char *)name_ptr + driv->offset);
+	}
+
+	if (driv->num_names == 0)
+		pr_info(" %s\n", driv->driver_name);
+}
+
+static int poll_invalid(struct comedi_device *dev, struct comedi_subdevice *s)
+{
+	return -EINVAL;
+}
+
+int insn_inval(struct comedi_device *dev, struct comedi_subdevice *s,
+	       struct comedi_insn *insn, unsigned int *data)
+{
+	return -EINVAL;
+}
+
+static int insn_rw_emulate_bits(struct comedi_device *dev,
+				struct comedi_subdevice *s,
+				struct comedi_insn *insn, unsigned int *data)
+{
+	struct comedi_insn new_insn;
+	int ret;
+	static const unsigned channels_per_bitfield = 32;
+
+	unsigned chan = CR_CHAN(insn->chanspec);
+	const unsigned base_bitfield_channel =
+	    (chan < channels_per_bitfield) ? 0 : chan;
+	unsigned int new_data[2];
+	memset(new_data, 0, sizeof(new_data));
+	memset(&new_insn, 0, sizeof(new_insn));
+	new_insn.insn = INSN_BITS;
+	new_insn.chanspec = base_bitfield_channel;
+	new_insn.n = 2;
+	new_insn.subdev = insn->subdev;
+
+	if (insn->insn == INSN_WRITE) {
+		if (!(s->subdev_flags & SDF_WRITABLE))
+			return -EINVAL;
+		new_data[0] = 1 << (chan - base_bitfield_channel); /* mask */
+		new_data[1] = data[0] ? (1 << (chan - base_bitfield_channel))
+			      : 0; /* bits */
+	}
+
+	ret = s->insn_bits(dev, s, &new_insn, new_data);
+	if (ret < 0)
+		return ret;
+
+	if (insn->insn == INSN_READ)
+		data[0] = (new_data[1] >> (chan - base_bitfield_channel)) & 1;
+
+	return 1;
 }
 
 int comedi_buf_alloc(struct comedi_device *dev, struct comedi_subdevice *s,
@@ -569,9 +551,9 @@ static unsigned int comedi_buf_munge(struct comedi_async *async,
 
 		block_size = num_bytes - count;
 		if (block_size < 0) {
-			printk(KERN_WARNING
-			       "%s: %s: bug! block_size is negative\n",
-			       __FILE__, __func__);
+			dev_warn(s->device->class_dev,
+				 "%s: %s: bug! block_size is negative\n",
+				 __FILE__, __func__);
 			break;
 		}
 		if ((int)(async->munge_ptr + block_size -
@@ -652,7 +634,8 @@ unsigned comedi_buf_write_free(struct comedi_async *async, unsigned int nbytes)
 {
 	if ((int)(async->buf_write_count + nbytes -
 		  async->buf_write_alloc_count) > 0) {
-		printk(KERN_INFO "comedi: attempted to write-free more bytes than have been write-allocated.\n");
+		dev_info(async->subdevice->device->class_dev,
+			 "attempted to write-free more bytes than have been write-allocated.\n");
 		nbytes = async->buf_write_alloc_count - async->buf_write_count;
 	}
 	async->buf_write_count += nbytes;
@@ -688,8 +671,8 @@ unsigned comedi_buf_read_free(struct comedi_async *async, unsigned int nbytes)
 	smp_mb();
 	if ((int)(async->buf_read_count + nbytes -
 		  async->buf_read_alloc_count) > 0) {
-		printk(KERN_INFO
-		       "comedi: attempted to read-free more bytes than have been read-allocated.\n");
+		dev_info(async->subdevice->device->class_dev,
+			 "attempted to read-free more bytes than have been read-allocated.\n");
 		nbytes = async->buf_read_alloc_count - async->buf_read_count;
 	}
 	async->buf_read_count += nbytes;
@@ -826,6 +809,13 @@ static int comedi_auto_config(struct device *hardware_device,
 	if (!comedi_autoconfig)
 		return 0;
 
+	if (!driver->auto_attach) {
+		dev_warn(hardware_device,
+			 "BUG! comedi driver '%s' has no auto_attach handler\n",
+			 driver->driver_name);
+		return -EINVAL;
+	}
+
 	minor = comedi_alloc_board_minor(hardware_device);
 	if (minor < 0)
 		return minor;
@@ -869,8 +859,30 @@ int comedi_pci_auto_config(struct pci_dev *pcidev, const char *board_name)
 	/*  pci slot */
 	options[1] = PCI_SLOT(pcidev->devfn);
 
-	return comedi_auto_config(&pcidev->dev, board_name,
+	return comedi_auto_config(&pcidev->dev, driver,
 				  options, ARRAY_SIZE(options));
+}
+
+static int comedi_pci_attach_wrapper(struct comedi_device *dev, void *pcidev)
+{
+	return dev->driver->attach_pci(dev, pcidev);
+}
+
+static int comedi_new_pci_auto_config(struct pci_dev *pcidev,
+				      struct comedi_driver *driver)
+{
+	return comedi_auto_config_helper(&pcidev->dev, driver,
+					 comedi_pci_attach_wrapper, pcidev);
+}
+EXPORT_SYMBOL_GPL(comedi_auto_unconfig);
+
+int comedi_pci_auto_config(struct pci_dev *pcidev, struct comedi_driver *driver)
+{
+
+	if (driver->attach_pci)
+		return comedi_new_pci_auto_config(pcidev, driver);
+	else
+		return comedi_old_pci_auto_config(pcidev, driver);
 }
 EXPORT_SYMBOL_GPL(comedi_pci_auto_config);
 
@@ -880,16 +892,64 @@ void comedi_pci_auto_unconfig(struct pci_dev *pcidev)
 }
 EXPORT_SYMBOL_GPL(comedi_pci_auto_unconfig);
 
-int comedi_usb_auto_config(struct usb_device *usbdev, const char *board_name)
+int comedi_pci_driver_register(struct comedi_driver *comedi_driver,
+		struct pci_driver *pci_driver)
 {
-	BUG_ON(usbdev == NULL);
-	return comedi_auto_config(&usbdev->dev, board_name, NULL, 0);
-}
-EXPORT_SYMBOL_GPL(comedi_usb_auto_config);
+	int ret;
 
-void comedi_usb_auto_unconfig(struct usb_device *usbdev)
-{
-	BUG_ON(usbdev == NULL);
-	comedi_auto_unconfig(&usbdev->dev);
+	ret = comedi_driver_register(comedi_driver);
+	if (ret < 0)
+		return ret;
+
+	/* FIXME: Remove this test after auditing all comedi pci drivers */
+	if (!pci_driver->name)
+		pci_driver->name = comedi_driver->driver_name;
+
+	ret = pci_register_driver(pci_driver);
+	if (ret < 0) {
+		comedi_driver_unregister(comedi_driver);
+		return ret;
+	}
+
+	return 0;
 }
-EXPORT_SYMBOL_GPL(comedi_usb_auto_unconfig);
+EXPORT_SYMBOL_GPL(comedi_pci_driver_register);
+
+void comedi_pci_driver_unregister(struct comedi_driver *comedi_driver,
+		struct pci_driver *pci_driver)
+{
+	pci_unregister_driver(pci_driver);
+	comedi_driver_unregister(comedi_driver);
+}
+EXPORT_SYMBOL_GPL(comedi_pci_driver_unregister);
+
+#if IS_ENABLED(CONFIG_USB)
+
+int comedi_usb_driver_register(struct comedi_driver *comedi_driver,
+		struct usb_driver *usb_driver)
+{
+	int ret;
+
+	ret = comedi_driver_register(comedi_driver);
+	if (ret < 0)
+		return ret;
+
+	ret = usb_register(usb_driver);
+	if (ret < 0) {
+		comedi_driver_unregister(comedi_driver);
+		return ret;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(comedi_usb_driver_register);
+
+void comedi_usb_driver_unregister(struct comedi_driver *comedi_driver,
+		struct usb_driver *usb_driver)
+{
+	usb_deregister(usb_driver);
+	comedi_driver_unregister(comedi_driver);
+}
+EXPORT_SYMBOL_GPL(comedi_usb_driver_unregister);
+
+#endif

@@ -1,0 +1,108 @@
+--- arch/m32r/kernel/process.c
++++ arch/m32r/kernel/process.c
+@@ -192,88 +157,31 @@
+ }
+ 
+ int copy_thread(unsigned long clone_flags, unsigned long spu,
+-	unsigned long unused, struct task_struct *tsk, struct pt_regs *regs)
++	unsigned long arg, struct task_struct *tsk)
+ {
+ 	struct pt_regs *childregs = task_pt_regs(tsk);
+ 	extern void ret_from_fork(void);
+-
+-	/* Copy registers */
+-	*childregs = *regs;
+-
+-	childregs->spu = spu;
+-	childregs->r0 = 0;	/* Child gets zero as return value */
+-	regs->r0 = tsk->pid;
++	extern void ret_from_kernel_thread(void);
++
++	if (unlikely(tsk->flags & PF_KTHREAD)) {
++		memset(childregs, 0, sizeof(struct pt_regs));
++		childregs->psw = M32R_PSW_BIE;
++		childregs->r1 = spu;	/* fn */
++		childregs->r0 = arg;
++		tsk->thread.lr = (unsigned long)ret_from_kernel_thread;
++	} else {
++		/* Copy registers */
++		*childregs = *current_pt_regs();
++		if (spu)
++			childregs->spu = spu;
++		childregs->r0 = 0;	/* Child gets zero as return value */
++		tsk->thread.lr = (unsigned long)ret_from_fork;
++	}
+ 	tsk->thread.sp = (unsigned long)childregs;
+-	tsk->thread.lr = (unsigned long)ret_from_fork;
+ 
+ 	return 0;
+ }
+ 
+-asmlinkage int sys_fork(unsigned long r0, unsigned long r1, unsigned long r2,
+-	unsigned long r3, unsigned long r4, unsigned long r5, unsigned long r6,
+-	struct pt_regs regs)
+-{
+-#ifdef CONFIG_MMU
+-	return do_fork(SIGCHLD, regs.spu, &regs, 0, NULL, NULL);
+-#else
+-	return -EINVAL;
+-#endif /* CONFIG_MMU */
+-}
+-
+-asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
+-			 unsigned long parent_tidptr,
+-			 unsigned long child_tidptr,
+-			 unsigned long r4, unsigned long r5, unsigned long r6,
+-			 struct pt_regs regs)
+-{
+-	if (!newsp)
+-		newsp = regs.spu;
+-
+-	return do_fork(clone_flags, newsp, &regs, 0,
+-		       (int __user *)parent_tidptr, (int __user *)child_tidptr);
+-}
+-
+-/*
+- * This is trivial, and on the face of it looks like it
+- * could equally well be done in user mode.
+- *
+- * Not so, for quite unobvious reasons - register pressure.
+- * In user mode vfork() cannot have a stack frame, and if
+- * done by calling the "clone()" system call directly, you
+- * do not have enough call-clobbered registers to hold all
+- * the information you need.
+- */
+-asmlinkage int sys_vfork(unsigned long r0, unsigned long r1, unsigned long r2,
+-	unsigned long r3, unsigned long r4, unsigned long r5, unsigned long r6,
+-	struct pt_regs regs)
+-{
+-	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.spu, &regs, 0,
+-			NULL, NULL);
+-}
+-
+-/*
+- * sys_execve() executes a new program.
+- */
+-asmlinkage int sys_execve(const char __user *ufilename,
+-			  const char __user *const __user *uargv,
+-			  const char __user *const __user *uenvp,
+-			  unsigned long r3, unsigned long r4, unsigned long r5,
+-			  unsigned long r6, struct pt_regs regs)
+-{
+-	int error;
+-	struct filename *filename;
+-
+-	filename = getname(ufilename);
+-	error = PTR_ERR(filename);
+-	if (IS_ERR(filename))
+-		goto out;
+-
+-	error = do_execve(filename->name, uargv, uenvp, &regs);
+-	putname(filename);
+-out:
+-	return error;
+-}
+-
+ /*
+  * These bracket the sleeping functions..
+  */

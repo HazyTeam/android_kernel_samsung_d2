@@ -1,0 +1,25 @@
+--- drivers/mtd/nand/mxc_nand.c
++++ drivers/mtd/nand/mxc_nand.c
+@@ -1479,18 +1746,12 @@
+ 	}
+ 
+ 	/* Call preset again, with correct writesize this time */
+-	host->preset(mtd);
++	host->devtype_data->preset(mtd);
+ 
+ 	if (mtd->writesize == 2048)
+-		this->ecc.layout = oob_largepage;
+-	if (nfc_is_v21() && mtd->writesize == 4096)
+-		this->ecc.layout = &nandv2_hw_eccoob_4k;
+-
+-	/* second phase scan */
+-	if (nand_scan_tail(mtd)) {
+-		err = -ENXIO;
+-		goto escan;
+-	}
++		this->ecc.layout = host->devtype_data->ecclayout_2k;
++	else if (mtd->writesize == 4096)
++		this->ecc.layout = host->devtype_data->ecclayout_4k;
+ 
+ 	if (this->ecc.mode == NAND_ECC_HW) {
+ 		if (nfc_is_v1())

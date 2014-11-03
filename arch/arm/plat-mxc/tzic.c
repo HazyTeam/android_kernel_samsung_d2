@@ -15,12 +15,15 @@
 #include <linux/device.h>
 #include <linux/errno.h>
 #include <linux/io.h>
+#include <linux/irqdomain.h>
+#include <linux/of.h>
 
 #include <asm/mach/irq.h>
 #include <asm/exception.h>
 
 #include <mach/hardware.h>
 #include <mach/common.h>
+#include <mach/irqs.h>
 
 #include "irq-common.h"
 
@@ -49,6 +52,7 @@
 #define TZIC_ID0	0x0FD0	/* Indentification Register 0 */
 
 void __iomem *tzic_base; /* Used as irq controller base in entry-macro.S */
+static struct irq_domain *domain;
 
 #define TZIC_NUM_IRQS 128
 
@@ -77,15 +81,14 @@ static int tzic_set_irq_fiq(unsigned int irq, unsigned int type)
 static void tzic_irq_suspend(struct irq_data *d)
 {
 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-	int idx = gc->irq_base >> 5;
+	int idx = d->hwirq >> 5;
 
 	__raw_writel(gc->wake_active, tzic_base + TZIC_WAKEUP0(idx));
 }
 
 static void tzic_irq_resume(struct irq_data *d)
 {
-	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-	int idx = gc->irq_base >> 5;
+	int idx = d->hwirq >> 5;
 
 	__raw_writel(__raw_readl(tzic_base + TZIC_ENSET0(idx)),
 		     tzic_base + TZIC_WAKEUP0(idx));
@@ -102,11 +105,10 @@ static struct mxc_extra_irq tzic_extra_irq = {
 #endif
 };
 
-static __init void tzic_init_gc(unsigned int irq_start)
+static __init void tzic_init_gc(int idx, unsigned int irq_start)
 {
 	struct irq_chip_generic *gc;
 	struct irq_chip_type *ct;
-	int idx = irq_start >> 5;
 
 	gc = irq_alloc_generic_chip("tzic", 1, irq_start, tzic_base,
 				    handle_level_irq);
@@ -140,7 +142,8 @@ asmlinkage void __exception_irq_entry tzic_handle_irq(struct pt_regs *regs)
 			while (stat) {
 				handled = 1;
 				irqofs = fls(stat) - 1;
-				handle_IRQ(irqofs + i * 32, regs);
+				handle_IRQ(irq_find_mapping(domain,
+						irqofs + i * 32), regs);
 				stat &= ~(1 << irqofs);
 			}
 		}
@@ -154,6 +157,8 @@ asmlinkage void __exception_irq_entry tzic_handle_irq(struct pt_regs *regs)
  */
 void __init tzic_init_irq(void __iomem *irqbase)
 {
+	struct device_node *np;
+	int irq_base;
 	int i;
 
 	tzic_base = irqbase;
@@ -190,6 +195,10 @@ void __init tzic_init_irq(void __iomem *irqbase)
  * tzic_enable_wake() - enable wakeup interrupt
  *
  * @return			0 if successful; non-zero otherwise
+ *
+ * This function provides an interrupt synchronization point that is required
+ * by tzic enabled platforms before entering imx specific low power modes (ie,
+ * those low power modes beyond the WAIT_CLOCKED basic ARM WFI only mode).
  */
 int tzic_enable_wake(void)
 {

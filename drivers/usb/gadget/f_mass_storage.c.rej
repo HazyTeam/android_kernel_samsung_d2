@@ -1,0 +1,24 @@
+--- drivers/usb/gadget/f_mass_storage.c
++++ drivers/usb/gadget/f_mass_storage.c
+@@ -2609,11 +2531,15 @@
+ 
+ /*************************** DEVICE ATTRIBUTES ***************************/
+ 
+-/* Write permission is checked per LUN in store_*() functions. */
+ static DEVICE_ATTR(ro, 0644, fsg_show_ro, fsg_store_ro);
+ static DEVICE_ATTR(nofua, 0644, fsg_show_nofua, fsg_store_nofua);
+ static DEVICE_ATTR(file, 0644, fsg_show_file, fsg_store_file);
+ 
++static struct device_attribute dev_attr_ro_cdrom =
++	__ATTR(ro, 0444, fsg_show_ro, NULL);
++static struct device_attribute dev_attr_file_nonremovable =
++	__ATTR(file, 0444, fsg_show_file, NULL);
++
+ 
+ /****************************** FSG COMMON ******************************/
+ 
+@@ -3129,4 +3059,3 @@
+ 	fsg_config_from_params(&cfg, params);
+ 	return fsg_common_init(common, cdev, &cfg);
+ }
+-

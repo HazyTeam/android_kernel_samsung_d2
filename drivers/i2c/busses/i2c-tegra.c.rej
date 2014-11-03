@@ -1,0 +1,60 @@
+--- drivers/i2c/busses/i2c-tegra.c
++++ drivers/i2c/busses/i2c-tegra.c
+@@ -380,11 +394,13 @@
+ static inline int tegra_i2c_clock_enable(struct tegra_i2c_dev *i2c_dev)
+ {
+ 	int ret;
+-	ret = clk_prepare_enable(i2c_dev->fast_clk);
+-	if (ret < 0) {
+-		dev_err(i2c_dev->dev,
+-			"Enabling fast clk failed, err %d\n", ret);
+-		return ret;
++	if (!i2c_dev->hw->has_single_clk_source) {
++		ret = clk_prepare_enable(i2c_dev->fast_clk);
++		if (ret < 0) {
++			dev_err(i2c_dev->dev,
++				"Enabling fast clk failed, err %d\n", ret);
++			return ret;
++		}
+ 	}
+ 	ret = clk_prepare_enable(i2c_dev->div_clk);
+ 	if (ret < 0) {
+@@ -398,15 +414,22 @@
+ static inline void tegra_i2c_clock_disable(struct tegra_i2c_dev *i2c_dev)
+ {
+ 	clk_disable_unprepare(i2c_dev->div_clk);
+-	clk_disable_unprepare(i2c_dev->fast_clk);
++	if (!i2c_dev->hw->has_single_clk_source)
++		clk_disable_unprepare(i2c_dev->fast_clk);
+ }
+ 
+ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
+ {
+ 	u32 val;
+ 	int err = 0;
++	int clk_multiplier = I2C_CLK_MULTIPLIER_STD_FAST_MODE;
++	u32 clk_divisor;
+ 
+-	tegra_i2c_clock_enable(i2c_dev);
++	err = tegra_i2c_clock_enable(i2c_dev);
++	if (err < 0) {
++		dev_err(i2c_dev->dev, "Clock enable failed %d\n", err);
++		return err;
++	}
+ 
+ 	tegra_periph_reset_assert(i2c_dev->div_clk);
+ 	udelay(2);
+@@ -623,7 +656,12 @@
+ 	if (i2c_dev->is_suspended)
+ 		return -EBUSY;
+ 
+-	tegra_i2c_clock_enable(i2c_dev);
++	ret = tegra_i2c_clock_enable(i2c_dev);
++	if (ret < 0) {
++		dev_err(i2c_dev->dev, "Clock enable failed %d\n", ret);
++		return ret;
++	}
++
+ 	for (i = 0; i < num; i++) {
+ 		enum msg_end_type end_type = MSG_END_STOP;
+ 		if (i < (num - 1)) {

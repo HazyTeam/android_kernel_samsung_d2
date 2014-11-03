@@ -1,0 +1,49 @@
+--- drivers/hid/hid-magicmouse.c
++++ drivers/hid/hid-magicmouse.c
+@@ -508,15 +523,10 @@
+ 		goto err_free;
+ 	}
+ 
+-	/* We do this after hid-input is done parsing reports so that
+-	 * hid-input uses the most natural button and axis IDs.
+-	 */
+-	if (msc->input) {
+-		ret = magicmouse_setup_input(msc->input, hdev);
+-		if (ret) {
+-			hid_err(hdev, "magicmouse setup input failed (%d)\n", ret);
+-			goto err_stop_hw;
+-		}
++	if (!msc->input) {
++		hid_err(hdev, "magicmouse input not registered\n");
++		ret = -ENOMEM;
++		goto err_stop_hw;
+ 	}
+ 
+ 	if (id->product == USB_DEVICE_ID_APPLE_MAGICMOUSE)
+@@ -583,24 +593,8 @@
+ 	.remove = magicmouse_remove,
+ 	.raw_event = magicmouse_raw_event,
+ 	.input_mapping = magicmouse_input_mapping,
++	.input_configured = magicmouse_input_configured,
+ };
++module_hid_driver(magicmouse_driver);
+ 
+-static int __init magicmouse_init(void)
+-{
+-	int ret;
+-
+-	ret = hid_register_driver(&magicmouse_driver);
+-	if (ret)
+-		pr_err("can't register magicmouse driver\n");
+-
+-	return ret;
+-}
+-
+-static void __exit magicmouse_exit(void)
+-{
+-	hid_unregister_driver(&magicmouse_driver);
+-}
+-
+-module_init(magicmouse_init);
+-module_exit(magicmouse_exit);
+ MODULE_LICENSE("GPL");

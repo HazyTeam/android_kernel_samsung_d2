@@ -1,0 +1,68 @@
+--- drivers/gpu/drm/radeon/radeon.h
++++ drivers/gpu/drm/radeon/radeon.h
+@@ -142,65 +141,8 @@
+ /*
+  * BIOS.
+  */
+-#define ATRM_BIOS_PAGE 4096
+-
+-#if defined(CONFIG_VGA_SWITCHEROO)
+-bool radeon_atrm_supported(struct pci_dev *pdev);
+-int radeon_atrm_get_bios_chunk(uint8_t *bios, int offset, int len);
+-#else
+-static inline bool radeon_atrm_supported(struct pci_dev *pdev)
+-{
+-	return false;
+-}
+-
+-static inline int radeon_atrm_get_bios_chunk(uint8_t *bios, int offset, int len){
+-	return -EINVAL;
+-}
+-#endif
+ bool radeon_get_bios(struct radeon_device *rdev);
+ 
+-
+-/*
+- * Mutex which allows recursive locking from the same process.
+- */
+-struct radeon_mutex {
+-	struct mutex		mutex;
+-	struct task_struct	*owner;
+-	int			level;
+-};
+-
+-static inline void radeon_mutex_init(struct radeon_mutex *mutex)
+-{
+-	mutex_init(&mutex->mutex);
+-	mutex->owner = NULL;
+-	mutex->level = 0;
+-}
+-
+-static inline void radeon_mutex_lock(struct radeon_mutex *mutex)
+-{
+-	if (mutex_trylock(&mutex->mutex)) {
+-		/* The mutex was unlocked before, so it's ours now */
+-		mutex->owner = current;
+-	} else if (mutex->owner != current) {
+-		/* Another process locked the mutex, take it */
+-		mutex_lock(&mutex->mutex);
+-		mutex->owner = current;
+-	}
+-	/* Otherwise the mutex was already locked by this process */
+-
+-	mutex->level++;
+-}
+-
+-static inline void radeon_mutex_unlock(struct radeon_mutex *mutex)
+-{
+-	if (--mutex->level > 0)
+-		return;
+-
+-	mutex->owner = NULL;
+-	mutex_unlock(&mutex->mutex);
+-}
+-
+-
+ /*
+  * Dummy page
+  */

@@ -1,0 +1,16 @@
+--- arch/arm/include/asm/hardware/coresight.h
++++ arch/arm/include/asm/hardware/coresight.h
+@@ -147,11 +147,11 @@
+ 
+ #define etm_lock(t) do { etm_writel((t), 0, CSMR_LOCKACCESS); } while (0)
+ #define etm_unlock(t) \
+-	do { etm_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
++	do { etm_writel((t), CS_LAR_KEY, CSMR_LOCKACCESS); } while (0)
+ 
+ #define etb_lock(t) do { etb_writel((t), 0, CSMR_LOCKACCESS); } while (0)
+ #define etb_unlock(t) \
+-	do { etb_writel((t), UNLOCK_MAGIC, CSMR_LOCKACCESS); } while (0)
++	do { etb_writel((t), CS_LAR_KEY, CSMR_LOCKACCESS); } while (0)
+ 
+ #endif /* __ASM_HARDWARE_CORESIGHT_H */
+ 

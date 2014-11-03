@@ -20,8 +20,10 @@
  *	(sct@redhat.com), 1993, 1998
  */
 
+#include <linux/aio.h>
 #include "ext4_jbd2.h"
 #include "truncate.h"
+#include "ext4_extents.h"	/* Needed for EXT_MAX_BLOCKS */
 
 #include <trace/events/ext4.h>
 
@@ -448,60 +450,59 @@ static int ext4_alloc_branch(handle_t *handle, struct inode *inode,
 			     int *blks, ext4_fsblk_t goal,
 			     ext4_lblk_t *offsets, Indirect *branch)
 {
-	int blocksize = inode->i_sb->s_blocksize;
-	int i, n = 0;
-	int err = 0;
-	struct buffer_head *bh;
-	int num;
-	ext4_fsblk_t new_blocks[4];
-	ext4_fsblk_t current_block;
+	struct ext4_allocation_request	ar;
+	struct buffer_head *		bh;
+	ext4_fsblk_t			b, new_blocks[4];
+	__le32				*p;
+	int				i, j, err, len = 1;
 
-	num = ext4_alloc_blocks(handle, inode, iblock, goal, indirect_blks,
-				*blks, new_blocks, &err);
-	if (err)
-		return err;
-
-	branch[0].key = cpu_to_le32(new_blocks[0]);
 	/*
-	 * metadata blocks and data blocks are allocated.
+	 * Set up for the direct block allocation
 	 */
-	for (n = 1; n <= indirect_blks;  n++) {
-		/*
-		 * Get buffer_head for parent block, zero it out
-		 * and set the pointer to new one, then send
-		 * parent to disk.
-		 */
-		bh = sb_getblk(inode->i_sb, new_blocks[n-1]);
+	memset(&ar, 0, sizeof(ar));
+	ar.inode = inode;
+	ar.len = *blks;
+	ar.logical = iblock;
+	if (S_ISREG(inode->i_mode))
+		ar.flags = EXT4_MB_HINT_DATA;
+
+	for (i = 0; i <= indirect_blks; i++) {
+		if (i == indirect_blks) {
+			ar.goal = goal;
+			new_blocks[i] = ext4_mb_new_blocks(handle, &ar, &err);
+		} else
+			goal = new_blocks[i] = ext4_new_meta_blocks(handle, inode,
+							goal, 0, NULL, &err);
+		if (err) {
+			i--;
+			goto failed;
+		}
+		branch[i].key = cpu_to_le32(new_blocks[i]);
+		if (i == 0)
+			continue;
+
+		bh = branch[i].bh = sb_getblk(inode->i_sb, new_blocks[i-1]);
 		if (unlikely(!bh)) {
 			err = -ENOMEM;
 			goto failed;
 		}
-
-		branch[n].bh = bh;
 		lock_buffer(bh);
 		BUFFER_TRACE(bh, "call get_create_access");
 		err = ext4_journal_get_create_access(handle, bh);
 		if (err) {
-			/* Don't brelse(bh) here; it's done in
-			 * ext4_journal_forget() below */
 			unlock_buffer(bh);
 			goto failed;
 		}
 
-		memset(bh->b_data, 0, blocksize);
-		branch[n].p = (__le32 *) bh->b_data + offsets[n];
-		branch[n].key = cpu_to_le32(new_blocks[n]);
-		*branch[n].p = branch[n].key;
-		if (n == indirect_blks) {
-			current_block = new_blocks[n];
-			/*
-			 * End of chain, update the last new metablock of
-			 * the chain to point to the new allocated
-			 * data blocks numbers
-			 */
-			for (i = 1; i < num; i++)
-				*(branch[n].p + i) = cpu_to_le32(++current_block);
-		}
+		memset(bh->b_data, 0, bh->b_size);
+		p = branch[i].p = (__le32 *) bh->b_data + offsets[i];
+		b = new_blocks[i];
+
+		if (i == indirect_blks)
+			len = ar.len;
+		for (j = 0; j < len; j++)
+			*p++ = cpu_to_le32(b++);
+
 		BUFFER_TRACE(bh, "marking uptodate");
 		set_buffer_uptodate(bh);
 		unlock_buffer(bh);
@@ -511,25 +512,16 @@ static int ext4_alloc_branch(handle_t *handle, struct inode *inode,
 		if (err)
 			goto failed;
 	}
-	*blks = num;
-	return err;
+	*blks = ar.len;
+	return 0;
 failed:
-	/* Allocation failed, free what we already allocated */
-	ext4_free_blocks(handle, inode, NULL, new_blocks[0], 1, 0);
-	for (i = 1; i <= n ; i++) {
-		/*
-		 * branch[i].bh is newly allocated, so there is no
-		 * need to revoke the block, which is why we don't
-		 * need to set EXT4_FREE_BLOCKS_METADATA.
-		 */
-		ext4_free_blocks(handle, inode, NULL, new_blocks[i], 1,
-				 EXT4_FREE_BLOCKS_FORGET);
+	for (; i >= 0; i--) {
+		if (i != indirect_blks && branch[i].bh)
+			ext4_forget(handle, 1, inode, branch[i].bh,
+				    branch[i].bh->b_blocknr);
+		ext4_free_blocks(handle, inode, NULL, new_blocks[i],
+				 (i == indirect_blks) ? ar.len : 1, 0);
 	}
-	for (i = n+1; i < indirect_blks; i++)
-		ext4_free_blocks(handle, inode, NULL, new_blocks[i], 1, 0);
-
-	ext4_free_blocks(handle, inode, NULL, new_blocks[i], num, 0);
-
 	return err;
 }
 
@@ -758,8 +750,7 @@ cleanup:
 		partial--;
 	}
 out:
-	trace_ext4_ind_map_blocks_exit(inode, map->m_lblk,
-				map->m_pblk, map->m_len, err);
+	trace_ext4_ind_map_blocks_exit(inode, map, err);
 	return err;
 }
 
@@ -810,16 +801,30 @@ ssize_t ext4_ind_direct_IO(int rw, struct kiocb *iocb,
 
 retry:
 	if (rw == READ && ext4_should_dioread_nolock(inode)) {
-		if (unlikely(!list_empty(&ei->i_completed_io_list))) {
+		if (unlikely(atomic_read(&EXT4_I(inode)->i_unwritten))) {
 			mutex_lock(&inode->i_mutex);
-			ext4_flush_completed_IO(inode);
+			ext4_flush_unwritten_io(inode);
 			mutex_unlock(&inode->i_mutex);
+		}
+		/*
+		 * Nolock dioread optimization may be dynamically disabled
+		 * via ext4_inode_block_unlocked_dio(). Check inode's state
+		 * while holding extra i_dio_count ref.
+		 */
+		atomic_inc(&inode->i_dio_count);
+		smp_mb();
+		if (unlikely(ext4_test_inode_state(inode,
+						    EXT4_STATE_DIOREAD_LOCK))) {
+			inode_dio_done(inode);
+			goto locked;
 		}
 		ret = __blockdev_direct_IO(rw, iocb, inode,
 				 inode->i_sb->s_bdev, iov,
 				 offset, nr_segs,
 				 ext4_get_block, NULL, NULL, 0);
+		inode_dio_done(inode);
 	} else {
+locked:
 		ret = blockdev_direct_IO(rw, iocb, inode, iov,
 				 offset, nr_segs, ext4_get_block);
 
@@ -1339,68 +1344,31 @@ static void ext4_free_branches(handle_t *handle, struct inode *inode,
 	}
 }
 
-void ext4_ind_truncate(struct inode *inode)
+void ext4_ind_truncate(handle_t *handle, struct inode *inode)
 {
-	handle_t *handle;
 	struct ext4_inode_info *ei = EXT4_I(inode);
 	__le32 *i_data = ei->i_data;
 	int addr_per_block = EXT4_ADDR_PER_BLOCK(inode->i_sb);
-	struct address_space *mapping = inode->i_mapping;
 	ext4_lblk_t offsets[4];
 	Indirect chain[4];
 	Indirect *partial;
 	__le32 nr = 0;
 	int n = 0;
 	ext4_lblk_t last_block, max_block;
-	loff_t page_len;
 	unsigned blocksize = inode->i_sb->s_blocksize;
-	int err;
-
-	handle = start_transaction(inode);
-	if (IS_ERR(handle))
-		return;		/* AKPM: return what? */
 
 	last_block = (inode->i_size + blocksize-1)
 					>> EXT4_BLOCK_SIZE_BITS(inode->i_sb);
 	max_block = (EXT4_SB(inode->i_sb)->s_bitmap_maxbytes + blocksize-1)
 					>> EXT4_BLOCK_SIZE_BITS(inode->i_sb);
 
-	if (inode->i_size % PAGE_CACHE_SIZE != 0) {
-		page_len = PAGE_CACHE_SIZE -
-			(inode->i_size & (PAGE_CACHE_SIZE - 1));
-
-		err = ext4_discard_partial_page_buffers(handle,
-			mapping, inode->i_size, page_len, 0);
-
-		if (err)
-			goto out_stop;
-	}
-
 	if (last_block != max_block) {
 		n = ext4_block_to_path(inode, last_block, offsets, NULL);
 		if (n == 0)
-			goto out_stop;	/* error */
+			return;
 	}
 
-	/*
-	 * OK.  This truncate is going to happen.  We add the inode to the
-	 * orphan list, so that if this truncate spans multiple transactions,
-	 * and we crash, we will resume the truncate when the filesystem
-	 * recovers.  It also marks the inode dirty, to catch the new size.
-	 *
-	 * Implication: the file must always be in a sane, consistent
-	 * truncatable state while each transaction commits.
-	 */
-	if (ext4_orphan_add(handle, inode))
-		goto out_stop;
-
-	/*
-	 * From here we block out all ext4_get_block() callers who want to
-	 * modify the block allocation tree.
-	 */
-	down_write(&ei->i_data_sem);
-
-	ext4_discard_preallocations(inode);
+	ext4_es_remove_extent(inode, last_block, EXT_MAX_BLOCKS - last_block);
 
 	/*
 	 * The orphan list entry will now protect us from any crash which
@@ -1416,7 +1384,7 @@ void ext4_ind_truncate(struct inode *inode)
 		 * It is unnecessary to free any data blocks if last_block is
 		 * equal to the indirect block limit.
 		 */
-		goto out_unlock;
+		return;
 	} else if (n == 1) {		/* direct blocks */
 		ext4_free_data(handle, inode, NULL, i_data+offsets[0],
 			       i_data + EXT4_NDIR_BLOCKS);
@@ -1476,30 +1444,5 @@ do_indirects:
 	case EXT4_TIND_BLOCK:
 		;
 	}
-
-out_unlock:
-	up_write(&ei->i_data_sem);
-	inode->i_mtime = inode->i_ctime = ext4_current_time(inode);
-	ext4_mark_inode_dirty(handle, inode);
-
-	/*
-	 * In a multi-transaction truncate, we only make the final transaction
-	 * synchronous
-	 */
-	if (IS_SYNC(inode))
-		ext4_handle_sync(handle);
-out_stop:
-	/*
-	 * If this was a simple ftruncate(), and the file will remain alive
-	 * then we need to clear up the orphan record which we created above.
-	 * However, if this was a real unlink then we were called by
-	 * ext4_delete_inode(), and we allow that function to clean up the
-	 * orphan info for us.
-	 */
-	if (inode->i_nlink)
-		ext4_orphan_del(handle, inode);
-
-	ext4_journal_stop(handle);
-	trace_ext4_truncate_exit(inode);
 }
 

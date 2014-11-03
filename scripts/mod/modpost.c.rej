@@ -1,0 +1,18 @@
+--- scripts/mod/modpost.c
++++ scripts/mod/modpost.c
+@@ -2146,13 +2170,13 @@
+ 	struct module *mod;
+ 	struct buffer buf = { };
+ 	char *kernel_read = NULL, *module_read = NULL;
+-	char *dump_write = NULL;
++	char *dump_write = NULL, *files_source = NULL;
+ 	int opt;
+ 	int err;
+ 	struct ext_sym_list *extsym_iter;
+ 	struct ext_sym_list *extsym_start = NULL;
+ 
+-	while ((opt = getopt(argc, argv, "i:I:e:msSo:awM:K:")) != -1) {
++	while ((opt = getopt(argc, argv, "i:I:e:msST:o:awM:K:")) != -1) {
+ 		switch (opt) {
+ 		case 'i':
+ 			kernel_read = optarg;

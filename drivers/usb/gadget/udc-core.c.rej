@@ -1,0 +1,21 @@
+--- drivers/usb/gadget/udc-core.c
++++ drivers/usb/gadget/udc-core.c
+@@ -213,14 +165,10 @@
+ 
+ 	kobject_uevent(&udc->dev.kobj, KOBJ_CHANGE);
+ 
+-	if (udc_is_newstyle(udc)) {
+-		usb_gadget_disconnect(udc->gadget);
+-		udc->driver->disconnect(udc->gadget);
+-		udc->driver->unbind(udc->gadget);
+-		usb_gadget_udc_stop(udc->gadget, udc->driver);
+-	} else {
+-		usb_gadget_stop(udc->gadget, udc->driver);
+-	}
++	usb_gadget_disconnect(udc->gadget);
++	udc->driver->disconnect(udc->gadget);
++	udc->driver->unbind(udc->gadget);
++	usb_gadget_udc_stop(udc->gadget, NULL);
+ 
+ 	udc->driver = NULL;
+ 	udc->dev.driver = NULL;

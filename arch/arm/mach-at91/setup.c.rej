@@ -1,0 +1,11 @@
+--- arch/arm/mach-at91/setup.c
++++ arch/arm/mach-at91/setup.c
+@@ -368,7 +403,7 @@
+ 
+ 	of_id = of_match_node(rstc_ids, np);
+ 	if (!of_id)
+-		panic("AT91: rtsc no restart function availlable\n");
++		panic("AT91: rtsc no restart function available\n");
+ 
+ 	arm_pm_restart = of_id->data;
+ 

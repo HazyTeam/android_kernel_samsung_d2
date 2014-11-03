@@ -1,0 +1,10 @@
+--- drivers/s390/scsi/zfcp_aux.c
++++ drivers/s390/scsi/zfcp_aux.c
+@@ -519,6 +519,7 @@
+ 
+ 	rwlock_init(&port->unit_list_lock);
+ 	INIT_LIST_HEAD(&port->unit_list);
++	atomic_set(&port->units, 0);
+ 
+ 	INIT_WORK(&port->gid_pn_work, zfcp_fc_port_did_lookup);
+ 	INIT_WORK(&port->test_link_work, zfcp_fc_link_test_work);

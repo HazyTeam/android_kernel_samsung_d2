@@ -1,0 +1,11 @@
+--- drivers/scsi/bnx2fc/bnx2fc_io.c
++++ drivers/scsi/bnx2fc/bnx2fc_io.c
+@@ -1807,7 +1807,7 @@
+ 			fcp_sns_len = SCSI_SENSE_BUFFERSIZE;
+ 		}
+ 
+-		memset(sc_cmd->sense_buffer, 0, sizeof(sc_cmd->sense_buffer));
++		memset(sc_cmd->sense_buffer, 0, SCSI_SENSE_BUFFERSIZE);
+ 		if (fcp_sns_len)
+ 			memcpy(sc_cmd->sense_buffer, rq_data, fcp_sns_len);
+ 

@@ -1,0 +1,11 @@
+--- drivers/infiniband/ulp/srpt/ib_srpt.c
++++ drivers/infiniband/ulp/srpt/ib_srpt.c
+@@ -1768,7 +1767,7 @@
+ 		kref_put(&send_ioctx->kref, srpt_put_send_ioctx_kref);
+ 		goto send_sense;
+ 	}
+-	ret = transport_generic_allocate_tasks(cmd, srp_cmd->cdb);
++	ret = target_setup_cmd_from_cdb(cmd, srp_cmd->cdb);
+ 	if (ret < 0) {
+ 		kref_put(&send_ioctx->kref, srpt_put_send_ioctx_kref);
+ 		if (cmd->se_cmd_flags & SCF_SCSI_RESERVATION_CONFLICT) {

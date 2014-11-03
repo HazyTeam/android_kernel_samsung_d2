@@ -81,18 +81,13 @@ static inline void dsb_sev(void)
 
 #ifndef CONFIG_ARM_TICKET_LOCKS
 /*
- * ARMv6 Spin-locking.
+ * ARMv6 ticket-based spin-locking.
  *
- * We exclusively read the old value.  If it is zero, we may have
- * won the lock, so we try exclusively storing it.  A memory barrier
- * is required after we get a lock, and before we release it, because
- * V6 CPUs are assumed to have weakly ordered memory.
- *
- * Unlocked value: 0
- * Locked value: 1
+ * A memory barrier is required after we get a lock, and before we
+ * release it, because V6 CPUs are assumed to have weakly ordered
+ * memory.
  */
 
-#define arch_spin_is_locked(x)		((x)->lock != 0)
 #define arch_spin_unlock_wait(lock) \
 	do { while (arch_spin_is_locked(lock)) cpu_relax(); } while (0)
 
@@ -317,7 +312,7 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
 	unsigned long tmp;
 
 	__asm__ __volatile__(
-"1:	ldrex	%0, [%1]\n"
+"	ldrex	%0, [%1]\n"
 "	teq	%0, #0\n"
 "	strexeq	%0, %2, [%1]"
 	: "=&r" (tmp)
@@ -405,7 +400,7 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
 	unsigned long tmp, tmp2 = 1;
 
 	__asm__ __volatile__(
-"1:	ldrex	%0, [%2]\n"
+"	ldrex	%0, [%2]\n"
 "	adds	%0, %0, #1\n"
 "	strexpl	%1, %0, [%2]\n"
 	: "=&r" (tmp), "+r" (tmp2)

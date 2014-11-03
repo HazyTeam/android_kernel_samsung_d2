@@ -1,0 +1,103 @@
+--- drivers/usb/serial/ftdi_sio.c
++++ drivers/usb/serial/ftdi_sio.c
+@@ -187,7 +185,10 @@
+ 	{ USB_DEVICE(FTDI_VID, FTDI_OPENDCC_THROTTLE_PID) },
+ 	{ USB_DEVICE(FTDI_VID, FTDI_OPENDCC_GATEWAY_PID) },
+ 	{ USB_DEVICE(FTDI_VID, FTDI_OPENDCC_GBM_PID) },
++	{ USB_DEVICE(FTDI_VID, FTDI_OPENDCC_GBM_BOOST_PID) },
+ 	{ USB_DEVICE(NEWPORT_VID, NEWPORT_AGILIS_PID) },
++	{ USB_DEVICE(NEWPORT_VID, NEWPORT_CONEX_CC_PID) },
++	{ USB_DEVICE(NEWPORT_VID, NEWPORT_CONEX_AGP_PID) },
+ 	{ USB_DEVICE(INTERBIOMETRICS_VID, INTERBIOMETRICS_IOBOARD_PID) },
+ 	{ USB_DEVICE(INTERBIOMETRICS_VID, INTERBIOMETRICS_MINI_IOBOARD_PID) },
+ 	{ USB_DEVICE(FTDI_VID, FTDI_SPROG_II) },
+@@ -868,7 +869,9 @@
+ 	{ USB_DEVICE(FTDI_VID, FTDI_DOTEC_PID) },
+ 	{ USB_DEVICE(QIHARDWARE_VID, MILKYMISTONE_JTAGSERIAL_PID),
+ 		.driver_info = (kernel_ulong_t)&ftdi_jtag_quirk },
+-	{ USB_DEVICE(ST_VID, ST_STMCLT1030_PID),
++	{ USB_DEVICE(ST_VID, ST_STMCLT_2232_PID),
++		.driver_info = (kernel_ulong_t)&ftdi_jtag_quirk },
++	{ USB_DEVICE(ST_VID, ST_STMCLT_4232_PID),
+ 		.driver_info = (kernel_ulong_t)&ftdi_stmclite_quirk },
+ 	{ USB_DEVICE(FTDI_VID, FTDI_RF_R106) },
+ 	{ USB_DEVICE(FTDI_VID, FTDI_DISTORTEC_JTAG_LOCK_PICK_PID),
+@@ -1786,20 +1785,24 @@
+ }
+ 
+ /*
+- * First and second port on STMCLiteadaptors is reserved for JTAG interface
+- * and the forth port for pio
++ * First two ports on JTAG adaptors using an FT4232 such as STMicroelectronics's
++ * ST Micro Connect Lite are reserved for JTAG or other non-UART interfaces and
++ * can be accessed from userspace.
++ * The next two ports are enabled as UARTs by default, where port 2 is
++ * a conventional RS-232 UART.
+  */
+ static int ftdi_stmclite_probe(struct usb_serial *serial)
+ {
+ 	struct usb_device *udev = serial->dev;
+ 	struct usb_interface *interface = serial->interface;
+ 
+-	if (interface == udev->actconfig->interface[2])
+-		return 0;
+-
+-	dev_info(&udev->dev, "Ignoring serial port reserved for JTAG\n");
++	if (interface == udev->actconfig->interface[0] ||
++	    interface == udev->actconfig->interface[1]) {
++		dev_info(&udev->dev, "Ignoring serial port reserved for JTAG\n");
++		return -ENODEV;
++	}
+ 
+-	return -ENODEV;
++	return 0;
+ }
+ 
+ /*
+@@ -1820,22 +1823,13 @@
+ 	return 0;
+ }
+ 
+-static void ftdi_sio_priv_release(struct kref *k)
+-{
+-	struct ftdi_private *priv = container_of(k, struct ftdi_private, kref);
+-
+-	kfree(priv);
+-}
+-
+ static int ftdi_sio_port_remove(struct usb_serial_port *port)
+ {
+ 	struct ftdi_private *priv = usb_get_serial_port_data(port);
+ 
+-	wake_up_interruptible(&port->delta_msr_wait);
+-
+ 	remove_sysfs_attrs(port);
+ 
+-	kref_put(&priv->kref, ftdi_sio_priv_release);
++	kfree(priv);
+ 
+ 	return 0;
+ }
+@@ -1970,18 +1945,18 @@
+ 		 * over framing errors */
+ 		if (packet[1] & FTDI_RS_BI) {
+ 			flag = TTY_BREAK;
+-			priv->icount.brk++;
++			port->icount.brk++;
+ 			usb_serial_handle_break(port);
+ 		} else if (packet[1] & FTDI_RS_PE) {
+ 			flag = TTY_PARITY;
+-			priv->icount.parity++;
++			port->icount.parity++;
+ 		} else if (packet[1] & FTDI_RS_FE) {
+ 			flag = TTY_FRAME;
+-			priv->icount.frame++;
++			port->icount.frame++;
+ 		}
+ 		/* Overrun is special, not associated with a char */
+ 		if (packet[1] & FTDI_RS_OE) {
+-			priv->icount.overrun++;
++			port->icount.overrun++;
+ 			tty_insert_flip_char(&port->port, 0, TTY_OVERRUN);
+ 		}
+ 	}

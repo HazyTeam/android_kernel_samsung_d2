@@ -1,0 +1,15 @@
+--- drivers/usb/musb/cppi_dma.c
++++ drivers/usb/musb/cppi_dma.c
+@@ -1314,10 +1314,10 @@
+ 
+ 	return IRQ_HANDLED;
+ }
++EXPORT_SYMBOL_GPL(cppi_interrupt);
+ 
+ /* Instantiate a software object representing a DMA controller. */
+-struct dma_controller *__devinit
+-dma_controller_create(struct musb *musb, void __iomem *mregs)
++struct dma_controller *dma_controller_create(struct musb *musb, void __iomem *mregs)
+ {
+ 	struct cppi		*controller;
+ 	struct device		*dev = musb->controller;

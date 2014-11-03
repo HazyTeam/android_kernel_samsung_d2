@@ -1,0 +1,25 @@
+--- net/ipv4/inet_hashtables.c
++++ net/ipv4/inet_hashtables.c
+@@ -262,14 +264,18 @@
+ begintw:
+ 	/* Must check for a TIME_WAIT'er before going to listener hash. */
+ 	sk_nulls_for_each_rcu(sk, node, &head->twchain) {
+-		if (INET_TW_MATCH(sk, net, hash, acookie,
+-					saddr, daddr, ports, dif)) {
++		if (sk->sk_hash != hash)
++			continue;
++		if (likely(INET_TW_MATCH(sk, net, acookie,
++					 saddr, daddr, ports,
++					 dif))) {
+ 			if (unlikely(!atomic_inc_not_zero(&sk->sk_refcnt))) {
+ 				sk = NULL;
+ 				goto out;
+ 			}
+-			if (unlikely(!INET_TW_MATCH(sk, net, hash, acookie,
+-				 saddr, daddr, ports, dif))) {
++			if (unlikely(!INET_TW_MATCH(sk, net, acookie,
++						    saddr, daddr, ports,
++						    dif))) {
+ 				sock_put(sk);
+ 				goto begintw;
+ 			}

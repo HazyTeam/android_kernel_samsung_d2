@@ -1,0 +1,31 @@
+--- drivers/md/dm.c
++++ drivers/md/dm.c
+@@ -1210,8 +1219,8 @@
+ 		 * reconfiguration might also have changed that since the
+ 		 * check was performed.
+ 		 */
+-		num_requests = get_num_requests ? get_num_requests(ti) : 0;
+-		if (!num_requests)
++		num_bios = get_num_bios ? get_num_bios(ti) : 0;
++		if (!num_bios)
+ 			return -EOPNOTSUPP;
+ 
+ 		if (is_split_required && !is_split_required(ti))
+@@ -1219,7 +1228,7 @@
+ 		else
+ 			len = min(ci->sector_count, max_io_len(ci->sector, ti));
+ 
+-		__issue_target_requests(ci, ti, num_requests, len);
++		__send_duplicate_bios(ci, ti, num_bios, len);
+ 
+ 		ci->sector += len;
+ 	} while (ci->sector_count -= len);
+@@ -2435,7 +2449,7 @@
+  */
+ struct dm_table *dm_swap_table(struct mapped_device *md, struct dm_table *table)
+ {
+-	struct dm_table *live_map, *map = ERR_PTR(-EINVAL);
++	struct dm_table *live_map = NULL, *map = ERR_PTR(-EINVAL);
+ 	struct queue_limits limits;
+ 	int r;
+ 

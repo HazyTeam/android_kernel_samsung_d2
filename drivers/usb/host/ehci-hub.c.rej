@@ -1,0 +1,11 @@
+--- drivers/usb/host/ehci-hub.c
++++ drivers/usb/host/ehci-hub.c
+@@ -328,7 +328,7 @@
+ 	ehci->rh_state = EHCI_RH_SUSPENDED;
+ 
+ 	end_unlink_async(ehci);
+-	unlink_empty_async(ehci);
++	unlink_empty_async_suspended(ehci);
+ 	ehci_handle_intr_unlinks(ehci);
+ 	end_free_itds(ehci);
+ 

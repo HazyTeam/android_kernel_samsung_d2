@@ -1,0 +1,21 @@
+--- drivers/md/dm-region-hash.c
++++ drivers/md/dm-region-hash.c
+@@ -404,6 +404,9 @@
+ 		return;
+ 	}
+ 
++	if (bio->bi_rw & REQ_DISCARD)
++		return;
++
+ 	/* We must inform the log that the sync count has changed. */
+ 	log->type->set_region_sync(log, region, 0);
+ 
+@@ -524,7 +527,7 @@
+ 	struct bio *bio;
+ 
+ 	for (bio = bios->head; bio; bio = bio->bi_next) {
+-		if (bio->bi_rw & REQ_FLUSH)
++		if (bio->bi_rw & (REQ_FLUSH | REQ_DISCARD))
+ 			continue;
+ 		rh_inc(rh, dm_rh_bio_to_region(rh, bio));
+ 	}

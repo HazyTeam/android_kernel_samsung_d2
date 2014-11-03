@@ -1,0 +1,16 @@
+--- drivers/mfd/max8925-core.c
++++ drivers/mfd/max8925-core.c
+@@ -14,10 +14,13 @@
+ #include <linux/i2c.h>
+ #include <linux/irq.h>
+ #include <linux/interrupt.h>
++#include <linux/irqdomain.h>
+ #include <linux/platform_device.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/mfd/core.h>
+ #include <linux/mfd/max8925.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
+ 
+ static struct resource bk_resources[] = {
+ 	{ 0x84, 0x84, "mode control", IORESOURCE_REG, },

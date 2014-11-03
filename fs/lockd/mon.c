@@ -7,17 +7,19 @@
  */
 
 #include <linux/types.h>
-#include <linux/utsname.h>
 #include <linux/kernel.h>
 #include <linux/ktime.h>
 #include <linux/slab.h>
 
 #include <linux/sunrpc/clnt.h>
+#include <linux/sunrpc/addr.h>
 #include <linux/sunrpc/xprtsock.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/lockd/lockd.h>
 
 #include <asm/unaligned.h>
+
+#include "netns.h"
 
 #define NLMDBG_FACILITY		NLMDBG_MONITOR
 #define NSM_PROGRAM		100024
@@ -71,7 +73,7 @@ static struct rpc_clnt *nsm_create(struct net *net)
 	};
 	struct rpc_create_args args = {
 		.net			= net,
-		.protocol		= XPRT_TRANSPORT_UDP,
+		.protocol		= XPRT_TRANSPORT_TCP,
 		.address		= (struct sockaddr *)&sin,
 		.addrsize		= sizeof(sin),
 		.servername		= "rpc.statd",
@@ -84,10 +86,61 @@ static struct rpc_clnt *nsm_create(struct net *net)
 	return rpc_create(&args);
 }
 
-static int nsm_mon_unmon(struct nsm_handle *nsm, u32 proc, struct nsm_res *res,
-			 struct net *net)
+static struct rpc_clnt *nsm_client_set(struct lockd_net *ln,
+		struct rpc_clnt *clnt)
 {
-	struct rpc_clnt	*clnt;
+	spin_lock(&ln->nsm_clnt_lock);
+	if (ln->nsm_users == 0) {
+		if (clnt == NULL)
+			goto out;
+		ln->nsm_clnt = clnt;
+	}
+	clnt = ln->nsm_clnt;
+	ln->nsm_users++;
+out:
+	spin_unlock(&ln->nsm_clnt_lock);
+	return clnt;
+}
+
+static struct rpc_clnt *nsm_client_get(struct net *net)
+{
+	struct rpc_clnt	*clnt, *new;
+	struct lockd_net *ln = net_generic(net, lockd_net_id);
+
+	clnt = nsm_client_set(ln, NULL);
+	if (clnt != NULL)
+		goto out;
+
+	clnt = new = nsm_create(net);
+	if (IS_ERR(clnt))
+		goto out;
+
+	clnt = nsm_client_set(ln, new);
+	if (clnt != new)
+		rpc_shutdown_client(new);
+out:
+	return clnt;
+}
+
+static void nsm_client_put(struct net *net)
+{
+	struct lockd_net *ln = net_generic(net, lockd_net_id);
+	struct rpc_clnt	*clnt = NULL;
+
+	spin_lock(&ln->nsm_clnt_lock);
+	ln->nsm_users--;
+	if (ln->nsm_users == 0) {
+		clnt = ln->nsm_clnt;
+		ln->nsm_clnt = NULL;
+	}
+	spin_unlock(&ln->nsm_clnt_lock);
+	if (clnt != NULL)
+		rpc_shutdown_client(clnt);
+}
+
+static int nsm_mon_unmon(struct nsm_handle *nsm, u32 proc, struct nsm_res *res,
+			 struct rpc_clnt *clnt)
+{
 	int		status;
 	struct nsm_args args = {
 		.priv		= &nsm->sm_priv,
@@ -140,6 +193,7 @@ int nsm_monitor(const struct nlm_host *host)
 	struct nsm_handle *nsm = host->h_nsmhandle;
 	struct nsm_res	res;
 	int		status;
+	struct rpc_clnt *clnt;
 
 	dprintk("lockd: nsm_monitor(%s)\n", nsm->sm_name);
 
@@ -152,7 +206,15 @@ int nsm_monitor(const struct nlm_host *host)
 	 */
 	nsm->sm_mon_name = nsm_use_hostnames ? nsm->sm_name : nsm->sm_addrbuf;
 
-	status = nsm_mon_unmon(nsm, NSMPROC_MON, &res, host->net);
+	clnt = nsm_client_get(host->net);
+	if (IS_ERR(clnt)) {
+		status = PTR_ERR(clnt);
+		dprintk("lockd: failed to create NSM upcall transport, "
+				"status=%d, net=%p\n", status, host->net);
+		return status;
+	}
+
+	status = nsm_mon_unmon(nsm, NSMPROC_MON, &res, clnt);
 	if (unlikely(res.status != 0))
 		status = -EIO;
 	if (unlikely(status < 0)) {
@@ -184,9 +246,11 @@ void nsm_unmonitor(const struct nlm_host *host)
 
 	if (atomic_read(&nsm->sm_count) == 1
 	 && nsm->sm_monitored && !nsm->sm_sticky) {
+		struct lockd_net *ln = net_generic(host->net, lockd_net_id);
+
 		dprintk("lockd: nsm_unmonitor(%s)\n", nsm->sm_name);
 
-		status = nsm_mon_unmon(nsm, NSMPROC_UNMON, &res, host->net);
+		status = nsm_mon_unmon(nsm, NSMPROC_UNMON, &res, ln->nsm_clnt);
 		if (res.status != 0)
 			status = -EIO;
 		if (status < 0)
@@ -194,6 +258,8 @@ void nsm_unmonitor(const struct nlm_host *host)
 					nsm->sm_name);
 		else
 			nsm->sm_monitored = 0;
+
+		nsm_client_put(host->net);
 	}
 }
 

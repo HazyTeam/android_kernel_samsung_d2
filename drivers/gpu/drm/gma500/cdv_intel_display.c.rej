@@ -1,0 +1,10 @@
+--- drivers/gpu/drm/gma500/cdv_intel_display.c
++++ drivers/gpu/drm/gma500/cdv_intel_display.c
+@@ -1776,6 +1795,7 @@
+ 	.mode_set_base = cdv_intel_pipe_set_base,
+ 	.prepare = cdv_intel_crtc_prepare,
+ 	.commit = cdv_intel_crtc_commit,
++	.disable = cdv_intel_crtc_disable,
+ };
+ 
+ const struct drm_crtc_funcs cdv_intel_crtc_funcs = {

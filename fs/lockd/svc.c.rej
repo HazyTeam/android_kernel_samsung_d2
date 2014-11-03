@@ -1,0 +1,10 @@
+--- fs/lockd/svc.c
++++ fs/lockd/svc.c
+@@ -266,6 +266,7 @@
+ 	error = make_socks(serv, net);
+ 	if (error < 0)
+ 		goto err_socks;
++	set_grace_period(net);
+ 	dprintk("lockd_up_net: per-net data created; net=%p\n", net);
+ 	return 0;
+ 

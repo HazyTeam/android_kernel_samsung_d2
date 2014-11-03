@@ -210,14 +210,13 @@ static int __init ttyprintk_init(void)
 		goto error;
 	}
 
-	tty_port_init(&tpk_port.port);
-	tpk_port.port.ops = &null_ops;
 	mutex_init(&tpk_port.port_write_mutex);
 
 	return 0;
 
 error:
 	put_tty_driver(ttyprintk_driver);
+	tty_port_destroy(&tpk_port.port);
 	ttyprintk_driver = NULL;
 	return ret;
 }

@@ -1,0 +1,32 @@
+--- arch/s390/crypto/aes_s390.c
++++ arch/s390/crypto/aes_s390.c
+@@ -458,7 +459,8 @@
+ 		u8 *in = walk->src.virt.addr;
+ 
+ 		ret = crypt_s390_kmc(func, param, out, in, n);
+-		BUG_ON((ret < 0) || (ret != n));
++		if (ret < 0 || ret != n)
++			return -EIO;
+ 
+ 		nbytes &= AES_BLOCK_SIZE - 1;
+ 		ret = blkcipher_walk_done(desc, walk, nbytes);
+@@ -626,7 +628,8 @@
+ 	memcpy(xts_ctx->pcc.tweak, walk->iv, sizeof(xts_ctx->pcc.tweak));
+ 	param = xts_ctx->pcc.key + offset;
+ 	ret = crypt_s390_pcc(func, param);
+-	BUG_ON(ret < 0);
++	if (ret < 0)
++		return -EIO;
+ 
+ 	memcpy(xts_ctx->xts_param, xts_ctx->pcc.xts, 16);
+ 	param = xts_ctx->key + offset;
+@@ -637,7 +640,8 @@
+ 		in = walk->src.virt.addr;
+ 
+ 		ret = crypt_s390_km(func, param, out, in, n);
+-		BUG_ON(ret < 0 || ret != n);
++		if (ret < 0 || ret != n)
++			return -EIO;
+ 
+ 		nbytes &= AES_BLOCK_SIZE - 1;
+ 		ret = blkcipher_walk_done(desc, walk, nbytes);

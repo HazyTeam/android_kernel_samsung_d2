@@ -590,6 +590,9 @@ static int apei_check_gar(struct acpi_generic_address *reg, u64 *paddr,
 	if (bit_width == 32 && bit_offset == 0 && (*paddr & 0x03) == 0 &&
 	    *access_bit_width < 32)
 		*access_bit_width = 32;
+	else if (bit_width == 64 && bit_offset == 0 && (*paddr & 0x07) == 0 &&
+	    *access_bit_width < 64)
+		*access_bit_width = 64;
 
 	if ((bit_width + bit_offset) > *access_bit_width) {
 		pr_warning(FW_BUG APEI_PFX
@@ -610,6 +613,19 @@ static int apei_check_gar(struct acpi_generic_address *reg, u64 *paddr,
 
 	return 0;
 }
+
+int apei_map_generic_address(struct acpi_generic_address *reg)
+{
+	int rc;
+	u32 access_bit_width;
+	u64 address;
+
+	rc = apei_check_gar(reg, &address, &access_bit_width);
+	if (rc)
+		return rc;
+	return acpi_os_map_generic_address(reg);
+}
+EXPORT_SYMBOL_GPL(apei_map_generic_address);
 
 int apei_map_generic_address(struct acpi_generic_address *reg)
 {

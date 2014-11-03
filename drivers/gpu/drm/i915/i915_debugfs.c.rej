@@ -1,0 +1,20 @@
+--- drivers/gpu/drm/i915/i915_debugfs.c
++++ drivers/gpu/drm/i915/i915_debugfs.c
+@@ -103,7 +103,7 @@
+ static void
+ describe_obj(struct seq_file *m, struct drm_i915_gem_object *obj)
+ {
+-	seq_printf(m, "%p: %s%s %8zdKiB %04x %04x %d %d %d%s%s%s",
++	seq_printf(m, "%pK: %s%s %8zdKiB %02x %02x %d %d %d%s%s%s",
+ 		   &obj->base,
+ 		   get_pin_flag(obj),
+ 		   get_tiling_flag(obj),
+@@ -694,7 +697,7 @@
+ 
+ 	seq_printf(m, "Time: %ld s %ld us\n", error->time.tv_sec,
+ 		   error->time.tv_usec);
+-	seq_printf(m, "Kernel: " UTS_RELEASE);
++	seq_printf(m, "Kernel: " UTS_RELEASE "\n");
+ 	seq_printf(m, "PCI ID: 0x%04x\n", dev->pci_device);
+ 	seq_printf(m, "EIR: 0x%08x\n", error->eir);
+ 	seq_printf(m, "IER: 0x%08x\n", error->ier);

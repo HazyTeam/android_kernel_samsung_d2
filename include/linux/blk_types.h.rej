@@ -1,0 +1,19 @@
+--- include/linux/blk_types.h
++++ include/linux/blk_types.h
+@@ -177,6 +179,7 @@
+ 	__REQ_IO_STAT,		/* account I/O stat */
+ 	__REQ_MIXED_MERGE,	/* merge of different types, fail separately */
+ 	__REQ_KERNEL, 		/* direct IO to kernel pages */
++	__REQ_PM,		/* runtime pm request */
+ 	__REQ_NR_BITS,		/* stops here */
+ };
+ 
+@@ -199,6 +202,8 @@
+ 	 REQ_SECURE)
+ #define REQ_CLONE_MASK		REQ_COMMON_MASK
+ 
++#define BIO_NO_ADVANCE_ITER_MASK	(REQ_DISCARD|REQ_WRITE_SAME)
++
+ /* This mask is used for both bio and request merge checking */
+ #define REQ_NOMERGE_FLAGS \
+ 	(REQ_NOMERGE | REQ_STARTED | REQ_SOFTBARRIER | REQ_FLUSH | REQ_FUA)

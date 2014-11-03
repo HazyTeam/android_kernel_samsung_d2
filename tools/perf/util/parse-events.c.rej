@@ -1,0 +1,37 @@
+--- tools/perf/util/parse-events.c
++++ tools/perf/util/parse-events.c
+@@ -318,7 +328,7 @@
+ 	for (i = 0; (i < 2) && (op_result[i]); i++) {
+ 		char *str = op_result[i];
+ 
+-		snprintf(name + n, MAX_NAME_LEN - n, "-%s\n", str);
++		n += snprintf(name + n, MAX_NAME_LEN - n, "-%s", str);
+ 
+ 		if (cache_op == -1) {
+ 			cache_op = parse_aliases(str, perf_evsel__hw_cache_op,
+@@ -603,8 +599,23 @@
+ 	if (perf_pmu__config(pmu, &attr, head_config))
+ 		return -EINVAL;
+ 
+-	return add_event(list, idx, &attr,
+-			 pmu_event_name(head_config));
++	return __add_event(list, idx, &attr, pmu_event_name(head_config),
++			   pmu->cpus);
++}
++
++int parse_events__modifier_group(struct list_head *list,
++				 char *event_mod)
++{
++	return parse_events__modifier_event(list, event_mod, true);
++}
++
++void parse_events__set_leader(char *name, struct list_head *list)
++{
++	struct perf_evsel *leader;
++
++	__perf_evlist__set_leader(list);
++	leader = list_entry(list->next, struct perf_evsel, node);
++	leader->group_name = name ? strdup(name) : NULL;
+ }
+ 
+ void parse_events_update_lists(struct list_head *list_event,

@@ -1,0 +1,12 @@
+--- drivers/scsi/device_handler/scsi_dh_alua.c
++++ drivers/scsi/device_handler/scsi_dh_alua.c
+@@ -641,8 +641,7 @@
+ 		h->state = TPGS_STATE_STANDBY;
+ 		break;
+ 	case TPGS_STATE_OFFLINE:
+-	case TPGS_STATE_UNAVAILABLE:
+-		/* Path unusable for unavailable/offline */
++		/* Path unusable */
+ 		err = SCSI_DH_DEV_OFFLINED;
+ 		break;
+ 	default:

@@ -1,0 +1,11 @@
+--- net/sctp/associola.c
++++ net/sctp/associola.c
+@@ -1079,7 +1078,7 @@
+ 			transports) {
+ 
+ 		if (transport == active)
+-			break;
++			continue;
+ 		list_for_each_entry(chunk, &transport->transmitted,
+ 				transmitted_list) {
+ 			if (key == chunk->subh.data_hdr->tsn) {

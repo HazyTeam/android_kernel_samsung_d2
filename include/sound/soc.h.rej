@@ -1,0 +1,11 @@
+--- include/sound/soc.h
++++ include/sound/soc.h
+@@ -833,7 +843,7 @@
+ 	const char *name;
+ 	int id;
+ 	struct device *dev;
+-	struct snd_soc_platform_driver *driver;
++	const struct snd_soc_platform_driver *driver;
+ 	struct mutex mutex;
+ 
+ 	unsigned int suspended:1; /* platform is suspended */

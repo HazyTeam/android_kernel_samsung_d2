@@ -1,0 +1,20 @@
+--- mm/nommu.c
++++ mm/nommu.c
+@@ -821,7 +823,7 @@
+ 	struct vm_area_struct *vma;
+ 
+ 	/* check the cache first */
+-	vma = mm->mmap_cache;
++	vma = ACCESS_ONCE(mm->mmap_cache);
+ 	if (vma && vma->vm_start <= addr && vma->vm_end > addr)
+ 		return vma;
+ 
+@@ -1920,7 +1937,7 @@
+ 		 */
+ 		free -= global_page_state(NR_SHMEM);
+ 
+-		free += nr_swap_pages;
++		free += get_nr_swap_pages();
+ 
+ 		/*
+ 		 * Any slabs which are created with the

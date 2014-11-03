@@ -1,0 +1,10 @@
+--- drivers/bluetooth/bfusb.c
++++ drivers/bluetooth/bfusb.c
+@@ -738,7 +735,6 @@
+ 
+ 	hci_unregister_dev(hdev);
+ 	hci_free_dev(hdev);
+-	kfree(data);
+ }
+ 
+ static struct usb_driver bfusb_driver = {

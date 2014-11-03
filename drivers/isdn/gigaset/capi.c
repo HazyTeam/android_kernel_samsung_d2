@@ -306,6 +306,7 @@ static inline void dump_rawmsg(enum debuglevel level, const char *tag,
  * format CAPI IE as string
  */
 
+#ifdef CONFIG_GIGASET_DEBUG
 static const char *format_ie(const char *ie)
 {
 	static char result[3 * MAX_FMT_IE_LEN];
@@ -331,6 +332,7 @@ static const char *format_ie(const char *ie)
 	*--pout = 0;
 	return result;
 }
+#endif
 
 /*
  * emit DATA_B3_CONF message
@@ -2344,7 +2346,7 @@ static int gigaset_proc_show(struct seq_file *m, void *v)
 
 static int gigaset_proc_open(struct inode *inode, struct file *file)
 {
-	return single_open(file, gigaset_proc_show, PDE(inode)->data);
+	return single_open(file, gigaset_proc_show, PDE_DATA(inode));
 }
 
 static const struct file_operations gigaset_proc_fops = {

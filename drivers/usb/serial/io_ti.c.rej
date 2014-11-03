@@ -1,0 +1,67 @@
+--- drivers/usb/serial/io_ti.c
++++ drivers/usb/serial/io_ti.c
+@@ -1657,7 +1657,7 @@
+ 		else
+ 			edge_tty_recv(edge_port->port, data,
+ 					urb->actual_length);
+-		edge_port->icount.rx += urb->actual_length;
++		edge_port->port->icount.rx += urb->actual_length;
+ 	}
+ 
+ exit:
+@@ -2019,8 +2005,6 @@
+ 	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
+ 	int chars = 0;
+ 	unsigned long flags;
+-	int ret;
+-
+ 	if (edge_port == NULL)
+ 		return 0;
+ 
+@@ -2028,16 +2012,22 @@
+ 	chars = kfifo_len(&edge_port->write_fifo);
+ 	spin_unlock_irqrestore(&edge_port->ep_lock, flags);
+ 
+-	if (!chars) {
+-		ret = tx_active(edge_port);
+-		if (ret > 0)
+-			chars = ret;
+-	}
+-
+ 	dev_dbg(&port->dev, "%s - returns %d\n", __func__, chars);
+ 	return chars;
+ }
+ 
++static bool edge_tx_empty(struct usb_serial_port *port)
++{
++	struct edgeport_port *edge_port = usb_get_serial_port_data(port);
++	int ret;
++
++	ret = tx_active(edge_port);
++	if (ret > 0)
++		return false;
++
++	return true;
++}
++
+ static void edge_throttle(struct tty_struct *tty)
+ {
+ 	struct usb_serial_port *port = tty->driver_data;
+@@ -2357,7 +2326,7 @@
+ 
+ 	cwait = edge_port->port->port.closing_wait;
+ 	if (cwait != ASYNC_CLOSING_WAIT_NONE)
+-		cwait = jiffies_to_msecs(closing_wait) / 10;
++		cwait = jiffies_to_msecs(cwait) / 10;
+ 
+ 	memset(&tmp, 0, sizeof(tmp));
+ 
+@@ -2400,8 +2341,6 @@
+ 	int status;
+ 	int bv = 0;	/* Off */
+ 
+-	tty_wait_until_sent(tty, 0);
+-
+ 	if (break_state == -1)
+ 		bv = 1;	/* On */
+ 	status = ti_do_config(edge_port, UMPC_SET_CLR_BREAK, bv);

@@ -1,0 +1,10 @@
+--- fs/ceph/debugfs.c
++++ fs/ceph/debugfs.c
+@@ -201,6 +201,7 @@
+ 	int err = -ENOMEM;
+ 
+ 	dout("ceph_fs_debugfs_init\n");
++	BUG_ON(!fsc->client->debugfs_dir);
+ 	fsc->debugfs_congestion_kb =
+ 		debugfs_create_file("writeback_congestion_kb",
+ 				    0600,

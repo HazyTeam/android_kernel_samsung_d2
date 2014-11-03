@@ -1,0 +1,11 @@
+--- net/core/ethtool.c
++++ net/core/ethtool.c
+@@ -1421,7 +1426,7 @@
+ 	void __user *useraddr = ifr->ifr_data;
+ 	u32 ethcmd;
+ 	int rc;
+-	u32 old_features;
++	netdev_features_t old_features;
+ 
+ 	if (!dev || !netif_device_present(dev))
+ 		return -ENODEV;

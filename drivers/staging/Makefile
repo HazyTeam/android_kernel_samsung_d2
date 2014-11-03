@@ -3,7 +3,6 @@
 # fix for build system bug...
 obj-$(CONFIG_STAGING)		+= staging.o
 
-obj-y				+= serial/
 obj-y				+= media/
 obj-$(CONFIG_ET131X)		+= et131x/
 obj-$(CONFIG_SLICOSS)		+= slicoss/
@@ -19,13 +18,12 @@ obj-$(CONFIG_R8187SE)		+= rtl8187se/
 obj-$(CONFIG_RTL8192U)		+= rtl8192u/
 obj-$(CONFIG_RTL8192E)		+= rtl8192e/
 obj-$(CONFIG_R8712U)		+= rtl8712/
-obj-$(CONFIG_RTS_PSTOR)		+= rts_pstor/
 obj-$(CONFIG_RTS5139)		+= rts5139/
 obj-$(CONFIG_TRANZPORT)		+= frontier/
 obj-$(CONFIG_IDE_PHISON)	+= phison/
 obj-$(CONFIG_LINE6_USB)		+= line6/
+obj-$(CONFIG_NETLOGIC_XLR_NET)	+= netlogic/
 obj-$(CONFIG_USB_SERIAL_QUATECH2)	+= serqt_usb2/
-obj-$(CONFIG_USB_SERIAL_QUATECH_USB2)	+= quatech_usb2/
 obj-$(CONFIG_OCTEON_ETHERNET)	+= octeon/
 obj-$(CONFIG_VT6655)		+= vt6655/
 obj-$(CONFIG_VT6656)		+= vt6656/
@@ -38,7 +36,7 @@ obj-$(CONFIG_QCACHE)		+= qcache/
 obj-$(CONFIG_ZSMALLOC)		+= zsmalloc/
 obj-$(CONFIG_WLAGS49_H2)	+= wlags49_h2/
 obj-$(CONFIG_WLAGS49_H25)	+= wlags49_h25/
-obj-$(CONFIG_FB_SM7XX)		+= sm7xx/
+obj-$(CONFIG_FB_SM7XX)		+= sm7xxfb/
 obj-$(CONFIG_CRYSTALHD)		+= crystalhd/
 obj-$(CONFIG_CXT1E1)		+= cxt1e1/
 obj-$(CONFIG_FB_XGI)		+= xgifb/

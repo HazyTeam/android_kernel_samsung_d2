@@ -1,0 +1,10 @@
+--- arch/sparc/include/asm/pgtable_64.h
++++ arch/sparc/include/asm/pgtable_64.h
+@@ -915,6 +915,7 @@
+ 	return remap_pfn_range(vma, from, phys_base >> PAGE_SHIFT, size, prot);
+ }
+ 
++#include <asm/tlbflush.h>
+ #include <asm-generic/pgtable.h>
+ 
+ /* We provide our own get_unmapped_area to cope with VA holes and

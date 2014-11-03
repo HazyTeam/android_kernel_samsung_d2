@@ -1,0 +1,122 @@
+--- drivers/staging/vt6656/wcmd.c
++++ drivers/staging/vt6656/wcmd.c
+@@ -304,23 +277,22 @@
+ 	return;
+ }
+ 
+-void vRunCommand(void *hDeviceContext)
++void vRunCommand(struct vnt_private *pDevice)
+ {
+-    PSDevice        pDevice = (PSDevice)hDeviceContext;
+-    PSMgmtObject    pMgmt = &(pDevice->sMgmtObj);
+-    PWLAN_IE_SSID   pItemSSID;
+-    PWLAN_IE_SSID   pItemSSIDCurr;
+-    CMD_STATUS      Status;
+-    unsigned int            ii;
+-    BYTE            byMask[8] = {1, 2, 4, 8, 0x10, 0x20, 0x40, 0x80};
+-    struct sk_buff  *skb;
+-    BYTE            byData;
++	struct vnt_manager *pMgmt = &pDevice->vnt_mgmt;
++	PWLAN_IE_SSID pItemSSID;
++	PWLAN_IE_SSID pItemSSIDCurr;
++	CMD_STATUS Status;
++	struct sk_buff  *skb;
+ 	union iwreq_data wrqu;
++	int ii;
++	u8 byMask[8] = {1, 2, 4, 8, 0x10, 0x20, 0x40, 0x80};
++	u8 byData;
+ 
+ 
+     if (pDevice->dwDiagRefCount != 0)
+         return;
+-    if (pDevice->bCmdRunning != TRUE)
++    if (pDevice->bCmdRunning != true)
+         return;
+ 
+     spin_lock_irq(&pDevice->lock);
+@@ -494,12 +466,12 @@
+                 return;
+             } else {
+ 
+-		      pDevice->bwextstep0 = FALSE;
+-                        pDevice->bwextstep1 = FALSE;
+-                        pDevice->bwextstep2 = FALSE;
+-                        pDevice->bwextstep3 = FALSE;
+-		   pDevice->bWPASuppWextEnabled = FALSE;
+-                   pDevice->fWPA_Authened = FALSE;
++		      pDevice->bwextstep0 = false;
++                        pDevice->bwextstep1 = false;
++                        pDevice->bwextstep2 = false;
++                        pDevice->bwextstep3 = false;
++		   pDevice->bWPASuppWextEnabled = false;
++                   pDevice->fWPA_Authened = false;
+ 
+                 DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO"Send Disassociation Packet..\n");
+                 // reason = 8 : disassoc because sta has left
+@@ -641,7 +613,7 @@
+                 }
+                 else {
+                     DBG_PRT(MSG_LEVEL_DEBUG, KERN_INFO "Disconnect SSID none\n");
+-                    // if(pDevice->bWPASuppWextEnabled == TRUE)
++                    // if(pDevice->bWPASuppWextEnabled == true)
+                         {
+                   	union iwreq_data  wrqu;
+                   	memset(&wrqu, 0, sizeof (wrqu));
+@@ -867,31 +839,31 @@
+ 	       pDevice->cbFreeCmdQueue = CMD_Q_SIZE;
+                 pDevice->uCmdDequeueIdx = 0;
+                 pDevice->uCmdEnqueueIdx = 0;
+-                //0415pDevice->bCmdRunning = FALSE;
+-                pDevice->bCmdClear = TRUE;
+-                pDevice->bStopTx0Pkt = FALSE;
+-                pDevice->bStopDataPkt = TRUE;
++                //0415pDevice->bCmdRunning = false;
++                pDevice->bCmdClear = true;
++                pDevice->bStopTx0Pkt = false;
++                pDevice->bStopDataPkt = true;
+ 
+                 pDevice->byKeyIndex = 0;
+-                pDevice->bTransmitKey = FALSE;
++                pDevice->bTransmitKey = false;
+ 	    spin_unlock_irq(&pDevice->lock);
+ 	    KeyvInitTable(pDevice,&pDevice->sKey);
+ 	    spin_lock_irq(&pDevice->lock);
+ 	       pMgmt->byCSSPK = KEY_CTL_NONE;
+                 pMgmt->byCSSGK = KEY_CTL_NONE;
+ 
+-	  if (pDevice->bLinkPass == TRUE) {
++	  if (pDevice->bLinkPass == true) {
+                 // reason = 8 : disassoc because sta has left
+ 		vMgrDisassocBeginSta((void *) pDevice,
+ 				     pMgmt,
+ 				     pMgmt->abyCurrBSSID,
+ 				     (8),
+ 				     &Status);
+-                       pDevice->bLinkPass = FALSE;
++                       pDevice->bLinkPass = false;
+                 // unlock command busy
+                         pMgmt->eCurrState = WMAC_STATE_IDLE;
+-                        pMgmt->sNodeDBTable[0].bActive = FALSE;
+-                    // if(pDevice->bWPASuppWextEnabled == TRUE)
++                        pMgmt->sNodeDBTable[0].bActive = false;
++                    // if(pDevice->bWPASuppWextEnabled == true)
+                         {
+                   	union iwreq_data  wrqu;
+                   	memset(&wrqu, 0, sizeof (wrqu));
+@@ -900,11 +872,11 @@
+                   	wireless_send_event(pDevice->dev, SIOCGIWAP, &wrqu, NULL);
+                        }
+ 	  	}
+-	               pDevice->bwextstep0 = FALSE;
+-                        pDevice->bwextstep1 = FALSE;
+-                        pDevice->bwextstep2 = FALSE;
+-                        pDevice->bwextstep3 = FALSE;
+-		      pDevice->bWPASuppWextEnabled = FALSE;
++	               pDevice->bwextstep0 = false;
++                        pDevice->bwextstep1 = false;
++                        pDevice->bwextstep2 = false;
++                        pDevice->bwextstep3 = false;
++		      pDevice->bWPASuppWextEnabled = false;
+ 	                  //clear current SSID
+                   pItemSSID = (PWLAN_IE_SSID)pMgmt->abyCurrSSID;
+                   pItemSSID->len = 0;

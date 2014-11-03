@@ -1,0 +1,31 @@
+--- drivers/net/ethernet/intel/ixgbe/ixgbe_common.c
++++ drivers/net/ethernet/intel/ixgbe/ixgbe_common.c
+@@ -3177,28 +3151,6 @@
+ }
+ 
+ /**
+- *  ixgbe_device_supports_autoneg_fc - Check if phy supports autoneg flow
+- *  control
+- *  @hw: pointer to hardware structure
+- *
+- *  There are several phys that do not support autoneg flow control. This
+- *  function check the device id to see if the associated phy supports
+- *  autoneg flow control.
+- **/
+-static s32 ixgbe_device_supports_autoneg_fc(struct ixgbe_hw *hw)
+-{
+-
+-	switch (hw->device_id) {
+-	case IXGBE_DEV_ID_X540T:
+-		return 0;
+-	case IXGBE_DEV_ID_82599_T3_LOM:
+-		return 0;
+-	default:
+-		return IXGBE_ERR_FC_NOT_SUPPORTED;
+-	}
+-}
+-
+-/**
+  *  ixgbe_set_mac_anti_spoofing - Enable/Disable MAC anti-spoofing
+  *  @hw: pointer to hardware structure
+  *  @enable: enable or disable switch for anti-spoofing

@@ -1,0 +1,11 @@
+--- drivers/base/dd.c
++++ drivers/base/dd.c
+@@ -173,6 +174,8 @@
+ 
+ 	driver_deferred_probe_enable = true;
+ 	driver_deferred_probe_trigger();
++	/* Sort as many dependencies as possible before exiting initcalls */
++	flush_workqueue(deferred_wq);
+ 	return 0;
+ }
+ late_initcall(deferred_probe_initcall);

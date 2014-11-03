@@ -1,0 +1,10 @@
+--- net/rds/recv.c
++++ net/rds/recv.c
+@@ -487,6 +489,7 @@
+ 			sin->sin_port = inc->i_hdr.h_sport;
+ 			sin->sin_addr.s_addr = inc->i_saddr;
+ 			memset(sin->sin_zero, 0, sizeof(sin->sin_zero));
++			msg->msg_namelen = sizeof(*sin);
+ 		}
+ 		break;
+ 	}

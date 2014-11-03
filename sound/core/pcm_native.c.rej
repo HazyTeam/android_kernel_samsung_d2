@@ -1,0 +1,12 @@
+--- sound/core/pcm_native.c
++++ sound/core/pcm_native.c
+@@ -1664,8 +1678,7 @@
+  _nolock:
+ 	snd_card_unref(substream1->pcm->card);
+ 	fput_light(file, fput_needed);
+-	if (res < 0)
+-		kfree(group);
++	kfree(group);
+ 	return res;
+ }
+ 

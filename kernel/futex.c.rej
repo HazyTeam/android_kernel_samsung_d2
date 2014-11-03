@@ -1,0 +1,32 @@
+--- kernel/futex.c
++++ kernel/futex.c
+@@ -60,6 +60,7 @@
+ #include <linux/pid.h>
+ #include <linux/nsproxy.h>
+ #include <linux/ptrace.h>
++#include <linux/sched/rt.h>
+ 
+ #include <asm/futex.h>
+ 
+@@ -1191,9 +1193,9 @@
+  * then direct futex_lock_pi_atomic() to force setting the FUTEX_WAITERS bit.
+  * hb1 and hb2 must be held by the caller.
+  *
+- * Returns:
+- *  0 - failed to acquire the lock atomicly
+- *  1 - acquired the lock
++ * Return:
++ *  0 - failed to acquire the lock atomically;
++ *  1 - acquired the lock;
+  * <0 - error
+  */
+ static int futex_proxy_trylock_atomic(u32 __user *pifutex,
+@@ -2471,8 +2472,6 @@
+ 	if (!futex_cmpxchg_enabled)
+ 		return -ENOSYS;
+ 
+-	WARN_ONCE(1, "deprecated: get_robust_list will be deleted in 2013.\n");
+-
+ 	rcu_read_lock();
+ 
+ 	ret = -ESRCH;

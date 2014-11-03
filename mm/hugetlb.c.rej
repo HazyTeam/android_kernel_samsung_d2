@@ -1,0 +1,20 @@
+--- mm/hugetlb.c
++++ mm/hugetlb.c
+@@ -2419,7 +2435,7 @@
+ 
+ 		pte = huge_ptep_get_and_clear(mm, address, ptep);
+ 		tlb_remove_tlb_entry(tlb, ptep, address);
+-		if (pte_dirty(pte))
++		if (huge_pte_dirty(pte))
+ 			set_page_dirty(page);
+ 
+ 		page_remove_rmap(page);
+@@ -2839,7 +2855,7 @@
+ 	if (ptep) {
+ 		entry = huge_ptep_get(ptep);
+ 		if (unlikely(is_hugetlb_entry_migration(entry))) {
+-			migration_entry_wait(mm, (pmd_t *)ptep, address);
++			migration_entry_wait_huge(mm, ptep);
+ 			return 0;
+ 		} else if (unlikely(is_hugetlb_entry_hwpoisoned(entry)))
+ 			return VM_FAULT_HWPOISON_LARGE |

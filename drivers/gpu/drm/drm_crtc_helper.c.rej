@@ -1,0 +1,31 @@
+--- drivers/gpu/drm/drm_crtc_helper.c
++++ drivers/gpu/drm/drm_crtc_helper.c
+@@ -358,17 +391,24 @@
+ }
+ 
+ /**
+- * drm_crtc_set_mode - set a mode
++ * drm_crtc_helper_set_mode - internal helper to set a mode
+  * @crtc: CRTC to program
+  * @mode: mode to use
+- * @x: width of mode
+- * @y: height of mode
++ * @x: horizontal offset into the surface
++ * @y: vertical offset into the surface
++ * @old_fb: old framebuffer, for cleanup
+  *
+  * LOCKING:
+  * Caller must hold mode config lock.
+  *
+  * Try to set @mode on @crtc.  Give @crtc and its associated connectors a chance
+- * to fixup or reject the mode prior to trying to set it.
++ * to fixup or reject the mode prior to trying to set it. This is an internal
++ * helper that drivers could e.g. use to update properties that require the
++ * entire output pipe to be disabled and re-enabled in a new configuration. For
++ * example for changing whether audio is enabled on a hdmi link or for changing
++ * panel fitter or dither attributes. It is also called by the
++ * drm_crtc_helper_set_config() helper function to drive the mode setting
++ * sequence.
+  *
+  * RETURNS:
+  * True if the mode was set successfully, or false otherwise.

@@ -1,0 +1,23 @@
+--- arch/arm/mach-footbridge/common.c
++++ arch/arm/mach-footbridge/common.c
+@@ -15,7 +15,7 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/spinlock.h>
+- 
++
+ #include <asm/pgtable.h>
+ #include <asm/page.h>
+ #include <asm/irq.h>
+@@ -192,8 +188,10 @@
+ 	 * Now, work out what we've got to map in addition on this
+ 	 * platform.
+ 	 */
+-	if (footbridge_cfn_mode())
++	if (footbridge_cfn_mode()) {
+ 		iotable_init(ebsa285_host_io_desc, ARRAY_SIZE(ebsa285_host_io_desc));
++		pci_map_io_early(__phys_to_pfn(DC21285_PCI_IO));
++	}
+ }
+ 
+ void footbridge_restart(char mode, const char *cmd)

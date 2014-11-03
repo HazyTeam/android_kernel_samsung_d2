@@ -26,7 +26,7 @@
 #include <linux/ethtool.h>
 
 #define DRV_NAME        "rionet"
-#define DRV_VERSION     "0.2"
+#define DRV_VERSION     "0.3"
 #define DRV_AUTHOR      "Matt Porter <mporter@kernel.crashing.org>"
 #define DRV_DESC        "Ethernet over RapidIO"
 
@@ -47,8 +47,7 @@ MODULE_LICENSE("GPL");
 
 #define RIONET_TX_RING_SIZE	CONFIG_RIONET_TX_SIZE
 #define RIONET_RX_RING_SIZE	CONFIG_RIONET_RX_SIZE
-
-static LIST_HEAD(rionet_peers);
+#define RIONET_MAX_NETS		8
 
 struct rionet_private {
 	struct rio_mport *mport;
@@ -334,7 +333,8 @@ static int rionet_open(struct net_device *ndev)
 	netif_carrier_on(ndev);
 	netif_start_queue(ndev);
 
-	list_for_each_entry_safe(peer, tmp, &rionet_peers, node) {
+	list_for_each_entry_safe(peer, tmp,
+				 &nets[rnet->mport->id].peers, node) {
 		if (!(peer->res = rio_request_outb_dbell(peer->rdev,
 							 RIONET_DOORBELL_JOIN,
 							 RIONET_DOORBELL_LEAVE)))
@@ -359,7 +359,7 @@ static int rionet_close(struct net_device *ndev)
 	int i;
 
 	if (netif_msg_ifup(rnet))
-		printk(KERN_INFO "%s: close\n", DRV_NAME);
+		printk(KERN_INFO "%s: close %s\n", DRV_NAME, ndev->name);
 
 	netif_stop_queue(ndev);
 	netif_carrier_off(ndev);
@@ -367,10 +367,11 @@ static int rionet_close(struct net_device *ndev)
 	for (i = 0; i < RIONET_RX_RING_SIZE; i++)
 		kfree_skb(rnet->rx_skb[i]);
 
-	list_for_each_entry_safe(peer, tmp, &rionet_peers, node) {
-		if (rionet_active[peer->rdev->destid]) {
+	list_for_each_entry_safe(peer, tmp,
+				 &nets[rnet->mport->id].peers, node) {
+		if (nets[rnet->mport->id].active[peer->rdev->destid]) {
 			rio_send_doorbell(peer->rdev, RIONET_DOORBELL_LEAVE);
-			rionet_active[peer->rdev->destid] = NULL;
+			nets[rnet->mport->id].active[peer->rdev->destid] = NULL;
 		}
 		rio_release_outb_dbell(peer->rdev, peer->res);
 	}
@@ -386,17 +387,21 @@ static int rionet_close(struct net_device *ndev)
 static void rionet_remove(struct rio_dev *rdev)
 {
 	struct net_device *ndev = rio_get_drvdata(rdev);
+	unsigned char netid = rdev->net->hport->id;
 	struct rionet_peer *peer, *tmp;
 
-	free_pages((unsigned long)rionet_active, get_order(sizeof(void *) *
-			RIO_MAX_ROUTE_ENTRIES(rdev->net->hport->sys_size)));
 	unregister_netdev(ndev);
-	free_netdev(ndev);
 
-	list_for_each_entry_safe(peer, tmp, &rionet_peers, node) {
+	free_pages((unsigned long)nets[netid].active, get_order(sizeof(void *) *
+			RIO_MAX_ROUTE_ENTRIES(rdev->net->hport->sys_size)));
+	nets[netid].active = NULL;
+
+	list_for_each_entry_safe(peer, tmp, &nets[netid].peers, node) {
 		list_del(&peer->node);
 		kfree(peer);
 	}
+
+	free_netdev(ndev);
 }
 
 static void rionet_get_drvinfo(struct net_device *ndev,
@@ -404,10 +409,10 @@ static void rionet_get_drvinfo(struct net_device *ndev,
 {
 	struct rionet_private *rnet = netdev_priv(ndev);
 
-	strcpy(info->driver, DRV_NAME);
-	strcpy(info->version, DRV_VERSION);
-	strcpy(info->fw_version, "n/a");
-	strcpy(info->bus_info, rnet->mport->name);
+	strlcpy(info->driver, DRV_NAME, sizeof(info->driver));
+	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
+	strlcpy(info->fw_version, "n/a", sizeof(info->fw_version));
+	strlcpy(info->bus_info, rnet->mport->name, sizeof(info->bus_info));
 }
 
 static u32 rionet_get_msglevel(struct net_device *ndev)
@@ -448,13 +453,13 @@ static int rionet_setup_netdev(struct rio_mport *mport, struct net_device *ndev)
 	const size_t rionet_active_bytes = sizeof(void *) *
 				RIO_MAX_ROUTE_ENTRIES(mport->sys_size);
 
-	rionet_active = (struct rio_dev **)__get_free_pages(GFP_KERNEL,
-			get_order(rionet_active_bytes));
-	if (!rionet_active) {
+	nets[mport->id].active = (struct rio_dev **)__get_free_pages(GFP_KERNEL,
+						get_order(rionet_active_bytes));
+	if (!nets[mport->id].active) {
 		rc = -ENOMEM;
 		goto out;
 	}
-	memset((void *)rionet_active, 0, rionet_active_bytes);
+	memset((void *)nets[mport->id].active, 0, rionet_active_bytes);
 
 	/* Set up private area */
 	rnet = netdev_priv(ndev);
@@ -549,10 +554,10 @@ static int rionet_probe(struct rio_dev *rdev, const struct rio_device_id *id)
 			goto out;
 		}
 		peer->rdev = rdev;
-		list_add_tail(&peer->node, &rionet_peers);
+		list_add_tail(&peer->node, &nets[netid].peers);
 	}
 
-	rio_set_drvdata(rdev, ndev);
+	rio_set_drvdata(rdev, nets[netid].ndev);
 
       out:
 	return rc;

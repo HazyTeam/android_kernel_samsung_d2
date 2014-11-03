@@ -1,0 +1,21 @@
+--- net/ipv6/inet6_hashtables.c
++++ net/ipv6/inet6_hashtables.c
+@@ -106,12 +108,16 @@
+ begintw:
+ 	/* Must check for a TIME_WAIT'er before going to listener hash. */
+ 	sk_nulls_for_each_rcu(sk, node, &head->twchain) {
+-		if (INET6_TW_MATCH(sk, net, hash, saddr, daddr, ports, dif)) {
++		if (sk->sk_hash != hash)
++			continue;
++		if (likely(INET6_TW_MATCH(sk, net, saddr, daddr,
++					  ports, dif))) {
+ 			if (unlikely(!atomic_inc_not_zero(&sk->sk_refcnt))) {
+ 				sk = NULL;
+ 				goto out;
+ 			}
+-			if (!INET6_TW_MATCH(sk, net, hash, saddr, daddr, ports, dif)) {
++			if (unlikely(!INET6_TW_MATCH(sk, net, saddr, daddr,
++						     ports, dif))) {
+ 				sock_put(sk);
+ 				goto begintw;
+ 			}

@@ -1,0 +1,11 @@
+--- drivers/media/rc/gpio-ir-recv.c
++++ drivers/media/rc/gpio-ir-recv.c
+@@ -95,7 +95,7 @@
+ 	if (pdata->allowed_protos)
+ 		rcdev->allowed_protos = pdata->allowed_protos;
+ 	else
+-		rcdev->allowed_protos = RC_TYPE_ALL;
++		rcdev->allowed_protos = RC_BIT_ALL;
+ 	rcdev->map_name = pdata->map_name ?: RC_MAP_EMPTY;
+ 
+ 	gpio_dev->rcdev = rcdev;

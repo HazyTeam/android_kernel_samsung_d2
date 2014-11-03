@@ -1,0 +1,182 @@
+--- fs/nfs/nfs4proc.c
++++ fs/nfs/nfs4proc.c
+@@ -1078,7 +1134,7 @@
+ 	struct nfs4_state *state = opendata->state;
+ 	struct nfs_inode *nfsi = NFS_I(state->inode);
+ 	struct nfs_delegation *delegation;
+-	int open_mode = opendata->o_arg.open_flags & (O_EXCL|O_TRUNC);
++	int open_mode = opendata->o_arg.open_flags;
+ 	fmode_t fmode = opendata->o_arg.fmode;
+ 	nfs4_stateid stateid;
+ 	int ret = -EAGAIN;
+@@ -1383,71 +1445,72 @@
+ 
+ 	ctx = nfs4_state_find_open_context(state);
+ 	if (IS_ERR(ctx))
+-		return PTR_ERR(ctx);
++		return -EAGAIN;
+ 	ret = nfs4_do_open_reclaim(ctx, state);
+ 	put_nfs_open_context(ctx);
+ 	return ret;
+ }
+ 
+-static int _nfs4_open_delegation_recall(struct nfs_open_context *ctx, struct nfs4_state *state, const nfs4_stateid *stateid)
++static int nfs4_handle_delegation_recall_error(struct nfs_server *server, struct nfs4_state *state, const nfs4_stateid *stateid, int err)
+ {
+-	struct nfs4_opendata *opendata;
+-	int ret;
+-
+-	opendata = nfs4_open_recoverdata_alloc(ctx, state);
+-	if (IS_ERR(opendata))
+-		return PTR_ERR(opendata);
+-	opendata->o_arg.claim = NFS4_OPEN_CLAIM_DELEGATE_CUR;
+-	nfs4_stateid_copy(&opendata->o_arg.u.delegation, stateid);
+-	ret = nfs4_open_recover(opendata, state);
+-	nfs4_opendata_put(opendata);
+-	return ret;
++	switch (err) {
++		default:
++			printk(KERN_ERR "NFS: %s: unhandled error "
++					"%d.\n", __func__, err);
++		case 0:
++		case -ENOENT:
++		case -ESTALE:
++			break;
++		case -NFS4ERR_BADSESSION:
++		case -NFS4ERR_BADSLOT:
++		case -NFS4ERR_BAD_HIGH_SLOT:
++		case -NFS4ERR_CONN_NOT_BOUND_TO_SESSION:
++		case -NFS4ERR_DEADSESSION:
++			set_bit(NFS_DELEGATED_STATE, &state->flags);
++			nfs4_schedule_session_recovery(server->nfs_client->cl_session, err);
++			return -EAGAIN;
++		case -NFS4ERR_STALE_CLIENTID:
++		case -NFS4ERR_STALE_STATEID:
++			set_bit(NFS_DELEGATED_STATE, &state->flags);
++		case -NFS4ERR_EXPIRED:
++			/* Don't recall a delegation if it was lost */
++			nfs4_schedule_lease_recovery(server->nfs_client);
++			return -EAGAIN;
++		case -NFS4ERR_DELEG_REVOKED:
++		case -NFS4ERR_ADMIN_REVOKED:
++		case -NFS4ERR_BAD_STATEID:
++		case -NFS4ERR_OPENMODE:
++			nfs_inode_find_state_and_recover(state->inode,
++					stateid);
++			nfs4_schedule_stateid_recovery(server, state);
++			return 0;
++		case -NFS4ERR_DELAY:
++		case -NFS4ERR_GRACE:
++			set_bit(NFS_DELEGATED_STATE, &state->flags);
++			ssleep(1);
++			return -EAGAIN;
++		case -ENOMEM:
++		case -NFS4ERR_DENIED:
++			/* kill_proc(fl->fl_pid, SIGLOST, 1); */
++			return 0;
++	}
++	return err;
+ }
+ 
+ int nfs4_open_delegation_recall(struct nfs_open_context *ctx, struct nfs4_state *state, const nfs4_stateid *stateid)
+ {
+-	struct nfs4_exception exception = { };
+ 	struct nfs_server *server = NFS_SERVER(state->inode);
++	struct nfs4_opendata *opendata;
+ 	int err;
+-	do {
+-		err = _nfs4_open_delegation_recall(ctx, state, stateid);
+-		switch (err) {
+-			case 0:
+-			case -ENOENT:
+-			case -ESTALE:
+-				goto out;
+-			case -NFS4ERR_BADSESSION:
+-			case -NFS4ERR_BADSLOT:
+-			case -NFS4ERR_BAD_HIGH_SLOT:
+-			case -NFS4ERR_CONN_NOT_BOUND_TO_SESSION:
+-			case -NFS4ERR_DEADSESSION:
+-				set_bit(NFS_DELEGATED_STATE, &state->flags);
+-				nfs4_schedule_session_recovery(server->nfs_client->cl_session, err);
+-				err = -EAGAIN;
+-				goto out;
+-			case -NFS4ERR_STALE_CLIENTID:
+-			case -NFS4ERR_STALE_STATEID:
+-				set_bit(NFS_DELEGATED_STATE, &state->flags);
+-			case -NFS4ERR_EXPIRED:
+-				/* Don't recall a delegation if it was lost */
+-				nfs4_schedule_lease_recovery(server->nfs_client);
+-				err = -EAGAIN;
+-				goto out;
+-			case -NFS4ERR_DELEG_REVOKED:
+-			case -NFS4ERR_ADMIN_REVOKED:
+-			case -NFS4ERR_BAD_STATEID:
+-				nfs_inode_find_state_and_recover(state->inode,
+-						stateid);
+-				nfs4_schedule_stateid_recovery(server, state);
+-			case -ENOMEM:
+-				err = 0;
+-				goto out;
+-		}
+-		set_bit(NFS_DELEGATED_STATE, &state->flags);
+-		err = nfs4_handle_exception(server, err, &exception);
+-	} while (exception.retry);
+-out:
+-	return err;
++
++	opendata = nfs4_open_recoverdata_alloc(ctx, state,
++			NFS4_OPEN_CLAIM_DELEG_CUR_FH);
++	if (IS_ERR(opendata))
++		return PTR_ERR(opendata);
++	nfs4_stateid_copy(&opendata->o_arg.u.delegation, stateid);
++	err = nfs4_open_recover(opendata, state);
++	nfs4_opendata_put(opendata);
++	return nfs4_handle_delegation_recall_error(server, state, stateid, err);
+ }
+ 
+ static void nfs4_open_confirm_done(struct rpc_task *task, void *calldata)
+@@ -1546,15 +1610,20 @@
+ 		rcu_read_lock();
+ 		delegation = rcu_dereference(NFS_I(data->state->inode)->delegation);
+ 		if (data->o_arg.claim != NFS4_OPEN_CLAIM_DELEGATE_CUR &&
++		    data->o_arg.claim != NFS4_OPEN_CLAIM_DELEG_CUR_FH &&
+ 		    can_open_delegated(delegation, data->o_arg.fmode))
+ 			goto unlock_no_action;
+ 		rcu_read_unlock();
+ 	}
+ 	/* Update client id. */
+-	data->o_arg.clientid = sp->so_server->nfs_client->cl_clientid;
+-	if (data->o_arg.claim == NFS4_OPEN_CLAIM_PREVIOUS) {
+-		task->tk_msg.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_OPEN_NOATTR];
++	data->o_arg.clientid = clp->cl_clientid;
++	switch (data->o_arg.claim) {
++	case NFS4_OPEN_CLAIM_PREVIOUS:
++	case NFS4_OPEN_CLAIM_DELEG_CUR_FH:
++	case NFS4_OPEN_CLAIM_DELEG_PREV_FH:
+ 		data->o_arg.open_bitmap = &nfs4_open_noattr_bitmap[0];
++	case NFS4_OPEN_CLAIM_FH:
++		task->tk_msg.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_OPEN_NOATTR];
+ 		nfs_copy_fh(&data->o_res.fh, data->o_arg.fh);
+ 	}
+ 	data->timestamp = jiffies;
+@@ -2320,8 +2434,10 @@
+ 	if (calldata->arg.fmode == 0) {
+ 		task->tk_msg.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_CLOSE];
+ 		if (calldata->roc &&
+-		    pnfs_roc_drain(inode, &calldata->roc_barrier, task))
++		    pnfs_roc_drain(inode, &calldata->roc_barrier, task)) {
++			nfs_release_seqid(calldata->arg.seqid);
+ 			goto out_wait;
++		    }
+ 	}
+ 
+ 	nfs_fattr_init(calldata->res.fattr);
+@@ -6023,7 +6205,7 @@
+ 		.rpc_client = clp->cl_rpcclient,
+ 		.rpc_message = &msg,
+ 		.callback_ops = &nfs41_sequence_ops,
+-		.flags = RPC_TASK_ASYNC | RPC_TASK_SOFT,
++		.flags = RPC_TASK_ASYNC | RPC_TASK_TIMEOUT,
+ 	};
+ 
+ 	if (!atomic_inc_not_zero(&clp->cl_count))

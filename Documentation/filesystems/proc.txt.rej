@@ -1,0 +1,13 @@
+--- Documentation/filesystems/proc.txt
++++ Documentation/filesystems/proc.txt
+@@ -418,8 +421,9 @@
+ KernelPageSize:        4 kB
+ MMUPageSize:           4 kB
+ Locked:              374 kB
++VmFlags: rd ex mr mw me de
+ 
+-The first of these lines shows the same information as is displayed for the
++the first of these lines shows the same information as is displayed for the
+ mapping in /proc/PID/maps.  The remaining lines show the size of the mapping
+ (size), the amount of the mapping that is currently resident in RAM (RSS), the
+ process' proportional share of this mapping (PSS), the number of clean and

@@ -1,0 +1,8 @@
+--- include/linux/Kbuild
++++ include/linux/Kbuild
+@@ -1,5 +0,0 @@
+-header-y += dvb/
+-header-y += hdlc/
+-header-y += hsi/
+-header-y += raid/
+-header-y += usb/

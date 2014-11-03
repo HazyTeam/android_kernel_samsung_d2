@@ -1,0 +1,33 @@
+--- drivers/usb/gadget/Kconfig
++++ drivers/usb/gadget/Kconfig
+@@ -144,8 +144,8 @@
+ config USB_LPC32XX
+ 	tristate "LPC32XX USB Peripheral Controller"
+ 	depends on ARCH_LPC32XX
++	depends on USB_PHY
+ 	select USB_ISP1301
+-	select USB_OTG_UTILS
+ 	help
+ 	   This option selects the USB device controller in the LPC32xx SoC.
+ 
+@@ -495,6 +489,7 @@
+ # composite based drivers
+ config USB_LIBCOMPOSITE
+ 	tristate
++	select CONFIGFS_FS
+ 	depends on USB_GADGET
+ 
+ config USB_F_ACM
+@@ -506,6 +501,12 @@
+ config USB_U_SERIAL
+ 	tristate
+ 
++config USB_F_SERIAL
++	tristate
++
++config USB_F_OBEX
++	tristate
++
+ choice
+ 	tristate "USB Gadget Drivers"
+ 	default USB_ETH

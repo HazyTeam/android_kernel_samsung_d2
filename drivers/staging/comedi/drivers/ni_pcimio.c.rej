@@ -1,0 +1,195 @@
+--- drivers/staging/comedi/drivers/ni_pcimio.c
++++ drivers/staging/comedi/drivers/ni_pcimio.c
+@@ -1426,6 +1283,7 @@
+ 
+ static void init_6143(struct comedi_device *dev)
+ {
++	const struct ni_board_struct *board = comedi_board(dev);
+ 	struct ni_private *devpriv = dev->private;
+ 
+ 	/*  Disable interrupts */
+@@ -1464,48 +1323,38 @@
+ 			mite_free(devpriv->mite);
+ 		}
+ 	}
+-}
+-
+-static const struct ni_board_struct *
+-pcimio_find_boardinfo(struct pci_dev *pcidev)
+-{
+-	unsigned int device_id = pcidev->device;
+-	unsigned int n;
+-
+-	for (n = 0; n < ARRAY_SIZE(ni_boards); n++) {
+-		const struct ni_board_struct *board = &ni_boards[n];
+-		if (board->device_id == device_id)
+-			return board;
+-	}
+-	return NULL;
++	comedi_pci_disable(dev);
+ }
+ 
+ static int pcimio_auto_attach(struct comedi_device *dev,
+-					unsigned long context_unused)
++			      unsigned long context)
+ {
+ 	struct pci_dev *pcidev = comedi_to_pci_dev(dev);
++	const struct ni_board_struct *board = NULL;
+ 	struct ni_private *devpriv;
+ 	int ret;
+ 
+-	dev_info(dev->class_dev, "ni_pcimio: attach %s\n", pci_name(pcidev));
++	if (context < ARRAY_SIZE(ni_boards))
++		board = &ni_boards[context];
++	if (!board)
++		return -ENODEV;
++	dev->board_ptr = board;
++	dev->board_name = board->name;
++
++	ret = comedi_pci_enable(dev);
++	if (ret)
++		return ret;
+ 
+ 	ret = ni_alloc_private(dev);
+ 	if (ret)
+ 		return ret;
+ 	devpriv = dev->private;
+ 
+-	dev->board_ptr = pcimio_find_boardinfo(pcidev);
+-	if (!dev->board_ptr)
+-		return -ENODEV;
+-
+ 	devpriv->mite = mite_alloc(pcidev);
+ 	if (!devpriv->mite)
+ 		return -ENOMEM;
+ 
+-	dev_dbg(dev->class_dev, "%s\n", boardtype.name);
+-	dev->board_name = boardtype.name;
+-
+-	if (boardtype.reg_type & ni_reg_m_series_mask) {
++	if (board->reg_type & ni_reg_m_series_mask) {
+ 		devpriv->stc_writew = &m_series_stc_writew;
+ 		devpriv->stc_readw = &m_series_stc_readw;
+ 		devpriv->stc_writel = &m_series_stc_writel;
+@@ -1646,65 +1495,66 @@
+ };
+ 
+ static int ni_pcimio_pci_probe(struct pci_dev *dev,
+-					 const struct pci_device_id *ent)
++			       const struct pci_device_id *id)
+ {
+-	return comedi_pci_auto_config(dev, &ni_pcimio_driver);
++	return comedi_pci_auto_config(dev, &ni_pcimio_driver, id->driver_data);
+ }
+ 
+ static DEFINE_PCI_DEVICE_TABLE(ni_pcimio_pci_table) = {
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x0162) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x1170) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x1180) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x1190) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x11b0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x11c0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x11d0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x1270) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x1330) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x1340) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x1350) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x14e0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x14f0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x1580) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x15b0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x1880) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x1870) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x18b0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x18c0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2410) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2420) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2430) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2890) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x28c0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2a60) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2a70) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2a80) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2ab0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2b80) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2b90) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2c80) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x2ca0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70aa) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70ab) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70ac) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70af) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70b0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70b4) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70b6) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70b7) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70b8) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70bc) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70bd) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70bf) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70c0) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x70f2) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x710d) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x716c) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x716d) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x717f) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x71bc) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x717d) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_NI, 0x72e8) },
++	{ PCI_VDEVICE(NI, 0x0162), BOARD_PCIMIO_16XE_50 },	/* 0x1620? */
++	{ PCI_VDEVICE(NI, 0x1170), BOARD_PCIMIO_16XE_10 },
++	{ PCI_VDEVICE(NI, 0x1180), BOARD_PCIMIO_16E_1 },
++	{ PCI_VDEVICE(NI, 0x1190), BOARD_PCIMIO_16E_4 },
++	{ PCI_VDEVICE(NI, 0x11b0), BOARD_PXI6070E },
++	{ PCI_VDEVICE(NI, 0x11c0), BOARD_PXI6040E },
++	{ PCI_VDEVICE(NI, 0x11d0), BOARD_PXI6030E },
++	{ PCI_VDEVICE(NI, 0x1270), BOARD_PCI6032E },
++	{ PCI_VDEVICE(NI, 0x1330), BOARD_PCI6031E },
++	{ PCI_VDEVICE(NI, 0x1340), BOARD_PCI6033E },
++	{ PCI_VDEVICE(NI, 0x1350), BOARD_PCI6071E },
++	{ PCI_VDEVICE(NI, 0x14e0), BOARD_PCI6110 },
++	{ PCI_VDEVICE(NI, 0x14f0), BOARD_PCI6111 },
++	{ PCI_VDEVICE(NI, 0x1580), BOARD_PXI6031E },
++	{ PCI_VDEVICE(NI, 0x15b0), BOARD_PXI6071E },
++	{ PCI_VDEVICE(NI, 0x1880), BOARD_PCI6711 },
++	{ PCI_VDEVICE(NI, 0x1870), BOARD_PCI6713 },
++	{ PCI_VDEVICE(NI, 0x18b0), BOARD_PCI6052E },
++	{ PCI_VDEVICE(NI, 0x18c0), BOARD_PXI6052E },
++	{ PCI_VDEVICE(NI, 0x2410), BOARD_PCI6733 },
++	{ PCI_VDEVICE(NI, 0x2420), BOARD_PXI6733 },
++	{ PCI_VDEVICE(NI, 0x2430), BOARD_PCI6731 },
++	{ PCI_VDEVICE(NI, 0x2890), BOARD_PCI6036E },
++	{ PCI_VDEVICE(NI, 0x28c0), BOARD_PCI6014 },
++	{ PCI_VDEVICE(NI, 0x2a60), BOARD_PCI6023E },
++	{ PCI_VDEVICE(NI, 0x2a70), BOARD_PCI6024E },
++	{ PCI_VDEVICE(NI, 0x2a80), BOARD_PCI6025E },
++	{ PCI_VDEVICE(NI, 0x2ab0), BOARD_PXI6025E },
++	{ PCI_VDEVICE(NI, 0x2b80), BOARD_PXI6713 },
++	{ PCI_VDEVICE(NI, 0x2b90), BOARD_PXI6711 },
++	{ PCI_VDEVICE(NI, 0x2c80), BOARD_PCI6035E },
++	{ PCI_VDEVICE(NI, 0x2ca0), BOARD_PCI6034E },
++	{ PCI_VDEVICE(NI, 0x70aa), BOARD_PCI6229 },
++	{ PCI_VDEVICE(NI, 0x70ab), BOARD_PCI6259 },
++	{ PCI_VDEVICE(NI, 0x70ac), BOARD_PCI6289 },
++	{ PCI_VDEVICE(NI, 0x70af), BOARD_PCI6221 },
++	{ PCI_VDEVICE(NI, 0x70b0), BOARD_PCI6220 },
++	{ PCI_VDEVICE(NI, 0x70b4), BOARD_PCI6250 },
++	{ PCI_VDEVICE(NI, 0x70b6), BOARD_PCI6280 },
++	{ PCI_VDEVICE(NI, 0x70b7), BOARD_PCI6254 },
++	{ PCI_VDEVICE(NI, 0x70b8), BOARD_PCI6251 },
++	{ PCI_VDEVICE(NI, 0x70bc), BOARD_PCI6284 },
++	{ PCI_VDEVICE(NI, 0x70bd), BOARD_PCI6281 },
++	{ PCI_VDEVICE(NI, 0x70bf), BOARD_PXI6281 },
++	{ PCI_VDEVICE(NI, 0x70c0), BOARD_PCI6143 },
++	{ PCI_VDEVICE(NI, 0x70f2), BOARD_PCI6224 },
++	{ PCI_VDEVICE(NI, 0x70f3), BOARD_PXI6224 },
++	{ PCI_VDEVICE(NI, 0x710d), BOARD_PXI6143 },
++	{ PCI_VDEVICE(NI, 0x716c), BOARD_PCI6225 },
++	{ PCI_VDEVICE(NI, 0x716d), BOARD_PXI6225 },
++	{ PCI_VDEVICE(NI, 0x717f), BOARD_PCIE6259 },
++	{ PCI_VDEVICE(NI, 0x71bc), BOARD_PCI6221_37PIN },
++	{ PCI_VDEVICE(NI, 0x717d), BOARD_PCIE6251 },
++	{ PCI_VDEVICE(NI, 0x72e8), BOARD_PXIE6251 },
+ 	{ 0 }
+ };
+ MODULE_DEVICE_TABLE(pci, ni_pcimio_pci_table);

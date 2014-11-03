@@ -1,0 +1,23 @@
+--- drivers/usb/serial/garmin_gps.c
++++ drivers/usb/serial/garmin_gps.c
+@@ -956,10 +953,7 @@
+ 	if (!serial)
+ 		return;
+ 
+-	mutex_lock(&port->serial->disc_mutex);
+-
+-	if (!port->serial->disconnected)
+-		garmin_clear(garmin_data_p);
++	garmin_clear(garmin_data_p);
+ 
+ 	/* shutdown our urbs */
+ 	usb_kill_urb(port->read_urb);
+@@ -968,8 +962,6 @@
+ 	/* keep reset state so we know that we must start a new session */
+ 	if (garmin_data_p->state != STATE_RESET)
+ 		garmin_data_p->state = STATE_DISCONNECTED;
+-
+-	mutex_unlock(&port->serial->disc_mutex);
+ }
+ 
+ 

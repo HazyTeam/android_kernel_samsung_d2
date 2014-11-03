@@ -1,0 +1,98 @@
+--- drivers/hid/hid-multitouch.c
++++ drivers/hid/hid-multitouch.c
+@@ -98,9 +110,9 @@
+ 					   multitouch fields */
+ 	int cc_index;	/* contact count field index in the report */
+ 	int cc_value_index;	/* contact count value index in the field */
+-	unsigned last_field_index;	/* last field index of the report */
+ 	unsigned last_slot_field;	/* the last field of a slot */
+ 	unsigned mt_report_id;	/* the report ID of the multitouch device */
++	unsigned pen_report_id;	/* the report ID of the pen device */
+ 	__s8 inputmode;		/* InputMode HID feature, -1 if non-existent */
+ 	__s8 inputmode_index;	/* InputMode HID feature index in the report */
+ 	__s8 maxcontact_report_id;	/* Maximum Contact Number HID feature,
+@@ -445,12 +512,6 @@
+ 	    (usage->hid & HID_USAGE_PAGE) == HID_UP_BUTTON)
+ 		td->mt_flags |= INPUT_MT_POINTER;
+ 
+-	/* eGalax devices provide a Digitizer.Stylus input which overrides
+-	 * the correct Digitizers.Finger X/Y ranges.
+-	 * Let's just ignore this input. */
+-	if (field->physical == HID_DG_STYLUS)
+-		return -1;
+-
+ 	if (usage->usage_index)
+ 		prev_usage = &field->usage[usage->usage_index - 1];
+ 
+@@ -472,7 +533,6 @@
+ 			}
+ 
+ 			mt_store_field(usage, td, hi);
+-			td->last_field_index = field->index;
+ 			return 1;
+ 		case HID_GD_Y:
+ 			if (prev_usage && (prev_usage->hid == usage->hid)) {
+@@ -488,7 +548,6 @@
+ 			}
+ 
+ 			mt_store_field(usage, td, hi);
+-			td->last_field_index = field->index;
+ 			return 1;
+ 		}
+ 		return 0;
+@@ -503,21 +562,17 @@
+ 					ABS_MT_DISTANCE, 0, 1, 0, 0);
+ 			}
+ 			mt_store_field(usage, td, hi);
+-			td->last_field_index = field->index;
+ 			return 1;
+ 		case HID_DG_CONFIDENCE:
+ 			mt_store_field(usage, td, hi);
+-			td->last_field_index = field->index;
+ 			return 1;
+ 		case HID_DG_TIPSWITCH:
+ 			hid_map_usage(hi, usage, bit, max, EV_KEY, BTN_TOUCH);
+ 			input_set_capability(hi->input, EV_KEY, BTN_TOUCH);
+ 			mt_store_field(usage, td, hi);
+-			td->last_field_index = field->index;
+ 			return 1;
+ 		case HID_DG_CONTACTID:
+ 			mt_store_field(usage, td, hi);
+-			td->last_field_index = field->index;
+ 			td->touches_by_report++;
+ 			td->mt_report_id = field->report->id;
+ 			return 1;
+@@ -528,7 +583,6 @@
+ 				set_abs(hi->input, ABS_MT_TOUCH_MAJOR, field,
+ 					cls->sn_width);
+ 			mt_store_field(usage, td, hi);
+-			td->last_field_index = field->index;
+ 			return 1;
+ 		case HID_DG_HEIGHT:
+ 			hid_map_usage(hi, usage, bit, max,
+@@ -540,7 +594,6 @@
+ 					ABS_MT_ORIENTATION, 0, 1, 0, 0);
+ 			}
+ 			mt_store_field(usage, td, hi);
+-			td->last_field_index = field->index;
+ 			return 1;
+ 		case HID_DG_TIPPRESSURE:
+ 			hid_map_usage(hi, usage, bit, max,
+@@ -548,17 +601,14 @@
+ 			set_abs(hi->input, ABS_MT_PRESSURE, field,
+ 				cls->sn_pressure);
+ 			mt_store_field(usage, td, hi);
+-			td->last_field_index = field->index;
+ 			return 1;
+ 		case HID_DG_CONTACTCOUNT:
+ 			td->cc_index = field->index;
+ 			td->cc_value_index = usage->usage_index;
+-			td->last_field_index = field->index;
+ 			return 1;
+ 		case HID_DG_CONTACTMAX:
+ 			/* we don't set td->last_slot_field as contactcount and
+ 			 * contact max are global to the report */
+-			td->last_field_index = field->index;
+ 			return -1;
+ 		case HID_DG_TOUCH:
+ 			/* Legacy devices use TIPSWITCH and not TOUCH.

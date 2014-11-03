@@ -1,0 +1,12 @@
+--- drivers/mmc/host/omap_hsmmc.c
++++ drivers/mmc/host/omap_hsmmc.c
+@@ -2054,8 +2002,7 @@
+ 	if (ret) {
+ 		host->suspended = 0;
+ 		if (host->pdata->resume) {
+-			ret = host->pdata->resume(dev, host->slot_id);
+-			if (ret)
++			if (host->pdata->resume(dev, host->slot_id))
+ 				dev_dbg(dev, "Unmask interrupt failed\n");
+ 		}
+ 		goto err;

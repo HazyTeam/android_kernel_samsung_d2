@@ -1,0 +1,12 @@
+--- drivers/staging/vt6656/rf.c
++++ drivers/staging/vt6656/rf.c
+@@ -769,6 +769,9 @@
+         return TRUE;
+     }
+ 
++	if (uCH == 0)
++		return -EINVAL;
++
+     switch (uRATE) {
+     case RATE_1M:
+     case RATE_2M:

@@ -1,0 +1,10 @@
+--- drivers/md/dm-snap.c
++++ drivers/md/dm-snap.c
+@@ -1121,6 +1121,7 @@
+ 	s->pending_pool = mempool_create_slab_pool(MIN_IOS, pending_cache);
+ 	if (!s->pending_pool) {
+ 		ti->error = "Could not allocate mempool for pending exceptions";
++		r = -ENOMEM;
+ 		goto bad_pending_pool;
+ 	}
+ 

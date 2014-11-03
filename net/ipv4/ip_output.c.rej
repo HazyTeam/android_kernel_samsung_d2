@@ -1,0 +1,69 @@
+--- net/ipv4/ip_output.c
++++ net/ipv4/ip_output.c
+@@ -1338,10 +1329,10 @@
+ 	iph->ihl = 5;
+ 	iph->tos = inet->tos;
+ 	iph->frag_off = df;
+-	ip_select_ident(iph, &rt->dst, sk);
+ 	iph->ttl = ttl;
+ 	iph->protocol = sk->sk_protocol;
+ 	ip_copy_addrs(iph, fl4);
++	ip_select_ident(iph, &rt->dst, sk);
+ 
+ 	if (opt) {
+ 		iph->ihl += opt->optlen>>2;
+@@ -1507,38 +1512,40 @@
+ 
+ 	flowi4_init_output(&fl4, arg->bound_dev_if, 0,
+ 			   RT_TOS(arg->tos),
+-			   RT_SCOPE_UNIVERSE, sk->sk_protocol,
++			   RT_SCOPE_UNIVERSE, ip_hdr(skb)->protocol,
+ 			   ip_reply_arg_flowi_flags(arg),
+-			   daddr, rt->rt_spec_dst,
++			   daddr, saddr,
+ 			   tcp_hdr(skb)->source, tcp_hdr(skb)->dest);
+ 	security_skb_classify_flow(skb, flowi4_to_flowi(&fl4));
+-	rt = ip_route_output_key(sock_net(sk), &fl4);
++	rt = ip_route_output_key(net, &fl4);
+ 	if (IS_ERR(rt))
+ 		return;
+ 
+-	/* And let IP do all the hard work.
++	inet = &get_cpu_var(unicast_sock);
+ 
+-	   This chunk is not reenterable, hence spinlock.
+-	   Note that it uses the fact, that this function is called
+-	   with locally disabled BH and that sk cannot be already spinlocked.
+-	 */
+-	bh_lock_sock(sk);
+ 	inet->tos = arg->tos;
++	sk = &inet->sk;
+ 	sk->sk_priority = skb->priority;
+ 	sk->sk_protocol = ip_hdr(skb)->protocol;
+ 	sk->sk_bound_dev_if = arg->bound_dev_if;
++	sock_net_set(sk, net);
++	__skb_queue_head_init(&sk->sk_write_queue);
++	sk->sk_sndbuf = sysctl_wmem_default;
+ 	ip_append_data(sk, &fl4, ip_reply_glue_bits, arg->iov->iov_base, len, 0,
+ 		       &ipc, &rt, MSG_DONTWAIT);
+-	if ((skb = skb_peek(&sk->sk_write_queue)) != NULL) {
++	nskb = skb_peek(&sk->sk_write_queue);
++	if (nskb) {
+ 		if (arg->csumoffset >= 0)
+-			*((__sum16 *)skb_transport_header(skb) +
+-			  arg->csumoffset) = csum_fold(csum_add(skb->csum,
++			*((__sum16 *)skb_transport_header(nskb) +
++			  arg->csumoffset) = csum_fold(csum_add(nskb->csum,
+ 								arg->csum));
+-		skb->ip_summed = CHECKSUM_NONE;
++		nskb->ip_summed = CHECKSUM_NONE;
++		skb_orphan(nskb);
++		skb_set_queue_mapping(nskb, skb_get_queue_mapping(skb));
+ 		ip_push_pending_frames(sk, &fl4);
+ 	}
+ 
+-	bh_unlock_sock(sk);
++	put_cpu_var(unicast_sock);
+ 
+ 	ip_rt_put(rt);
+ }

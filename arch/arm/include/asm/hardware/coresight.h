@@ -44,7 +44,7 @@
 /* CoreSight Component Registers */
 #define CSCR_CLASS	0xff4
 
-#define UNLOCK_MAGIC	0xc5acce55
+#define CS_LAR_KEY	0xc5acce55
 
 /* ETM control register, "ETM Architecture", 3.3.1 */
 #define ETMR_CTRL		0

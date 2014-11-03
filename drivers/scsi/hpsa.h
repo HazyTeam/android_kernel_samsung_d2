@@ -34,7 +34,7 @@ struct access_method {
 	void (*set_intr_mask)(struct ctlr_info *h, unsigned long val);
 	unsigned long (*fifo_full)(struct ctlr_info *h);
 	bool (*intr_pending)(struct ctlr_info *h);
-	unsigned long (*command_completed)(struct ctlr_info *h);
+	unsigned long (*command_completed)(struct ctlr_info *h, u8 q);
 };
 
 struct hpsa_scsi_dev_t {
@@ -46,6 +46,13 @@ struct hpsa_scsi_dev_t {
 	unsigned char vendor[8];        /* bytes 8-15 of inquiry data */
 	unsigned char model[16];        /* bytes 16-31 of inquiry data */
 	unsigned char raid_level;	/* from inquiry page 0xC1 */
+};
+
+struct reply_pool {
+	u64 *head;
+	size_t size;
+	u8 wraparound;
+	u32 current_entry;
 };
 
 struct ctlr_info {
@@ -68,7 +75,7 @@ struct ctlr_info {
 #	define DOORBELL_INT	1
 #	define SIMPLE_MODE_INT	2
 #	define MEMQ_MODE_INT	3
-	unsigned int intr[4];
+	unsigned int intr[MAX_REPLY_QUEUES];
 	unsigned int msix_vector;
 	unsigned int msi_vector;
 	int intr_mode; /* either PERF_MODE_INT or SIMPLE_MODE_INT */
@@ -78,7 +85,6 @@ struct ctlr_info {
 	struct list_head reqQ;
 	struct list_head cmpQ;
 	unsigned int Qdepth;
-	unsigned int maxQsinceinit;
 	unsigned int maxSG;
 	spinlock_t lock;
 	int maxsgentries;
@@ -218,9 +224,6 @@ static void SA5_submit_command(struct ctlr_info *h,
 		c->Header.Tag.lower);
 	writel(c->busaddr, h->vaddr + SA5_REQUEST_PORT_OFFSET);
 	(void) readl(h->vaddr + SA5_SCRATCHPAD_OFFSET);
-	h->commands_outstanding++;
-	if (h->commands_outstanding > h->max_outstanding)
-		h->max_outstanding = h->commands_outstanding;
 }
 
 /*
@@ -256,16 +259,17 @@ static void SA5_performant_intr_mask(struct ctlr_info *h, unsigned long val)
 	}
 }
 
-static unsigned long SA5_performant_completed(struct ctlr_info *h)
+static unsigned long SA5_performant_completed(struct ctlr_info *h, u8 q)
 {
-	unsigned long register_value = FIFO_EMPTY;
+	struct reply_pool *rq = &h->reply_queue[q];
+	unsigned long flags, register_value = FIFO_EMPTY;
 
-	/* flush the controller write of the reply queue by reading
-	 * outbound doorbell status register.
-	 */
-	register_value = readl(h->vaddr + SA5_OUTDB_STATUS);
 	/* msi auto clears the interrupt pending bit. */
 	if (!(h->msi_vector || h->msix_vector)) {
+		/* flush the controller write of the reply queue by reading
+		 * outbound doorbell status register.
+		 */
+		register_value = readl(h->vaddr + SA5_OUTDB_STATUS);
 		writel(SA5_OUTDB_CLEAR_PERF_BIT, h->vaddr + SA5_OUTDB_CLEAR);
 		/* Do a read in order to flush the write to the controller
 		 * (as per spec.)
@@ -273,19 +277,20 @@ static unsigned long SA5_performant_completed(struct ctlr_info *h)
 		register_value = readl(h->vaddr + SA5_OUTDB_STATUS);
 	}
 
-	if ((*(h->reply_pool_head) & 1) == (h->reply_pool_wraparound)) {
-		register_value = *(h->reply_pool_head);
-		(h->reply_pool_head)++;
+	if ((rq->head[rq->current_entry] & 1) == rq->wraparound) {
+		register_value = rq->head[rq->current_entry];
+		rq->current_entry++;
+		spin_lock_irqsave(&h->lock, flags);
 		h->commands_outstanding--;
+		spin_unlock_irqrestore(&h->lock, flags);
 	} else {
 		register_value = FIFO_EMPTY;
 	}
 	/* Check for wraparound */
-	if (h->reply_pool_head == (h->reply_pool + h->max_commands)) {
-		h->reply_pool_head = h->reply_pool;
-		h->reply_pool_wraparound ^= 1;
+	if (rq->current_entry == h->max_commands) {
+		rq->current_entry = 0;
+		rq->wraparound ^= 1;
 	}
-
 	return register_value;
 }
 
@@ -305,13 +310,18 @@ static unsigned long SA5_fifo_full(struct ctlr_info *h)
  *   returns value read from hardware.
  *     returns FIFO_EMPTY if there is nothing to read
  */
-static unsigned long SA5_completed(struct ctlr_info *h)
+static unsigned long SA5_completed(struct ctlr_info *h,
+	__attribute__((unused)) u8 q)
 {
 	unsigned long register_value
 		= readl(h->vaddr + SA5_REPLY_PORT_OFFSET);
+	unsigned long flags;
 
-	if (register_value != FIFO_EMPTY)
+	if (register_value != FIFO_EMPTY) {
+		spin_lock_irqsave(&h->lock, flags);
 		h->commands_outstanding--;
+		spin_unlock_irqrestore(&h->lock, flags);
+	}
 
 #ifdef HPSA_DEBUG
 	if (register_value != FIFO_EMPTY)

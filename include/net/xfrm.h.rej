@@ -1,0 +1,12 @@
+--- include/net/xfrm.h
++++ include/net/xfrm.h
+@@ -273,6 +277,9 @@
+ 	int	(*check)(struct xfrm_state *x,
+ 			 struct sk_buff *skb,
+ 			 __be32 net_seq);
++	int	(*recheck)(struct xfrm_state *x,
++			   struct sk_buff *skb,
++			   __be32 net_seq);
+ 	void	(*notify)(struct xfrm_state *x, int event);
+ 	int	(*overflow)(struct xfrm_state *x, struct sk_buff *skb);
+ };

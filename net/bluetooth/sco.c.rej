@@ -1,0 +1,21 @@
+--- net/bluetooth/sco.c
++++ net/bluetooth/sco.c
+@@ -353,7 +353,7 @@
+ 		if (sco_pi(sk)->conn->hcon) {
+ 			sk->sk_state = BT_DISCONN;
+ 			sco_sock_set_timer(sk, SCO_DISCONN_TIMEOUT);
+-			hci_conn_put(sco_pi(sk)->conn->hcon);
++			hci_conn_drop(sco_pi(sk)->conn->hcon);
+ 			sco_pi(sk)->conn->hcon = NULL;
+ 		} else
+ 			sco_chan_del(sk, ECONNRESET);
+@@ -481,8 +481,7 @@
+ {
+ 	struct sockaddr_sco *sa = (struct sockaddr_sco *) addr;
+ 	struct sock *sk = sock->sk;
+-	int err = 0;
+-
++	int err;
+ 
+ 	BT_DBG("sk %p", sk);
+ 

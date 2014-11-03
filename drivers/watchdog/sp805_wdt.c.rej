@@ -1,0 +1,33 @@
+--- drivers/watchdog/sp805_wdt.c
++++ drivers/watchdog/sp805_wdt.c
+@@ -63,24 +61,24 @@
+  * @timeout: current programmed timeout
+  */
+ struct sp805_wdt {
++	struct watchdog_device		wdd;
+ 	spinlock_t			lock;
+ 	void __iomem			*base;
+ 	struct clk			*clk;
+ 	struct amba_device		*adev;
+-	unsigned long			status;
+-	#define WDT_BUSY		0
+-	#define WDT_CAN_BE_CLOSED	1
+ 	unsigned int			load_val;
+ 	unsigned int			timeout;
+ };
+ 
+-/* local variables */
+-static struct sp805_wdt *wdt;
+ static bool nowayout = WATCHDOG_NOWAYOUT;
++module_param(nowayout, bool, 0);
++MODULE_PARM_DESC(nowayout,
++		"Set to 1 to keep watchdog running after device release");
+ 
+ /* This routine finds load value that will reset system in required timout */
+-static void wdt_setload(unsigned int timeout)
++static int wdt_setload(struct watchdog_device *wdd, unsigned int timeout)
+ {
++	struct sp805_wdt *wdt = watchdog_get_drvdata(wdd);
+ 	u64 load, rate;
+ 
+ 	rate = clk_get_rate(wdt->clk);

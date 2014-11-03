@@ -60,6 +60,7 @@ struct hci_conn_hash {
 	struct list_head list;
 	spinlock_t       lock;
 	unsigned int     acl_num;
+	unsigned int     amp_num;
 	unsigned int     sco_num;
 	unsigned int     le_num;
 };
@@ -77,6 +78,7 @@ struct bdaddr_list {
 struct bt_uuid {
 	struct list_head list;
 	u8 uuid[16];
+	u8 size;
 	u8 svc_hint;
 };
 
@@ -127,6 +129,16 @@ struct adv_entry {
 	u8 flags;
 };
 
+struct amp_assoc {
+	__u16	len;
+	__u16	offset;
+	__u16	rem_len;
+	__u16	len_so_far;
+	__u8	data[HCI_MAX_AMP_ASSOC_SIZE];
+};
+
+#define HCI_MAX_PAGES	3
+
 #define NUM_REASSEMBLY 4
 struct hci_dev {
 	struct list_head list;
@@ -151,9 +163,18 @@ struct hci_dev {
 	__u16		hci_rev;
 	__u8		lmp_ver;
 	__u16		manufacturer;
-	__le16		lmp_subver;
+	__u16		lmp_subver;
 	__u16		voice_setting;
 	__u8		io_capability;
+	__s8		inq_tx_power;
+	__u16		page_scan_interval;
+	__u16		page_scan_window;
+	__u8		page_scan_type;
+
+	__u16		devid_source;
+	__u16		devid_vendor;
+	__u16		devid_product;
+	__u16		devid_version;
 
 	__u16		pkt_type;
 	__u16		esco_type;
@@ -201,6 +222,7 @@ struct hci_dev {
 	unsigned long	le_last_tx;
 
 	struct workqueue_struct	*workqueue;
+	struct workqueue_struct	*req_workqueue;
 
 	struct work_struct	power_on;
 	struct work_struct	power_off;
@@ -215,6 +237,7 @@ struct hci_dev {
 	struct sk_buff_head	raw_q;
 	struct sk_buff_head	cmd_q;
 
+	struct sk_buff		*recv_evt;
 	struct sk_buff		*sent_cmd;
 	struct sk_buff		*reassembly[NUM_REASSEMBLY];
 
@@ -259,21 +282,27 @@ struct hci_dev {
 
 	struct dentry		*debugfs;
 
-	struct device		*parent;
 	struct device		dev;
 
 	struct rfkill		*rfkill;
 
 	struct module		*owner;
 
+	__s8			adv_tx_power;
+	__u8			adv_data[HCI_MAX_AD_LENGTH];
+	__u8			adv_data_len;
+
 	int (*open)(struct hci_dev *hdev);
 	int (*close)(struct hci_dev *hdev);
 	int (*flush)(struct hci_dev *hdev);
+	int (*setup)(struct hci_dev *hdev);
 	int (*send)(struct sk_buff *skb);
 	void (*destruct)(struct hci_dev *hdev);
 	void (*notify)(struct hci_dev *hdev, unsigned int evt);
 	int (*ioctl)(struct hci_dev *hdev, unsigned int cmd, unsigned long arg);
 };
+
+#define HCI_PHY_HANDLE(handle)	(handle & 0xff)
 
 struct hci_conn {
 	struct list_head list;
@@ -330,7 +359,6 @@ struct hci_conn {
 	struct work_struct work_del;
 	struct wake_lock idle_lock;
 	struct device	dev;
-	atomic_t	devref;
 
 	struct hci_dev	*hdev;
 	void		*l2cap_data;
@@ -445,6 +473,9 @@ static inline void hci_conn_hash_add(struct hci_dev *hdev, struct hci_conn *c)
 	case ACL_LINK:
 		h->acl_num++;
 		break;
+	case AMP_LINK:
+		h->amp_num++;
+		break;
 	case LE_LINK:
 		h->le_num++;
 		break;
@@ -462,6 +493,9 @@ static inline void hci_conn_hash_del(struct hci_dev *hdev, struct hci_conn *c)
 	switch (c->type) {
 	case ACL_LINK:
 		h->acl_num--;
+		break;
+	case AMP_LINK:
+		h->amp_num--;
 		break;
 	case LE_LINK:
 		h->le_num--;
@@ -570,9 +604,7 @@ static inline struct hci_chan *hci_chan_list_lookup_id(struct hci_dev *hdev,
 	return NULL;
 }
 
-void hci_acl_connect(struct hci_conn *conn);
-void hci_acl_disconn(struct hci_conn *conn, __u8 reason);
-void hci_add_sco(struct hci_conn *conn, __u16 handle);
+void hci_disconnect(struct hci_conn *conn, __u8 reason);
 void hci_setup_sync(struct hci_conn *conn, __u16 handle);
 void hci_sco_setup(struct hci_conn *conn, __u8 status);
 
@@ -619,8 +651,36 @@ void hci_disconnect_amp(struct hci_conn *conn, __u8 reason);
 void hci_conn_enter_active_mode(struct hci_conn *conn, __u8 force_active);
 void hci_conn_enter_sniff_mode(struct hci_conn *conn);
 
-void hci_conn_hold_device(struct hci_conn *conn);
-void hci_conn_put_device(struct hci_conn *conn);
+/*
+ * hci_conn_get() and hci_conn_put() are used to control the life-time of an
+ * "hci_conn" object. They do not guarantee that the hci_conn object is running,
+ * working or anything else. They just guarantee that the object is available
+ * and can be dereferenced. So you can use its locks, local variables and any
+ * other constant data.
+ * Before accessing runtime data, you _must_ lock the object and then check that
+ * it is still running. As soon as you release the locks, the connection might
+ * get dropped, though.
+ *
+ * On the other hand, hci_conn_hold() and hci_conn_drop() are used to control
+ * how long the underlying connection is held. So every channel that runs on the
+ * hci_conn object calls this to prevent the connection from disappearing. As
+ * long as you hold a device, you must also guarantee that you have a valid
+ * reference to the device via hci_conn_get() (or the initial reference from
+ * hci_conn_add()).
+ * The hold()/drop() ref-count is known to drop below 0 sometimes, which doesn't
+ * break because nobody cares for that. But this means, we cannot use
+ * _get()/_drop() in it, but require the caller to have a valid ref (FIXME).
+ */
+
+static inline void hci_conn_get(struct hci_conn *conn)
+{
+	get_device(&conn->dev);
+}
+
+static inline void hci_conn_put(struct hci_conn *conn)
+{
+	put_device(&conn->dev);
+}
 
 void hci_conn_set_rssi_reporter(struct hci_conn *conn,
 		s8 rssi_threshold, u16 interval, u8 updateOnThreshExceed);
@@ -632,11 +692,14 @@ static inline void hci_conn_hold(struct hci_conn *conn)
 	del_timer(&conn->disc_timer);
 }
 
-static inline void hci_conn_put(struct hci_conn *conn)
+static inline void hci_conn_drop(struct hci_conn *conn)
 {
 	if (atomic_dec_and_test(&conn->refcnt)) {
 		unsigned long timeo;
-		if (conn->type == ACL_LINK || conn->type == LE_LINK) {
+
+		switch (conn->type) {
+		case ACL_LINK:
+		case LE_LINK:
 			del_timer(&conn->idle_timer);
 			if (conn->state == BT_CONNECTED) {
 				timeo = msecs_to_jiffies(conn->disc_timeout);
@@ -727,14 +790,6 @@ int hci_add_remote_oob_data(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 *hash,
 								u8 *randomizer);
 int hci_remove_remote_oob_data(struct hci_dev *hdev, bdaddr_t *bdaddr);
 
-#define ADV_CLEAR_TIMEOUT (3*60*HZ) /* Three minutes */
-int hci_adv_entries_clear(struct hci_dev *hdev);
-struct adv_entry *hci_find_adv_entry(struct hci_dev *hdev, bdaddr_t *bdaddr);
-int hci_add_adv_entry(struct hci_dev *hdev,
-					struct hci_ev_le_advertising_info *ev);
-
-void hci_del_off_timer(struct hci_dev *hdev);
-
 void hci_event_packet(struct hci_dev *hdev, struct sk_buff *skb);
 
 int hci_recv_frame(struct sk_buff *skb);
@@ -747,7 +802,7 @@ void hci_conn_init_sysfs(struct hci_conn *conn);
 void hci_conn_add_sysfs(struct hci_conn *conn);
 void hci_conn_del_sysfs(struct hci_conn *conn);
 
-#define SET_HCIDEV_DEV(hdev, pdev) ((hdev)->parent = (pdev))
+#define SET_HCIDEV_DEV(hdev, pdev) ((hdev)->dev.parent = (pdev))
 
 /* ----- LMP capabilities ----- */
 #define lmp_rswitch_capable(dev)   ((dev)->features[0] & LMP_RSWITCH)
@@ -926,7 +981,7 @@ struct hci_cb {
 
 static inline void hci_auth_cfm(struct hci_conn *conn, __u8 status)
 {
-	struct list_head *p;
+	struct hci_cb *cb;
 	__u8 encrypt;
 
 	hci_proto_auth_cfm(conn, status);
@@ -947,7 +1002,7 @@ static inline void hci_auth_cfm(struct hci_conn *conn, __u8 status)
 
 static inline void hci_encrypt_cfm(struct hci_conn *conn, __u8 status, __u8 encrypt)
 {
-	struct list_head *p;
+	struct hci_cb *cb;
 
 	if (conn->sec_level == BT_SECURITY_SDP)
 		conn->sec_level = BT_SECURITY_LOW;
@@ -1104,7 +1159,7 @@ struct hci_sec_filter {
 #define hci_req_lock(d)		mutex_lock(&d->req_lock)
 #define hci_req_unlock(d)	mutex_unlock(&d->req_lock)
 
-void hci_req_complete(struct hci_dev *hdev, __u16 cmd, int result);
+void hci_update_ad(struct hci_request *req);
 
 void hci_le_conn_update(struct hci_conn *conn, u16 min, u16 max,
 					u16 latency, u16 to_multiplier);

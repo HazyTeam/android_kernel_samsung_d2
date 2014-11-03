@@ -43,14 +43,13 @@ struct mpc5xxx_can_data {
 };
 
 #ifdef CONFIG_PPC_MPC52xx
-static struct of_device_id __devinitdata mpc52xx_cdm_ids[] = {
+static struct of_device_id mpc52xx_cdm_ids[] = {
 	{ .compatible = "fsl,mpc5200-cdm", },
 	{}
 };
 
-static u32 __devinit mpc52xx_can_get_clock(struct platform_device *ofdev,
-					   const char *clock_name,
-					   int *mscan_clksrc)
+static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
+				 const char *clock_name, int *mscan_clksrc)
 {
 	unsigned int pvr;
 	struct mpc52xx_cdm  __iomem *cdm;
@@ -101,9 +100,8 @@ static u32 __devinit mpc52xx_can_get_clock(struct platform_device *ofdev,
 	return freq;
 }
 #else /* !CONFIG_PPC_MPC52xx */
-static u32 __devinit mpc52xx_can_get_clock(struct platform_device *ofdev,
-					   const char *clock_name,
-					   int *mscan_clksrc)
+static u32 mpc52xx_can_get_clock(struct platform_device *ofdev,
+				 const char *clock_name, int *mscan_clksrc)
 {
 	return 0;
 }
@@ -124,14 +122,13 @@ struct mpc512x_clockctl {
 	u32 mccr[4];		/* MSCAN Clk Ctrl Reg 1-3 */
 };
 
-static struct of_device_id __devinitdata mpc512x_clock_ids[] = {
+static struct of_device_id mpc512x_clock_ids[] = {
 	{ .compatible = "fsl,mpc5121-clock", },
 	{}
 };
 
-static u32 __devinit mpc512x_can_get_clock(struct platform_device *ofdev,
-					   const char *clock_name,
-					   int *mscan_clksrc)
+static u32 mpc512x_can_get_clock(struct platform_device *ofdev,
+				 const char *clock_name, int *mscan_clksrc)
 {
 	struct mpc512x_clockctl __iomem *clockctl;
 	struct device_node *np_clock;
@@ -251,7 +248,7 @@ static struct of_device_id mpc5xxx_can_table[];
 static int __devinit mpc5xxx_can_probe(struct platform_device *ofdev)
 {
 	const struct of_device_id *match;
-	struct mpc5xxx_can_data *data;
+	const struct mpc5xxx_can_data *data;
 	struct device_node *np = ofdev->dev.of_node;
 	struct net_device *dev;
 	struct mscan_priv *priv;
@@ -323,7 +320,7 @@ exit_unmap_mem:
 	return err;
 }
 
-static int __devexit mpc5xxx_can_remove(struct platform_device *ofdev)
+static int mpc5xxx_can_remove(struct platform_device *ofdev)
 {
 	struct net_device *dev = dev_get_drvdata(&ofdev->dev);
 	struct mscan_priv *priv = netdev_priv(dev);
@@ -404,7 +401,7 @@ static struct platform_driver mpc5xxx_can_driver = {
 		.of_match_table = mpc5xxx_can_table,
 	},
 	.probe = mpc5xxx_can_probe,
-	.remove = __devexit_p(mpc5xxx_can_remove),
+	.remove = mpc5xxx_can_remove,
 #ifdef CONFIG_PM
 	.suspend = mpc5xxx_can_suspend,
 	.resume = mpc5xxx_can_resume,

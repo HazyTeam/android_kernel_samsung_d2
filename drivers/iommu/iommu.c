@@ -116,6 +116,35 @@ bool iommu_present(struct bus_type *bus)
 }
 EXPORT_SYMBOL_GPL(iommu_present);
 
+struct iommu_group *iommu_group_get_by_id(int id)
+{
+	struct kobject *group_kobj;
+	struct iommu_group *group;
+	const char *name;
+
+	if (!iommu_group_kset)
+		return NULL;
+
+	name = kasprintf(GFP_KERNEL, "%d", id);
+	if (!name)
+		return NULL;
+
+	group_kobj = kset_find_obj(iommu_group_kset, name);
+	kfree(name);
+
+	if (!group_kobj)
+		return NULL;
+
+	group = container_of(group_kobj, struct iommu_group, kobj);
+	BUG_ON(group->id != id);
+
+	kobject_get(group->devices_kobj);
+	kobject_put(&group->kobj);
+
+	return group;
+}
+EXPORT_SYMBOL_GPL(iommu_group_get_by_id);
+
 /**
  * iommu_set_fault_handler() - set a fault handler for an iommu domain
  * @domain: iommu domain
@@ -193,8 +222,46 @@ void iommu_detach_device(struct iommu_domain *domain, struct device *dev)
 }
 EXPORT_SYMBOL_GPL(iommu_detach_device);
 
-phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain,
-			       unsigned long iova)
+/*
+ * IOMMU groups are really the natrual working unit of the IOMMU, but
+ * the IOMMU API works on domains and devices.  Bridge that gap by
+ * iterating over the devices in a group.  Ideally we'd have a single
+ * device which represents the requestor ID of the group, but we also
+ * allow IOMMU drivers to create policy defined minimum sets, where
+ * the physical hardware may be able to distiguish members, but we
+ * wish to group them at a higher level (ex. untrusted multi-function
+ * PCI devices).  Thus we attach each device.
+ */
+static int iommu_group_do_attach_device(struct device *dev, void *data)
+{
+	struct iommu_domain *domain = data;
+
+	return iommu_attach_device(domain, dev);
+}
+
+int iommu_attach_group(struct iommu_domain *domain, struct iommu_group *group)
+{
+	return iommu_group_for_each_dev(group, domain,
+					iommu_group_do_attach_device);
+}
+EXPORT_SYMBOL_GPL(iommu_attach_group);
+
+static int iommu_group_do_detach_device(struct device *dev, void *data)
+{
+	struct iommu_domain *domain = data;
+
+	iommu_detach_device(domain, dev);
+
+	return 0;
+}
+
+void iommu_detach_group(struct iommu_domain *domain, struct iommu_group *group)
+{
+	iommu_group_for_each_dev(group, domain, iommu_group_do_detach_device);
+}
+EXPORT_SYMBOL_GPL(iommu_detach_group);
+
+phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain, dma_addr_t iova)
 {
 	if (unlikely(domain->ops->iova_to_phys == NULL))
 		return 0;
@@ -376,11 +443,48 @@ phys_addr_t iommu_get_pt_base_addr(struct iommu_domain *domain)
 }
 EXPORT_SYMBOL_GPL(iommu_get_pt_base_addr);
 
-int iommu_device_group(struct device *dev, unsigned int *groupid)
+static int __init iommu_init(void)
 {
-	if (iommu_present(dev->bus) && dev->bus->iommu_ops->device_group)
-		return dev->bus->iommu_ops->device_group(dev, groupid);
+	iommu_group_kset = kset_create_and_add("iommu_groups",
+					       NULL, kernel_kobj);
+	ida_init(&iommu_group_ida);
+	mutex_init(&iommu_group_mutex);
 
-	return -ENODEV;
+	BUG_ON(!iommu_group_kset);
+
+	return 0;
 }
-EXPORT_SYMBOL_GPL(iommu_device_group);
+subsys_initcall(iommu_init);
+
+int iommu_domain_get_attr(struct iommu_domain *domain,
+			  enum iommu_attr attr, void *data)
+{
+	struct iommu_domain_geometry *geometry;
+	int ret = 0;
+
+	switch (attr) {
+	case DOMAIN_ATTR_GEOMETRY:
+		geometry  = data;
+		*geometry = domain->geometry;
+
+		break;
+	default:
+		if (!domain->ops->domain_get_attr)
+			return -EINVAL;
+
+		ret = domain->ops->domain_get_attr(domain, attr, data);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(iommu_domain_get_attr);
+
+int iommu_domain_set_attr(struct iommu_domain *domain,
+			  enum iommu_attr attr, void *data)
+{
+	if (!domain->ops->domain_set_attr)
+		return -EINVAL;
+
+	return domain->ops->domain_set_attr(domain, attr, data);
+}
+EXPORT_SYMBOL_GPL(iommu_domain_set_attr);

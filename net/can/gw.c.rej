@@ -1,0 +1,57 @@
+--- net/can/gw.c
++++ net/can/gw.c
+@@ -457,16 +487,16 @@
+ 	if (msg == NETDEV_UNREGISTER) {
+ 
+ 		struct cgw_job *gwj = NULL;
+-		struct hlist_node *n, *nx;
++		struct hlist_node *nx;
+ 
+ 		ASSERT_RTNL();
+ 
+-		hlist_for_each_entry_safe(gwj, n, nx, &cgw_list, list) {
++		hlist_for_each_entry_safe(gwj, nx, &cgw_list, list) {
+ 
+ 			if (gwj->src.dev == dev || gwj->dst.dev == dev) {
+ 				hlist_del(&gwj->list);
+ 				cgw_unregister_filter(gwj);
+-				kfree(gwj);
++				kmem_cache_free(cgw_cache, gwj);
+ 			}
+ 		}
+ 	}
+@@ -857,21 +892,21 @@
+ static void cgw_remove_all_jobs(void)
+ {
+ 	struct cgw_job *gwj = NULL;
+-	struct hlist_node *n, *nx;
++	struct hlist_node *nx;
+ 
+ 	ASSERT_RTNL();
+ 
+-	hlist_for_each_entry_safe(gwj, n, nx, &cgw_list, list) {
++	hlist_for_each_entry_safe(gwj, nx, &cgw_list, list) {
+ 		hlist_del(&gwj->list);
+ 		cgw_unregister_filter(gwj);
+-		kfree(gwj);
++		kmem_cache_free(cgw_cache, gwj);
+ 	}
+ }
+ 
+ static int cgw_remove_job(struct sk_buff *skb,  struct nlmsghdr *nlh, void *arg)
+ {
+ 	struct cgw_job *gwj = NULL;
+-	struct hlist_node *n, *nx;
++	struct hlist_node *nx;
+ 	struct rtcanmsg *r;
+ 	struct cf_mod mod;
+ 	struct can_can_gw ccgw;
+@@ -920,7 +955,7 @@
+ 
+ 		hlist_del(&gwj->list);
+ 		cgw_unregister_filter(gwj);
+-		kfree(gwj);
++		kmem_cache_free(cgw_cache, gwj);
+ 		err = 0;
+ 		break;
+ 	}

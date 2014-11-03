@@ -1,0 +1,64 @@
+--- net/bluetooth/hci_conn.c
++++ net/bluetooth/hci_conn.c
+@@ -263,7 +273,7 @@
+ 		hci_amp_disconn(conn, reason);
+ 		break;
+ 	default:
+-		hci_acl_disconn(conn, reason);
++		hci_disconnect(conn, reason);
+ 		break;
+ 	}
+ }
+@@ -458,12 +468,11 @@
+ 
+ 	skb_queue_purge(&conn->data_q);
+ 
+-	hci_conn_put_device(conn);
++	hci_conn_del_sysfs(conn);
+ 
+ 	hci_dev_put(hdev);
+ 
+-	if (conn->handle == 0)
+-		kfree(conn);
++	hci_conn_put(conn);
+ 
+ 	return 0;
+ }
+@@ -575,7 +584,7 @@
+ 	if (!sco) {
+ 		sco = hci_conn_add(hdev, type, dst);
+ 		if (!sco) {
+-			hci_conn_put(acl);
++			hci_conn_drop(acl);
+ 			return ERR_PTR(-ENOMEM);
+ 		}
+ 	}
+@@ -845,19 +854,6 @@
+ 	hci_dev_unlock(hdev);
+ }
+ 
+-void hci_conn_hold_device(struct hci_conn *conn)
+-{
+-	atomic_inc(&conn->devref);
+-}
+-EXPORT_SYMBOL(hci_conn_hold_device);
+-
+-void hci_conn_put_device(struct hci_conn *conn)
+-{
+-	if (atomic_dec_and_test(&conn->devref))
+-		hci_conn_del_sysfs(conn);
+-}
+-EXPORT_SYMBOL(hci_conn_put_device);
+-
+ int hci_get_conn_list(void __user *arg)
+ {
+ 	struct hci_conn *c;
+@@ -990,7 +986,7 @@
+ 
+ 	synchronize_rcu();
+ 
+-	hci_conn_put(conn);
++	hci_conn_drop(conn);
+ 
+ 	skb_queue_purge(&chan->data_q);
+ 	kfree(chan);

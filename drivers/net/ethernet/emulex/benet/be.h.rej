@@ -1,0 +1,17 @@
+--- drivers/net/ethernet/emulex/benet/be.h
++++ drivers/net/ethernet/emulex/benet/be.h
+@@ -573,14 +618,6 @@
+ 	return val;
+ }
+ 
+-static inline void be_check_sriov_fn_type(struct be_adapter *adapter)
+-{
+-	u32 sli_intf;
+-
+-	pci_read_config_dword(adapter->pdev, SLI_INTF_REG_OFFSET, &sli_intf);
+-	adapter->is_virtfn = (sli_intf & SLI_INTF_FT_MASK) ? 1 : 0;
+-}
+-
+ static inline void be_vf_eth_addr_generate(struct be_adapter *adapter, u8 *mac)
+ {
+ 	u32 addr;

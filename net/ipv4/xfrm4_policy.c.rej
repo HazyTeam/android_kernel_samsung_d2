@@ -1,0 +1,10 @@
+--- net/ipv4/xfrm4_policy.c
++++ net/ipv4/xfrm4_policy.c
+@@ -91,6 +91,7 @@
+ 					      RTCF_LOCAL);
+ 	xdst->u.rt.rt_type = rt->rt_type;
+ 	xdst->u.rt.rt_gateway = rt->rt_gateway;
++	xdst->u.rt.rt_uses_gateway = rt->rt_uses_gateway;
+ 	xdst->u.rt.rt_pmtu = rt->rt_pmtu;
+ 	INIT_LIST_HEAD(&xdst->u.rt.rt_uncached);
+ 

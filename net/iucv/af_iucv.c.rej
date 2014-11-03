@@ -1,0 +1,10 @@
+--- net/iucv/af_iucv.c
++++ net/iucv/af_iucv.c
+@@ -372,7 +372,6 @@
+ 			skb_trim(skb, skb->dev->mtu);
+ 	}
+ 	skb->protocol = ETH_P_AF_IUCV;
+-	skb_shinfo(skb)->tx_flags |= SKBTX_DRV_NEEDS_SK_REF;
+ 	nskb = skb_clone(skb, GFP_ATOMIC);
+ 	if (!nskb)
+ 		return -ENOMEM;

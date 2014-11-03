@@ -1,0 +1,43 @@
+--- drivers/mtd/nand/nandsim.c
++++ drivers/mtd/nand/nandsim.c
+@@ -262,14 +261,13 @@
+ #define NS_OPER_STATES   6  /* Maximum number of states in operation */
+ 
+ #define OPT_ANY          0xFFFFFFFF /* any chip supports this operation */
+-#define OPT_PAGE256      0x00000001 /* 256-byte  page chips */
+ #define OPT_PAGE512      0x00000002 /* 512-byte  page chips */
+ #define OPT_PAGE2048     0x00000008 /* 2048-byte page chips */
+ #define OPT_SMARTMEDIA   0x00000010 /* SmartMedia technology chips */
+ #define OPT_PAGE512_8BIT 0x00000040 /* 512-byte page chips with 8-bit bus width */
+ #define OPT_PAGE4096     0x00000080 /* 4096-byte page chips */
+ #define OPT_LARGEPAGE    (OPT_PAGE2048 | OPT_PAGE4096) /* 2048 & 4096-byte page chips */
+-#define OPT_SMALLPAGE    (OPT_PAGE256  | OPT_PAGE512)  /* 256 and 512-byte page chips */
++#define OPT_SMALLPAGE    (OPT_PAGE512) /* 512-byte page chips */
+ 
+ /* Remove action bits from state */
+ #define NS_STATE(x) ((x) & ~ACTION_MASK)
+@@ -696,10 +692,7 @@
+ 	ns->geom.secszoob = ns->geom.secsz + ns->geom.oobsz * ns->geom.pgsec;
+ 	ns->options = 0;
+ 
+-	if (ns->geom.pgsz == 256) {
+-		ns->options |= OPT_PAGE256;
+-	}
+-	else if (ns->geom.pgsz == 512) {
++	if (ns->geom.pgsz == 512) {
+ 		ns->options |= OPT_PAGE512;
+ 		if (ns->busw == 8)
+ 			ns->options |= OPT_PAGE512_8BIT;
+@@ -766,9 +759,9 @@
+ 	}
+ 
+ 	/* Detect how many ID bytes the NAND chip outputs */
+-        for (i = 0; nand_flash_ids[i].name != NULL; i++) {
+-                if (second_id_byte != nand_flash_ids[i].id)
+-                        continue;
++	for (i = 0; nand_flash_ids[i].name != NULL; i++) {
++		if (second_id_byte != nand_flash_ids[i].dev_id)
++			continue;
+ 	}
+ 
+ 	if (ns->busw == 16)

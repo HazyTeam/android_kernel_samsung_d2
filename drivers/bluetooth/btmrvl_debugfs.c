@@ -29,20 +29,6 @@
 struct btmrvl_debugfs_data {
 	struct dentry *config_dir;
 	struct dentry *status_dir;
-
-	/* config */
-	struct dentry *psmode;
-	struct dentry *pscmd;
-	struct dentry *hsmode;
-	struct dentry *hscmd;
-	struct dentry *gpiogap;
-	struct dentry *hscfgcmd;
-
-	/* status */
-	struct dentry *curpsmode;
-	struct dentry *hsstate;
-	struct dentry *psstate;
-	struct dentry *txdnldready;
 };
 
 static int btmrvl_open_generic(struct inode *inode, struct file *file)
@@ -424,19 +410,8 @@ void btmrvl_debugfs_remove(struct hci_dev *hdev)
 	if (!dbg)
 		return;
 
-	debugfs_remove(dbg->psmode);
-	debugfs_remove(dbg->pscmd);
-	debugfs_remove(dbg->gpiogap);
-	debugfs_remove(dbg->hsmode);
-	debugfs_remove(dbg->hscmd);
-	debugfs_remove(dbg->hscfgcmd);
-	debugfs_remove(dbg->config_dir);
-
-	debugfs_remove(dbg->curpsmode);
-	debugfs_remove(dbg->psstate);
-	debugfs_remove(dbg->hsstate);
-	debugfs_remove(dbg->txdnldready);
-	debugfs_remove(dbg->status_dir);
+	debugfs_remove_recursive(dbg->config_dir);
+	debugfs_remove_recursive(dbg->status_dir);
 
 	kfree(dbg);
 }

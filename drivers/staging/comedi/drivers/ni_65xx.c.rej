@@ -1,0 +1,11 @@
+--- drivers/staging/comedi/drivers/ni_65xx.c
++++ drivers/staging/comedi/drivers/ni_65xx.c
+@@ -397,7 +381,7 @@
+ 		unsigned base_port_channel;
+ 		unsigned port_mask, port_data, port_read_bits;
+ 		int bitshift;
+-		if (port >= ni_65xx_total_num_ports(board(dev)))
++		if (port >= ni_65xx_total_num_ports(board))
+ 			break;
+ 		base_port_channel = port_offset * ni_65xx_channels_per_port;
+ 		port_mask = data[0];

@@ -1,0 +1,35 @@
+--- drivers/input/keyboard/matrix_keypad.c
++++ drivers/input/keyboard/matrix_keypad.c
+@@ -476,29 +493,15 @@
+ static int __devexit matrix_keypad_remove(struct platform_device *pdev)
+ {
+ 	struct matrix_keypad *keypad = platform_get_drvdata(pdev);
+-	const struct matrix_keypad_platform_data *pdata = keypad->pdata;
+-	int i;
+ 
+ 	device_init_wakeup(&pdev->dev, 0);
+ 
+-	if (pdata->clustered_irq > 0) {
+-		free_irq(pdata->clustered_irq, keypad);
+-	} else {
+-		for (i = 0; i < pdata->num_row_gpios; i++)
+-			free_irq(gpio_to_irq(pdata->row_gpios[i]), keypad);
+-	}
+-
+-	for (i = 0; i < pdata->num_row_gpios; i++)
+-		gpio_free(pdata->row_gpios[i]);
+-
+-	for (i = 0; i < pdata->num_col_gpios; i++)
+-		gpio_free(pdata->col_gpios[i]);
+-
++	matrix_keypad_free_gpio(keypad);
+ 	input_unregister_device(keypad->input_dev);
+-	platform_set_drvdata(pdev, NULL);
+-	kfree(keypad->keycodes);
+ 	kfree(keypad);
+ 
++	platform_set_drvdata(pdev, NULL);
++
+ 	return 0;
+ }
+ 

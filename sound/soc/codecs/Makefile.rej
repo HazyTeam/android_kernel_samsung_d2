@@ -1,0 +1,10 @@
+--- sound/soc/codecs/Makefile
++++ sound/soc/codecs/Makefile
+@@ -148,6 +149,7 @@
+ obj-$(CONFIG_SND_SOC_CS4271)	+= snd-soc-cs4271.o
+ obj-$(CONFIG_SND_SOC_CX20442)	+= snd-soc-cx20442.o
+ obj-$(CONFIG_SND_SOC_DA7210)	+= snd-soc-da7210.o
++obj-$(CONFIG_SND_SOC_DA7213)	+= snd-soc-da7213.o
+ obj-$(CONFIG_SND_SOC_DA732X)	+= snd-soc-da732x.o
+ obj-$(CONFIG_SND_SOC_DA9055)	+= snd-soc-da9055.o
+ obj-$(CONFIG_SND_SOC_DFBMCS320)	+= snd-soc-dfbmcs320.o

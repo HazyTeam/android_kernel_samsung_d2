@@ -277,6 +277,15 @@ struct mgmt_cp_le_cancel_create_conn {
 	bdaddr_t	bdaddr;
 } __packed;
 
+#define MGMT_OP_SET_DEVICE_ID		0x0028
+struct mgmt_cp_set_device_id {
+	__le16	source;
+	__le16	vendor;
+	__le16	product;
+	__le16	version;
+} __packed;
+#define MGMT_SET_DEVICE_ID_SIZE		8
+
 #define MGMT_EV_CMD_COMPLETE		0x0001
 struct mgmt_ev_cmd_complete {
 	__le16 opcode;
@@ -418,4 +427,11 @@ struct mgmt_ev_le_conn_params {
 	__u16 interval;
 	__u16 latency;
 	__u16 timeout;
+} __packed;
+
+#define MGMT_EV_PASSKEY_NOTIFY		0x0017
+struct mgmt_ev_passkey_notify {
+	struct mgmt_addr_info addr;
+	__le32	passkey;
+	__u8	entered;
 } __packed;

@@ -2,6 +2,7 @@
 #define __NET_IPIP_H 1
 
 #include <linux/if_tunnel.h>
+#include <net/gro_cells.h>
 #include <net/ip.h>
 
 /* Keep error state on tunnel for 30 sec */
@@ -36,6 +37,8 @@ struct ip_tunnel {
 #endif
 	struct ip_tunnel_prl_entry __rcu *prl;		/* potential router list */
 	unsigned int			prl_count;	/* # of entries in PRL */
+
+	struct gro_cells		gro_cells;
 };
 
 struct ip_tunnel_prl_entry {
@@ -54,8 +57,10 @@ struct ip_tunnel_prl_entry {
 									\
 	err = ip_local_out(skb);					\
 	if (likely(net_xmit_eval(err) == 0)) {				\
+		u64_stats_update_begin(&(stats1)->syncp);		\
 		(stats1)->tx_bytes += pkt_len;				\
 		(stats1)->tx_packets++;					\
+		u64_stats_update_end(&(stats1)->syncp);			\
 	} else {							\
 		(stats2)->tx_errors++;					\
 		(stats2)->tx_aborted_errors++;				\
@@ -64,4 +69,17 @@ struct ip_tunnel_prl_entry {
 
 #define IPTUNNEL_XMIT() __IPTUNNEL_XMIT(txq, stats)
 
+static inline void tunnel_ip_select_ident(struct sk_buff *skb,
+					  const struct iphdr  *old_iph,
+					  struct dst_entry *dst)
+{
+	struct iphdr *iph = ip_hdr(skb);
+
+	/* Use inner packet iph-id if possible. */
+	if (skb->protocol == htons(ETH_P_IP) && old_iph->id)
+		iph->id	= old_iph->id;
+	else
+		__ip_select_ident(iph, dst,
+				  (skb_shinfo(skb)->gso_segs ?: 1) - 1);
+}
 #endif

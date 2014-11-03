@@ -1,0 +1,11 @@
+--- sound/soc/codecs/wm8903.c
++++ sound/soc/codecs/wm8903.c
+@@ -1083,6 +1083,8 @@
+ 	{ "ROP", NULL, "Right Speaker PGA" },
+ 	{ "RON", NULL, "Right Speaker PGA" },
+ 
++	{ "Charge Pump", NULL, "CLK_DSP" },
++
+ 	{ "Left Headphone Output PGA", NULL, "Charge Pump" },
+ 	{ "Right Headphone Output PGA", NULL, "Charge Pump" },
+ 	{ "Left Line Output PGA", NULL, "Charge Pump" },

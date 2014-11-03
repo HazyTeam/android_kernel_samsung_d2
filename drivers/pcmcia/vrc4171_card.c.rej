@@ -1,0 +1,10 @@
+--- drivers/pcmcia/vrc4171_card.c
++++ drivers/pcmcia/vrc4171_card.c
+@@ -246,6 +246,7 @@
+ 	socket = &vrc4171_sockets[slot];
+ 	socket->csc_irq = search_nonuse_irq();
+ 	socket->io_irq = search_nonuse_irq();
++	spin_lock_init(&socket->lock);
+ 
+ 	return 0;
+ }

@@ -1,0 +1,11 @@
+--- net/ipv4/devinet.c
++++ net/ipv4/devinet.c
+@@ -732,7 +733,7 @@
+ 	case SIOCSIFDSTADDR:	/* Set the destination address */
+ 	case SIOCSIFNETMASK: 	/* Set the netmask for the interface */
+ 		ret = -EPERM;
+-		if (!capable(CAP_NET_ADMIN))
++		if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
+ 			goto out;
+ 		ret = -EINVAL;
+ 		if (sin->sin_family != AF_INET)

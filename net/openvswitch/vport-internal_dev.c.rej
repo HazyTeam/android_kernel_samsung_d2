@@ -1,0 +1,14 @@
+--- net/openvswitch/vport-internal_dev.c
++++ net/openvswitch/vport-internal_dev.c
+@@ -212,6 +215,11 @@
+ 	int len;
+ 
+ 	len = skb->len;
++
++	skb_dst_drop(skb);
++	nf_reset(skb);
++	secpath_reset(skb);
++
+ 	skb->dev = netdev;
+ 	skb->pkt_type = PACKET_HOST;
+ 	skb->protocol = eth_type_trans(skb, netdev);

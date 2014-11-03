@@ -1,0 +1,127 @@
+--- drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
++++ drivers/net/ethernet/intel/ixgbe/ixgbe_main.c
+@@ -2454,6 +2503,16 @@
+ 	 * with the write to EICR.
+ 	 */
+ 	eicr = IXGBE_READ_REG(hw, IXGBE_EICS);
++
++	/* The lower 16bits of the EICR register are for the queue interrupts
++	 * which should be masked here in order to not accidently clear them if
++	 * the bits are high when ixgbe_msix_other is called. There is a race
++	 * condition otherwise which results in possible performance loss
++	 * especially if the ixgbe_msix_other interrupt is triggering
++	 * consistently (as it would when PPS is turned on for the X540 device)
++	 */
++	eicr &= 0xFFFF0000;
++
+ 	IXGBE_WRITE_REG(hw, IXGBE_EICR, eicr);
+ 
+ 	if (eicr & IXGBE_EICR_LSC)
+@@ -7084,44 +7140,6 @@
+ 	return err;
+ }
+ 
+-static int ixgbe_ndo_fdb_del(struct ndmsg *ndm, struct nlattr *tb[],
+-			     struct net_device *dev,
+-			     const unsigned char *addr)
+-{
+-	struct ixgbe_adapter *adapter = netdev_priv(dev);
+-	int err = -EOPNOTSUPP;
+-
+-	if (ndm->ndm_state & NUD_PERMANENT) {
+-		pr_info("%s: FDB only supports static addresses\n",
+-			ixgbe_driver_name);
+-		return -EINVAL;
+-	}
+-
+-	if (adapter->flags & IXGBE_FLAG_SRIOV_ENABLED) {
+-		if (is_unicast_ether_addr(addr))
+-			err = dev_uc_del(dev, addr);
+-		else if (is_multicast_ether_addr(addr))
+-			err = dev_mc_del(dev, addr);
+-		else
+-			err = -EINVAL;
+-	}
+-
+-	return err;
+-}
+-
+-static int ixgbe_ndo_fdb_dump(struct sk_buff *skb,
+-			      struct netlink_callback *cb,
+-			      struct net_device *dev,
+-			      int idx)
+-{
+-	struct ixgbe_adapter *adapter = netdev_priv(dev);
+-
+-	if (adapter->flags & IXGBE_FLAG_SRIOV_ENABLED)
+-		idx = ndo_dflt_fdb_dump(skb, cb, dev, idx);
+-
+-	return idx;
+-}
+-
+ static int ixgbe_ndo_bridge_setlink(struct net_device *dev,
+ 				    struct nlmsghdr *nlh)
+ {
+@@ -7579,7 +7609,9 @@
+ 	/* WOL not supported for all devices */
+ 	adapter->wol = 0;
+ 	hw->eeprom.ops.read(hw, 0x2c, &adapter->eeprom_cap);
+-	if (ixgbe_wol_supported(adapter, pdev->device, pdev->subsystem_device))
++	hw->wol_enabled = ixgbe_wol_supported(adapter, pdev->device,
++						pdev->subsystem_device);
++	if (hw->wol_enabled)
+ 		adapter->wol = IXGBE_WUFC_MAG;
+ 
+ 	device_set_wakeup_enable(&adapter->pdev->dev, adapter->wol);
+@@ -7676,9 +7711,13 @@
+ 		e_err(probe, "failed to allocate sysfs resources\n");
+ #endif /* CONFIG_IXGBE_HWMON */
+ 
+-#ifdef CONFIG_DEBUG_FS
+ 	ixgbe_dbg_adapter_init(adapter);
+-#endif /* CONFIG_DEBUG_FS */
++
++	/* Need link setup for MNG FW, else wait for IXGBE_UP */
++	if (hw->mng_fw_enabled && hw->mac.ops.setup_link)
++		hw->mac.ops.setup_link(hw,
++			IXGBE_LINK_SPEED_10GB_FULL | IXGBE_LINK_SPEED_1GB_FULL,
++			true);
+ 
+ 	return 0;
+ 
+@@ -7714,9 +7753,7 @@
+ 	struct ixgbe_adapter *adapter = pci_get_drvdata(pdev);
+ 	struct net_device *netdev = adapter->netdev;
+ 
+-#ifdef CONFIG_DEBUG_FS
+ 	ixgbe_dbg_adapter_exit(adapter);
+-#endif /*CONFIG_DEBUG_FS */
+ 
+ 	set_bit(__IXGBE_DOWN, &adapter->state);
+ 	cancel_work_sync(&adapter->service_task);
+@@ -7979,15 +8016,11 @@
+ 	pr_info("%s - version %s\n", ixgbe_driver_string, ixgbe_driver_version);
+ 	pr_info("%s\n", ixgbe_copyright);
+ 
+-#ifdef CONFIG_DEBUG_FS
+ 	ixgbe_dbg_init();
+-#endif /* CONFIG_DEBUG_FS */
+ 
+ 	ret = pci_register_driver(&ixgbe_driver);
+ 	if (ret) {
+-#ifdef CONFIG_DEBUG_FS
+ 		ixgbe_dbg_exit();
+-#endif /* CONFIG_DEBUG_FS */
+ 		return ret;
+ 	}
+ 
+@@ -8013,9 +8046,7 @@
+ #endif
+ 	pci_unregister_driver(&ixgbe_driver);
+ 
+-#ifdef CONFIG_DEBUG_FS
+ 	ixgbe_dbg_exit();
+-#endif /* CONFIG_DEBUG_FS */
+ 
+ 	rcu_barrier(); /* Wait for completion of call_rcu()'s */
+ }

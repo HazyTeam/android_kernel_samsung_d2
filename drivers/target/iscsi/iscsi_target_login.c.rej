@@ -1,0 +1,124 @@
+--- drivers/target/iscsi/iscsi_target_login.c
++++ drivers/target/iscsi/iscsi_target_login.c
+@@ -1136,75 +1386,76 @@
+ 	}
+ 	spin_unlock_bh(&np->np_thread_lock);
+ 
+-	if (kernel_accept(sock, &new_sock, 0) < 0) {
+-		spin_lock_bh(&np->np_thread_lock);
+-		if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
+-			spin_unlock_bh(&np->np_thread_lock);
+-			complete(&np->np_restart_comp);
+-			/* Get another socket */
+-			return 1;
+-		}
+-		spin_unlock_bh(&np->np_thread_lock);
+-		goto out;
+-	}
+-	iscsi_start_login_thread_timer(np);
+-
+ 	conn = kzalloc(sizeof(struct iscsi_conn), GFP_KERNEL);
+ 	if (!conn) {
+ 		pr_err("Could not allocate memory for"
+ 			" new connection\n");
+-		sock_release(new_sock);
+ 		/* Get another socket */
+ 		return 1;
+ 	}
+-
+ 	pr_debug("Moving to TARG_CONN_STATE_FREE.\n");
+ 	conn->conn_state = TARG_CONN_STATE_FREE;
+-	conn->sock = new_sock;
+ 
+-	pr_debug("Moving to TARG_CONN_STATE_XPT_UP.\n");
+-	conn->conn_state = TARG_CONN_STATE_XPT_UP;
++	if (iscsit_conn_set_transport(conn, np->np_transport) < 0) {
++		kfree(conn);
++		return 1;
++	}
+ 
+-	/*
+-	 * Allocate conn->conn_ops early as a failure calling
+-	 * iscsit_tx_login_rsp() below will call tx_data().
+-	 */
+-	conn->conn_ops = kzalloc(sizeof(struct iscsi_conn_ops), GFP_KERNEL);
+-	if (!conn->conn_ops) {
+-		pr_err("Unable to allocate memory for"
+-			" struct iscsi_conn_ops.\n");
+-		goto new_sess_out;
++	rc = np->np_transport->iscsit_accept_np(np, conn);
++	if (rc == -ENOSYS) {
++		complete(&np->np_restart_comp);
++		iscsit_put_transport(conn->conn_transport);
++		kfree(conn);
++		conn = NULL;
++		goto exit;
++	} else if (rc < 0) {
++		spin_lock_bh(&np->np_thread_lock);
++		if (np->np_thread_state == ISCSI_NP_THREAD_RESET) {
++			spin_unlock_bh(&np->np_thread_lock);
++			complete(&np->np_restart_comp);
++			if (ret == -ENODEV) {
++				iscsit_put_transport(conn->conn_transport);
++				kfree(conn);
++				conn = NULL;
++				goto out;
++			}
++			/* Get another socket */
++			return 1;
++		}
++		spin_unlock_bh(&np->np_thread_lock);
++		iscsit_put_transport(conn->conn_transport);
++		kfree(conn);
++		conn = NULL;
++		goto out;
+ 	}
+ 	/*
+ 	 * Perform the remaining iSCSI connection initialization items..
+ 	 */
+-	if (iscsi_login_init_conn(conn) < 0)
+-		goto new_sess_out;
+-
+-	memset(buffer, 0, ISCSI_HDR_LEN);
+-	memset(&iov, 0, sizeof(struct kvec));
+-	iov.iov_base	= buffer;
+-	iov.iov_len	= ISCSI_HDR_LEN;
+-
+-	if (rx_data(conn, &iov, 1, ISCSI_HDR_LEN) <= 0) {
+-		pr_err("rx_data() returned an error.\n");
++	login = iscsi_login_init_conn(conn);
++	if (!login) {
+ 		goto new_sess_out;
+ 	}
+ 
+-	iscsi_opcode = (buffer[0] & ISCSI_OPCODE_MASK);
+-	if (!(iscsi_opcode & ISCSI_OP_LOGIN)) {
+-		pr_err("First opcode is not login request,"
+-			" failing login request.\n");
+-		goto new_sess_out;
+-	}
++	iscsi_start_login_thread_timer(np);
+ 
+-	pdu			= (struct iscsi_login_req *) buffer;
++	pr_debug("Moving to TARG_CONN_STATE_XPT_UP.\n");
++	conn->conn_state = TARG_CONN_STATE_XPT_UP;
++	/*
++	 * This will process the first login request + payload..
++	 */
++	rc = np->np_transport->iscsit_get_login_rx(conn, login);
++	if (rc == 1)
++		return 1;
++	else if (rc < 0)
++		goto new_sess_out;
+ 
++	buffer = &login->req[0];
++	pdu = (struct iscsi_login_req *)buffer;
+ 	/*
+ 	 * Used by iscsit_tx_login_rsp() for Login Resonses PDUs
+ 	 * when Status-Class != 0.
+ 	*/
+-	conn->login_itt		= pdu->itt;
++	conn->login_itt	= pdu->itt;
+ 
+ 	spin_lock_bh(&np->np_thread_lock);
+ 	if (np->np_thread_state != ISCSI_NP_THREAD_ACTIVE) {

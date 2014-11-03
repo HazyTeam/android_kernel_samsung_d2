@@ -1,0 +1,88 @@
+--- fs/ext4/move_extent.c
++++ fs/ext4/move_extent.c
+@@ -806,7 +798,13 @@
+ 		page_cache_release(page[0]);
+ 		return -ENOMEM;
+ 	}
+-
++	/*
++	 * grab_cache_page_write_begin() may not wait on page's writeback if
++	 * BDI not demand that. But it is reasonable to be very conservative
++	 * here and explicitly wait on page's writeback
++	 */
++	wait_on_page_writeback(page[0]);
++	wait_on_page_writeback(page[1]);
+ 	if (inode1 > inode2) {
+ 		struct page *tmp;
+ 		tmp = page[0];
+@@ -848,7 +846,6 @@
+ 		if (buffer_uptodate(bh))
+ 			continue;
+ 		if (!buffer_mapped(bh)) {
+-			int err = 0;
+ 			err = ext4_get_block(inode, block, bh, 0);
+ 			if (err) {
+ 				SetPageError(page);
+@@ -968,7 +965,7 @@
+ 	 * necessary, just swap data blocks between orig and donor.
+ 	 */
+ 	if (uninit) {
+-		double_down_write_data_sem(orig_inode, donor_inode);
++		ext4_double_down_write_data_sem(orig_inode, donor_inode);
+ 		/* If any of extents in range became initialized we have to
+ 		 * fallback to data copying */
+ 		uninit = mext_check_coverage(orig_inode, orig_blk_offset,
+@@ -982,7 +979,7 @@
+ 			goto drop_data_sem;
+ 
+ 		if (!uninit) {
+-			double_up_write_data_sem(orig_inode, donor_inode);
++			ext4_double_up_write_data_sem(orig_inode, donor_inode);
+ 			goto data_copy;
+ 		}
+ 		if ((page_has_private(pagep[0]) &&
+@@ -996,7 +993,7 @@
+ 						donor_inode, orig_blk_offset,
+ 						block_len_in_page, err);
+ 	drop_data_sem:
+-		double_up_write_data_sem(orig_inode, donor_inode);
++		ext4_double_up_write_data_sem(orig_inode, donor_inode);
+ 		goto unlock_pages;
+ 	}
+ data_copy:
+@@ -1025,7 +1022,7 @@
+ 	}
+ 	/* Perform all necessary steps similar write_begin()/write_end()
+ 	 * but keeping in mind that i_size will not change */
+-	*err = __block_write_begin(pagep[0], from, from + replaced_size,
++	*err = __block_write_begin(pagep[0], from, replaced_size,
+ 				   ext4_get_block);
+ 	if (!*err)
+ 		*err = block_commit_write(pagep[0], from, from + replaced_size);
+@@ -1057,11 +1054,11 @@
+ 	 * Extents are swapped already, but we are not able to copy data.
+ 	 * Try to swap extents to it's original places
+ 	 */
+-	double_down_write_data_sem(orig_inode, donor_inode);
++	ext4_double_down_write_data_sem(orig_inode, donor_inode);
+ 	replaced_count = mext_replace_branches(handle, donor_inode, orig_inode,
+ 					       orig_blk_offset,
+ 					       block_len_in_page, &err2);
+-	double_up_write_data_sem(orig_inode, donor_inode);
++	ext4_double_up_write_data_sem(orig_inode, donor_inode);
+ 	if (replaced_count != block_len_in_page) {
+ 		EXT4_ERROR_INODE_BLOCK(orig_inode, (sector_t)(orig_blk_offset),
+ 				       "Unable to copy data block,"
+@@ -1530,10 +1527,10 @@
+ 		ext4_ext_drop_refs(holecheck_path);
+ 		kfree(holecheck_path);
+ 	}
+-	double_up_write_data_sem(orig_inode, donor_inode);
++	ext4_double_up_write_data_sem(orig_inode, donor_inode);
+ 	ext4_inode_resume_unlocked_dio(orig_inode);
+ 	ext4_inode_resume_unlocked_dio(donor_inode);
+-	mext_inode_double_unlock(orig_inode, donor_inode);
++	ext4_inode_double_unlock(orig_inode, donor_inode);
+ 
+ 	return ret;
+ }

@@ -1,0 +1,11 @@
+--- arch/powerpc/kernel/dbell.c
++++ arch/powerpc/kernel/dbell.c
+@@ -28,6 +28,8 @@
+ 
+ void doorbell_cause_ipi(int cpu, unsigned long data)
+ {
++	/* Order previous accesses vs. msgsnd, which is treated as a store */
++	mb();
+ 	ppc_msgsnd(PPC_DBELL, 0, data);
+ }
+ 

@@ -7,6 +7,7 @@
 #include <linux/seq_file.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <asm/unaligned.h>
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
@@ -134,7 +135,6 @@ static void del_conn(struct work_struct *work)
 	}
 
 	device_del(&conn->dev);
-	put_device(&conn->dev);
 
 	hci_dev_put(hdev);
 }
@@ -354,11 +354,11 @@ static DEVICE_ATTR(hci_version, S_IRUGO, show_hci_version, NULL);
 static DEVICE_ATTR(hci_revision, S_IRUGO, show_hci_revision, NULL);
 
 static DEVICE_ATTR(idle_timeout, S_IRUGO | S_IWUSR,
-				show_idle_timeout, store_idle_timeout);
+		   show_idle_timeout, store_idle_timeout);
 static DEVICE_ATTR(sniff_max_interval, S_IRUGO | S_IWUSR,
-				show_sniff_max_interval, store_sniff_max_interval);
+		   show_sniff_max_interval, store_sniff_max_interval);
 static DEVICE_ATTR(sniff_min_interval, S_IRUGO | S_IWUSR,
-				show_sniff_min_interval, store_sniff_min_interval);
+		   show_sniff_min_interval, store_sniff_min_interval);
 
 static struct attribute *bt_host_attrs[] = {
 	&dev_attr_bus.attr,
@@ -407,8 +407,8 @@ static int inquiry_cache_show(struct seq_file *f, void *p)
 
 	for (e = cache->list; e; e = e->next) {
 		struct inquiry_data *data = &e->data;
-		seq_printf(f, "%s %d %d %d 0x%.2x%.2x%.2x 0x%.4x %d %d %u\n",
-			   batostr(&data->bdaddr),
+		seq_printf(f, "%pMR %d %d %d 0x%.2x%.2x%.2x 0x%.4x %d %d %u\n",
+			   &data->bdaddr,
 			   data->pscan_rep_mode, data->pscan_period_mode,
 			   data->pscan_mode, data->dev_class[2],
 			   data->dev_class[1], data->dev_class[0],
@@ -467,19 +467,18 @@ static const struct file_operations blacklist_fops = {
 
 static void print_bt_uuid(struct seq_file *f, u8 *uuid)
 {
-	u32 data0, data4;
-	u16 data1, data2, data3, data5;
+	u32 data0, data5;
+	u16 data1, data2, data3, data4;
 
-	memcpy(&data0, &uuid[0], 4);
-	memcpy(&data1, &uuid[4], 2);
-	memcpy(&data2, &uuid[6], 2);
-	memcpy(&data3, &uuid[8], 2);
-	memcpy(&data4, &uuid[10], 4);
-	memcpy(&data5, &uuid[14], 2);
+	data5 = get_unaligned_le32(uuid);
+	data4 = get_unaligned_le16(uuid + 4);
+	data3 = get_unaligned_le16(uuid + 6);
+	data2 = get_unaligned_le16(uuid + 8);
+	data1 = get_unaligned_le16(uuid + 10);
+	data0 = get_unaligned_le32(uuid + 12);
 
-	seq_printf(f, "%.8x-%.4x-%.4x-%.4x-%.8x%.4x\n",
-				ntohl(data0), ntohs(data1), ntohs(data2),
-				ntohs(data3), ntohl(data4), ntohs(data5));
+	seq_printf(f, "%.8x-%.4x-%.4x-%.4x-%.4x%.8x\n",
+		   data0, data1, data2, data3, data4, data5);
 }
 
 static int uuids_show(struct seq_file *f, void *p)
@@ -565,10 +564,8 @@ int __init bt_sysfs_init(void)
 	bt_debugfs = debugfs_create_dir("bluetooth", NULL);
 
 	bt_class = class_create(THIS_MODULE, "bluetooth");
-	if (IS_ERR(bt_class))
-		return PTR_ERR(bt_class);
 
-	return 0;
+	return PTR_RET(bt_class);
 }
 
 void bt_sysfs_cleanup(void)

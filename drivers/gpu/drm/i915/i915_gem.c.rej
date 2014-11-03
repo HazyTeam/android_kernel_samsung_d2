@@ -1,0 +1,20 @@
+--- drivers/gpu/drm/i915/i915_gem.c
++++ drivers/gpu/drm/i915/i915_gem.c
+@@ -2793,7 +2800,7 @@
+ 	 * will need to serialise the write to the associated fence register?
+ 	 */
+ 	if (obj->fence_dirty) {
+-		ret = i915_gem_object_flush_fence(obj);
++		ret = i915_gem_object_wait_fence(obj);
+ 		if (ret)
+ 			return ret;
+ 	}
+@@ -2814,7 +2821,7 @@
+ 		if (reg->obj) {
+ 			struct drm_i915_gem_object *old = reg->obj;
+ 
+-			ret = i915_gem_object_flush_fence(old);
++			ret = i915_gem_object_wait_fence(old);
+ 			if (ret)
+ 				return ret;
+ 

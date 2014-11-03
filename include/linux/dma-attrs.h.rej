@@ -1,0 +1,10 @@
+--- include/linux/dma-attrs.h
++++ include/linux/dma-attrs.h
+@@ -17,6 +17,7 @@
+ 	DMA_ATTR_NON_CONSISTENT,
+ 	DMA_ATTR_NO_KERNEL_MAPPING,
+ 	DMA_ATTR_SKIP_CPU_SYNC,
++	DMA_ATTR_FORCE_CONTIGUOUS,
+ 	DMA_ATTR_MAX,
+ };
+ 

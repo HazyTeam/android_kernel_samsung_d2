@@ -305,8 +305,7 @@ void scm_detach_fds_compat(struct msghdr *kmsg, struct scm_cookie *scm)
 			break;
 		}
 		/* Bump the usage count and install the file. */
-		get_file(fp[i]);
-		fd_install(new_fd, fp[i]);
+		fd_install(new_fd, get_file(fp[i]));
 	}
 
 	if (i > 0) {
@@ -483,6 +482,9 @@ int compat_sock_get_timestampns(struct sock *sk, struct timespec __user *usersta
 	struct compat_timespec __user *ctv;
 	int err;
 	struct timespec ts;
+
+	if (flags & MSG_CMSG_COMPAT)
+		return -EINVAL;
 
 	if (COMPAT_USE_64BIT_TIME)
 		return sock_get_timestampns (sk, userstamp);

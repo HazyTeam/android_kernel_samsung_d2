@@ -27,11 +27,9 @@
  *
  */
 
-
 #ifndef __RNDIS_H__
 #define __RNDIS_H__
 
-/*---------------------  Export Definitions -------------------------*/
 #define MESSAGE_TYPE_READ               0x01
 #define MESSAGE_TYPE_WRITE              0x00
 #define MESSAGE_TYPE_LOCK_OR            0x02

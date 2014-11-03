@@ -1,0 +1,29 @@
+--- security/keys/process_keys.c
++++ security/keys/process_keys.c
+@@ -57,7 +57,7 @@
+ 
+ 	kenter("%p{%u}", user, uid);
+ 
+-	if (user->uid_keyring) {
++	if (user->uid_keyring && user->session_keyring) {
+ 		kleave(" = 0 [exist]");
+ 		return 0;
+ 	}
+@@ -367,6 +367,8 @@
+ 
+ 		switch (PTR_ERR(key_ref)) {
+ 		case -EAGAIN: /* no key */
++			if (ret)
++				break;
+ 		case -ENOKEY: /* negative key */
+ 			ret = key_ref;
+ 			break;
+@@ -837,7 +839,7 @@
+ 	new-> sgid	= old-> sgid;
+ 	new->fsgid	= old->fsgid;
+ 	new->user	= get_uid(old->user);
+-	new->user_ns	= get_user_ns(new->user_ns);
++	new->user_ns	= get_user_ns(old->user_ns);
+ 	new->group_info	= get_group_info(old->group_info);
+ 
+ 	new->securebits	= old->securebits;

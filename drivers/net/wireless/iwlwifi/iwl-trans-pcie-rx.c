@@ -140,14 +140,17 @@ void iwl_rx_queue_update_write_ptr(struct iwl_trans *trans,
 	if (q->need_update == 0)
 		goto exit_unlock;
 
-	if (cfg(trans)->base_params->shadow_reg_enable) {
+	if (trans->cfg->base_params->shadow_reg_enable) {
 		/* shadow register enabled */
 		/* Device expects a multiple of 8 */
 		q->write_actual = (q->write & ~0x7);
 		iwl_write32(trans, FH_RSCSR_CHNL0_WPTR, q->write_actual);
 	} else {
+		struct iwl_trans_pcie *trans_pcie =
+			IWL_TRANS_GET_PCIE_TRANS(trans);
+
 		/* If power-saving is in use, make sure device is awake */
-		if (test_bit(STATUS_POWER_PMI, &trans->shrd->status)) {
+		if (test_bit(STATUS_TPOWER_PMI, &trans_pcie->status)) {
 			reg = iwl_read32(trans, CSR_UCODE_DRV_GP1);
 
 			if (reg & CSR_UCODE_DRV_GP1_BIT_MAC_SLEEP) {
@@ -271,17 +274,17 @@ static void iwlagn_rx_allocate(struct iwl_trans *trans, gfp_t priority)
 		if (rxq->free_count > RX_LOW_WATERMARK)
 			gfp_mask |= __GFP_NOWARN;
 
-		if (hw_params(trans).rx_page_order > 0)
+		if (trans_pcie->rx_page_order > 0)
 			gfp_mask |= __GFP_COMP;
 
 		/* Alloc a new receive buffer */
 		page = alloc_pages(gfp_mask,
-				  hw_params(trans).rx_page_order);
+				  trans_pcie->rx_page_order);
 		if (!page) {
 			if (net_ratelimit())
 				IWL_DEBUG_INFO(trans, "alloc_pages failed, "
 					   "order: %d\n",
-					   hw_params(trans).rx_page_order);
+					   trans_pcie->rx_page_order);
 
 			if ((rxq->free_count <= RX_LOW_WATERMARK) &&
 			    net_ratelimit())
@@ -300,7 +303,7 @@ static void iwlagn_rx_allocate(struct iwl_trans *trans, gfp_t priority)
 
 		if (list_empty(&rxq->rx_used)) {
 			spin_unlock_irqrestore(&rxq->lock, flags);
-			__free_pages(page, hw_params(trans).rx_page_order);
+			__free_pages(page, trans_pcie->rx_page_order);
 			return;
 		}
 		element = rxq->rx_used.next;
@@ -313,7 +316,7 @@ static void iwlagn_rx_allocate(struct iwl_trans *trans, gfp_t priority)
 		rxb->page = page;
 		/* Get physical address of the RB */
 		rxb->page_dma = dma_map_page(trans->dev, page, 0,
-				PAGE_SIZE << hw_params(trans).rx_page_order,
+				PAGE_SIZE << trans_pcie->rx_page_order,
 				DMA_FROM_DEVICE);
 		if (dma_mapping_error(trans->dev, rxb->page_dma)) {
 			rxb->page = NULL;
@@ -370,84 +373,98 @@ static void iwl_rx_handle_rxbuf(struct iwl_trans *trans,
 	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
 	struct iwl_rx_queue *rxq = &trans_pcie->rxq;
 	struct iwl_tx_queue *txq = &trans_pcie->txq[trans_pcie->cmd_queue];
-	struct iwl_device_cmd *cmd;
 	unsigned long flags;
-	int len, err;
-	u16 sequence;
-	struct iwl_rx_cmd_buffer rxcb;
-	struct iwl_rx_packet *pkt;
-	bool reclaim;
-	int index, cmd_index;
+	bool page_stolen = false;
+	int max_len = PAGE_SIZE << trans_pcie->rx_page_order;
+	u32 offset = 0;
 
 	if (WARN_ON(!rxb))
 		return;
 
-	rxcb.truesize = PAGE_SIZE << hw_params(trans).rx_page_order;
-	dma_unmap_page(trans->dev, rxb->page_dma,
-		       rxcb.truesize,
-		       DMA_FROM_DEVICE);
+	dma_unmap_page(trans->dev, rxb->page_dma, max_len, DMA_FROM_DEVICE);
 
-	rxcb._page = rxb->page;
-	pkt = rxb_addr(&rxcb);
+	while (offset + sizeof(u32) + sizeof(struct iwl_cmd_header) < max_len) {
+		struct iwl_rx_packet *pkt;
+		struct iwl_device_cmd *cmd;
+		u16 sequence;
+		bool reclaim;
+		int index, cmd_index, err, len;
+		struct iwl_rx_cmd_buffer rxcb = {
+			._offset = offset,
+			._page = rxb->page,
+			._page_stolen = false,
+			.truesize = max_len,
+		};
 
-	IWL_DEBUG_RX(trans, "%s, 0x%02x\n",
-		     get_cmd_string(pkt->hdr.cmd), pkt->hdr.cmd);
+		pkt = rxb_addr(&rxcb);
 
+		if (pkt->len_n_flags == cpu_to_le32(FH_RSCSR_FRAME_INVALID))
+			break;
 
-	len = le32_to_cpu(pkt->len_n_flags) & FH_RSCSR_FRAME_SIZE_MSK;
-	len += sizeof(u32); /* account for status word */
-	trace_iwlwifi_dev_rx(trans->dev, pkt, len);
+		IWL_DEBUG_RX(trans, "cmd at offset %d: %s (0x%.2x)\n",
+			rxcb._offset,
+			trans_pcie_get_cmd_string(trans_pcie, pkt->hdr.cmd),
+			pkt->hdr.cmd);
 
-	/* Reclaim a command buffer only if this packet is a response
-	 *   to a (driver-originated) command.
-	 * If the packet (e.g. Rx frame) originated from uCode,
-	 *   there is no command buffer to reclaim.
-	 * Ucode should set SEQ_RX_FRAME bit if ucode-originated,
-	 *   but apparently a few don't get set; catch them here. */
-	reclaim = !(pkt->hdr.sequence & SEQ_RX_FRAME);
-	if (reclaim) {
-		int i;
+		len = le32_to_cpu(pkt->len_n_flags) & FH_RSCSR_FRAME_SIZE_MSK;
+		len += sizeof(u32); /* account for status word */
+		trace_iwlwifi_dev_rx(trans->dev, pkt, len);
 
-		for (i = 0; i < trans_pcie->n_no_reclaim_cmds; i++) {
-			if (trans_pcie->no_reclaim_cmds[i] == pkt->hdr.cmd) {
-				reclaim = false;
-				break;
+		/* Reclaim a command buffer only if this packet is a response
+		 *   to a (driver-originated) command.
+		 * If the packet (e.g. Rx frame) originated from uCode,
+		 *   there is no command buffer to reclaim.
+		 * Ucode should set SEQ_RX_FRAME bit if ucode-originated,
+		 *   but apparently a few don't get set; catch them here. */
+		reclaim = !(pkt->hdr.sequence & SEQ_RX_FRAME);
+		if (reclaim) {
+			int i;
+
+			for (i = 0; i < trans_pcie->n_no_reclaim_cmds; i++) {
+				if (trans_pcie->no_reclaim_cmds[i] ==
+							pkt->hdr.cmd) {
+					reclaim = false;
+					break;
+				}
 			}
 		}
-	}
 
-	sequence = le16_to_cpu(pkt->hdr.sequence);
-	index = SEQ_TO_INDEX(sequence);
-	cmd_index = get_cmd_index(&txq->q, index);
+		sequence = le16_to_cpu(pkt->hdr.sequence);
+		index = SEQ_TO_INDEX(sequence);
+		cmd_index = get_cmd_index(&txq->q, index);
 
-	if (reclaim)
-		cmd = txq->cmd[cmd_index];
-	else
-		cmd = NULL;
-
-	err = iwl_op_mode_rx(trans->op_mode, &rxcb, cmd);
-
-	/*
-	 * XXX: After here, we should always check rxcb._page
-	 * against NULL before touching it or its virtual
-	 * memory (pkt). Because some rx_handler might have
-	 * already taken or freed the pages.
-	 */
-
-	if (reclaim) {
-		/* Invoke any callbacks, transfer the buffer to caller,
-		 * and fire off the (possibly) blocking
-		 * iwl_trans_send_cmd()
-		 * as we reclaim the driver command queue */
-		if (rxcb._page)
-			iwl_tx_cmd_complete(trans, &rxcb, err);
+		if (reclaim)
+			cmd = txq->entries[cmd_index].cmd;
 		else
-			IWL_WARN(trans, "Claim null rxb?\n");
+			cmd = NULL;
+
+		err = iwl_op_mode_rx(trans->op_mode, &rxcb, cmd);
+
+		/*
+		 * After here, we should always check rxcb._page_stolen,
+		 * if it is true then one of the handlers took the page.
+		 */
+
+		if (reclaim) {
+			/* Invoke any callbacks, transfer the buffer to caller,
+			 * and fire off the (possibly) blocking
+			 * iwl_trans_send_cmd()
+			 * as we reclaim the driver command queue */
+			if (!rxcb._page_stolen)
+				iwl_tx_cmd_complete(trans, &rxcb, err);
+			else
+				IWL_WARN(trans, "Claim null rxb?\n");
+		}
+
+		page_stolen |= rxcb._page_stolen;
+		offset += ALIGN(len, FH_RSCSR_FRAME_ALIGN);
 	}
 
-	/* page was stolen from us */
-	if (rxcb._page == NULL)
+	/* page was stolen from us -- free our reference */
+	if (page_stolen) {
+		__free_pages(rxb->page, trans_pcie->rx_page_order);
 		rxb->page = NULL;
+	}
 
 	/* Reuse the page if possible. For notification packets and
 	 * SKBs that fail to Rx correctly, add them back into the
@@ -456,7 +473,7 @@ static void iwl_rx_handle_rxbuf(struct iwl_trans *trans,
 	if (rxb->page != NULL) {
 		rxb->page_dma =
 			dma_map_page(trans->dev, rxb->page, 0,
-				PAGE_SIZE << hw_params(trans).rx_page_order,
+				PAGE_SIZE << trans_pcie->rx_page_order,
 				DMA_FROM_DEVICE);
 		if (dma_mapping_error(trans->dev, rxb->page_dma)) {
 			/*
@@ -983,7 +1000,7 @@ void iwl_irq_tasklet(struct iwl_trans *trans)
 	if (iwl_have_debug_level(IWL_DL_ISR)) {
 		/* just for debug */
 		inta_mask = iwl_read32(trans, CSR_INT_MASK);
-		IWL_DEBUG_ISR(trans, "inta 0x%08x, enabled 0x%08x\n ",
+		IWL_DEBUG_ISR(trans, "inta 0x%08x, enabled 0x%08x\n",
 				inta, inta_mask);
 	}
 #endif
@@ -1031,8 +1048,7 @@ void iwl_irq_tasklet(struct iwl_trans *trans)
 	if (inta & CSR_INT_BIT_RF_KILL) {
 		bool hw_rfkill;
 
-		hw_rfkill = !(iwl_read32(trans, CSR_GP_CNTRL) &
-				CSR_GP_CNTRL_REG_FLAG_HW_RF_KILL_SW);
+		hw_rfkill = iwl_is_rfkill_set(trans);
 		IWL_WARN(trans, "RF_KILL bit toggled to %s.\n",
 				hw_rfkill ? "disable radio" : "enable radio");
 
@@ -1063,7 +1079,7 @@ void iwl_irq_tasklet(struct iwl_trans *trans)
 	if (inta & CSR_INT_BIT_WAKEUP) {
 		IWL_DEBUG_ISR(trans, "Wakeup interrupt\n");
 		iwl_rx_queue_update_write_ptr(trans, &trans_pcie->rxq);
-		for (i = 0; i < cfg(trans)->base_params->num_of_queues; i++)
+		for (i = 0; i < trans->cfg->base_params->num_of_queues; i++)
 			iwl_txq_update_write_ptr(trans,
 						 &trans_pcie->txq[i]);
 

@@ -1,0 +1,11 @@
+--- drivers/usb/host/ohci-at91.c
++++ drivers/usb/host/ohci-at91.c
+@@ -236,7 +236,7 @@
+ 	return 0;
+ }
+ 
+-static int __devinit
++static int
+ ohci_at91_start (struct usb_hcd *hcd)
+ {
+ 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);

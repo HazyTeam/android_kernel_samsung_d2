@@ -1,0 +1,18 @@
+--- drivers/gpio/gpio-lpc32xx.c
++++ drivers/gpio/gpio-lpc32xx.c
+@@ -308,6 +309,7 @@
+ {
+ 	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+ 
++	__set_gpio_level_p012(group, pin, value);
+ 	__set_gpio_dir_p012(group, pin, 0);
+ 
+ 	return 0;
+@@ -318,6 +320,7 @@
+ {
+ 	struct lpc32xx_gpio_chip *group = to_lpc32xx_gpio(chip);
+ 
++	__set_gpio_level_p3(group, pin, value);
+ 	__set_gpio_dir_p3(group, pin, 0);
+ 
+ 	return 0;

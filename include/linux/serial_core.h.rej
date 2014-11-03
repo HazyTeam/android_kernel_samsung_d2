@@ -1,0 +1,19 @@
+--- include/linux/serial_core.h
++++ include/linux/serial_core.h
+@@ -29,7 +29,6 @@
+ #include <linux/tty.h>
+ #include <linux/mutex.h>
+ #include <linux/sysrq.h>
+-#include <linux/pps_kernel.h>
+ #include <uapi/linux/serial_core.h>
+ 
+ struct uart_port;
+@@ -83,7 +82,7 @@
+ 	int		(*ioctl)(struct uart_port *, unsigned int, unsigned long);
+ #ifdef CONFIG_CONSOLE_POLL
+ 	int		(*poll_init)(struct uart_port *);
+-	void	(*poll_put_char)(struct uart_port *, unsigned char);
++	void		(*poll_put_char)(struct uart_port *, unsigned char);
+ 	int		(*poll_get_char)(struct uart_port *);
+ #endif
+ };

@@ -1,0 +1,29 @@
+--- fs/nilfs2/page.c
++++ fs/nilfs2/page.c
+@@ -387,25 +392,9 @@
+ 				  PAGEVEC_SIZE)) {
+ 		for (i = 0; i < pagevec_count(&pvec); i++) {
+ 			struct page *page = pvec.pages[i];
+-			struct buffer_head *bh, *head;
+ 
+ 			lock_page(page);
+-			ClearPageUptodate(page);
+-			ClearPageMappedToDisk(page);
+-			bh = head = page_buffers(page);
+-			do {
+-				lock_buffer(bh);
+-				clear_buffer_dirty(bh);
+-				clear_buffer_nilfs_volatile(bh);
+-				clear_buffer_nilfs_checked(bh);
+-				clear_buffer_nilfs_redirected(bh);
+-				clear_buffer_uptodate(bh);
+-				clear_buffer_mapped(bh);
+-				unlock_buffer(bh);
+-				bh = bh->b_this_page;
+-			} while (bh != head);
+-
+-			__nilfs_clear_page_dirty(page);
++			nilfs_clear_dirty_page(page, silent);
+ 			unlock_page(page);
+ 		}
+ 		pagevec_release(&pvec);

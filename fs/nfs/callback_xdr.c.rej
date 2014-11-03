@@ -1,0 +1,24 @@
+--- fs/nfs/callback_xdr.c
++++ fs/nfs/callback_xdr.c
+@@ -455,9 +455,9 @@
+ 	args->csa_nrclists = ntohl(*p++);
+ 	args->csa_rclists = NULL;
+ 	if (args->csa_nrclists) {
+-		args->csa_rclists = kmalloc(args->csa_nrclists *
+-					    sizeof(*args->csa_rclists),
+-					    GFP_KERNEL);
++		args->csa_rclists = kmalloc_array(args->csa_nrclists,
++						  sizeof(*args->csa_rclists),
++						  GFP_KERNEL);
+ 		if (unlikely(args->csa_rclists == NULL))
+ 			goto out;
+ 
+@@ -696,7 +696,7 @@
+ 				       const struct cb_sequenceres *res)
+ {
+ 	__be32 *p;
+-	unsigned status = res->csr_status;
++	__be32 status = res->csr_status;
+ 
+ 	if (unlikely(status != 0))
+ 		goto out;

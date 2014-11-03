@@ -1,0 +1,11 @@
+--- drivers/mtd/devices/slram.c
++++ drivers/mtd/devices/slram.c
+@@ -240,7 +240,7 @@
+ 
+ 	if (*(szlength) != '+') {
+ 		devlength = simple_strtoul(szlength, &buffer, 0);
+-		devlength = handle_unit(devlength, buffer) - devstart;
++		devlength = handle_unit(devlength, buffer);
+ 		if (devlength < devstart)
+ 			goto err_out;
+ 

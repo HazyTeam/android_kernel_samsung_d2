@@ -1,0 +1,10 @@
+--- drivers/gpu/drm/radeon/radeon_asic.h
++++ drivers/gpu/drm/radeon/radeon_asic.h
+@@ -263,6 +263,7 @@
+ struct rv515_mc_save {
+ 	u32 vga_render_control;
+ 	u32 vga_hdp_control;
++	bool crtc_enabled[2];
+ };
+ 
+ int rv515_init(struct radeon_device *rdev);

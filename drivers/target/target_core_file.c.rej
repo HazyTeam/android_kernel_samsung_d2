@@ -1,0 +1,101 @@
+--- drivers/target/target_core_file.c
++++ drivers/target/target_core_file.c
+@@ -478,6 +514,75 @@
+ }
+ 
+ static sense_reason_t
++fd_do_unmap(struct se_cmd *cmd, void *priv, sector_t lba, sector_t nolb)
++{
++	struct file *file = priv;
++	struct inode *inode = file->f_mapping->host;
++	int ret;
++
++	if (S_ISBLK(inode->i_mode)) {
++		/* The backend is block device, use discard */
++		struct block_device *bdev = inode->i_bdev;
++
++		ret = blkdev_issue_discard(bdev, lba,
++				nolb, GFP_KERNEL, 0);
++		if (ret < 0) {
++			pr_warn("FILEIO: blkdev_issue_discard() failed: %d\n",
++				ret);
++			return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
++		}
++	} else {
++		/* The backend is normal file, use fallocate */
++		struct se_device *se_dev = cmd->se_dev;
++		loff_t pos = lba * se_dev->dev_attrib.block_size;
++		unsigned int len = nolb * se_dev->dev_attrib.block_size;
++		int mode = FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE;
++
++		if (!file->f_op->fallocate)
++			return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
++
++		ret = file->f_op->fallocate(file, mode, pos, len);
++		if (ret < 0) {
++			pr_warn("FILEIO: fallocate() failed: %d\n", ret);
++			return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
++		}
++	}
++
++	return 0;
++}
++
++static sense_reason_t
++fd_execute_write_same_unmap(struct se_cmd *cmd)
++{
++	struct se_device *se_dev = cmd->se_dev;
++	struct fd_dev *fd_dev = FD_DEV(se_dev);
++	struct file *file = fd_dev->fd_file;
++	sector_t lba = cmd->t_task_lba;
++	sector_t nolb = sbc_get_write_same_sectors(cmd);
++	int ret;
++
++	if (!nolb) {
++		target_complete_cmd(cmd, SAM_STAT_GOOD);
++		return 0;
++	}
++
++	ret = fd_do_unmap(cmd, file, lba, nolb);
++	if (ret)
++		return ret;
++
++	target_complete_cmd(cmd, GOOD);
++	return 0;
++}
++
++static sense_reason_t
++fd_execute_unmap(struct se_cmd *cmd)
++{
++	struct file *file = FD_DEV(cmd->se_dev)->fd_file;
++
++	return sbc_execute_unmap(cmd, fd_do_unmap, file);
++}
++
++static sense_reason_t
+ fd_execute_rw(struct se_cmd *cmd)
+ {
+ 	struct scatterlist *sgl = cmd->t_data_sg;
+@@ -625,17 +730,20 @@
+ 	 * to handle underlying block_device resize operations.
+ 	 */
+ 	if (S_ISBLK(i->i_mode))
+-		dev_size = (i_size_read(i) - fd_dev->fd_block_size);
++		dev_size = i_size_read(i);
+ 	else
+ 		dev_size = fd_dev->fd_dev_size;
+ 
+-	return div_u64(dev_size, dev->dev_attrib.block_size);
++	return div_u64(dev_size - dev->dev_attrib.block_size,
++		       dev->dev_attrib.block_size);
+ }
+ 
+ static struct sbc_ops fd_sbc_ops = {
+ 	.execute_rw		= fd_execute_rw,
+ 	.execute_sync_cache	= fd_execute_sync_cache,
+ 	.execute_write_same	= fd_execute_write_same,
++	.execute_write_same_unmap = fd_execute_write_same_unmap,
++	.execute_unmap		= fd_execute_unmap,
+ };
+ 
+ static sense_reason_t

@@ -1,0 +1,12 @@
+--- arch/sparc/mm/tlb.c
++++ arch/sparc/mm/tlb.c
+@@ -85,8 +85,8 @@
+ 	}
+ 
+ 	if (!tb->active) {
+-		global_flush_tlb_page(mm, vaddr);
+ 		flush_tsb_user_page(mm, vaddr);
++		global_flush_tlb_page(mm, vaddr);
+ 		goto out;
+ 	}
+ 

@@ -1,0 +1,20 @@
+--- arch/x86/kernel/alternative.c
++++ arch/x86/kernel/alternative.c
+@@ -165,7 +170,7 @@
+ #endif
+ 
+ #ifdef P6_NOP1
+-static const unsigned char  __initconst_or_module p6nops[] =
++static const unsigned char p6nops[] =
+ {
+ 	P6_NOP1,
+ 	P6_NOP2,
+@@ -224,7 +229,7 @@
+ 			ideal_nops = intel_nops;
+ #endif
+ 		}
+-
++		break;
+ 	default:
+ #ifdef CONFIG_X86_64
+ 		ideal_nops = k8_nops;

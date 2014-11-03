@@ -1,0 +1,14 @@
+--- drivers/staging/bcm/InterfaceInit.c
++++ drivers/staging/bcm/InterfaceInit.c
+@@ -190,9 +190,9 @@
+ 	}
+ 
+ 	/* Allocate interface adapter structure */
+-	psIntfAdapter = kzalloc(sizeof(struct bcm_interface_adapter), GFP_KERNEL);
++	psIntfAdapter = kzalloc(sizeof(struct bcm_interface_adapter),
++				GFP_KERNEL);
+ 	if (psIntfAdapter == NULL) {
+-		dev_err(&udev->dev, DRV_NAME ": no memory for Interface adapter\n");
+ 		AdapterFree(psAdapter);
+ 		return -ENOMEM;
+ 	}

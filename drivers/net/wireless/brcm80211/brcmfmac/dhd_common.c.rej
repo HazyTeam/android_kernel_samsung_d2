@@ -1,0 +1,26 @@
+--- drivers/net/wireless/brcm80211/brcmfmac/dhd_common.c
++++ drivers/net/wireless/brcm80211/brcmfmac/dhd_common.c
+@@ -337,23 +337,6 @@
+ 		goto done;
+ 	}
+ 
+-	/* Try to set and enable ARP offload feature, this may fail */
+-	err = brcmf_fil_iovar_int_set(ifp, "arp_ol", BRCMF_ARPOL_MODE);
+-	if (err) {
+-		brcmf_dbg(TRACE, "failed to set ARP offload mode to 0x%x, err = %d\n",
+-			  BRCMF_ARPOL_MODE, err);
+-		err = 0;
+-	} else {
+-		err = brcmf_fil_iovar_int_set(ifp, "arpoe", 1);
+-		if (err) {
+-			brcmf_dbg(TRACE, "failed to enable ARP offload err = %d\n",
+-				  err);
+-			err = 0;
+-		} else
+-			brcmf_dbg(TRACE, "successfully enabled ARP offload to 0x%x\n",
+-				  BRCMF_ARPOL_MODE);
+-	}
+-
+ 	/* Setup packet filter */
+ 	brcmf_c_pktfilter_offload_set(ifp, BRCMF_DEFAULT_PACKET_FILTER);
+ 	brcmf_c_pktfilter_offload_enable(ifp, BRCMF_DEFAULT_PACKET_FILTER,

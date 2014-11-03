@@ -25,15 +25,17 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/module.h>
-#include "drmP.h"
+#include <drm/drmP.h>
 #include "radeon.h"
 #include "radeon_asic.h"
-#include "radeon_drm.h"
+#include <drm/radeon_drm.h>
 #include "nid.h"
 #include "atom.h"
 #include "ni_reg.h"
 #include "cayman_blit_shaders.h"
 
+extern bool evergreen_is_display_hung(struct radeon_device *rdev);
+extern void evergreen_print_gpu_status_regs(struct radeon_device *rdev);
 extern void evergreen_mc_stop(struct radeon_device *rdev, struct evergreen_mc_save *save);
 extern void evergreen_mc_resume(struct radeon_device *rdev, struct evergreen_mc_save *save);
 extern int evergreen_mc_wait_for_idle(struct radeon_device *rdev);
@@ -75,6 +77,282 @@ MODULE_FIRMWARE("radeon/CAYMAN_rlc.bin");
 MODULE_FIRMWARE("radeon/ARUBA_pfp.bin");
 MODULE_FIRMWARE("radeon/ARUBA_me.bin");
 MODULE_FIRMWARE("radeon/ARUBA_rlc.bin");
+
+
+static const u32 cayman_golden_registers2[] =
+{
+	0x3e5c, 0xffffffff, 0x00000000,
+	0x3e48, 0xffffffff, 0x00000000,
+	0x3e4c, 0xffffffff, 0x00000000,
+	0x3e64, 0xffffffff, 0x00000000,
+	0x3e50, 0xffffffff, 0x00000000,
+	0x3e60, 0xffffffff, 0x00000000
+};
+
+static const u32 cayman_golden_registers[] =
+{
+	0x5eb4, 0xffffffff, 0x00000002,
+	0x5e78, 0x8f311ff1, 0x001000f0,
+	0x3f90, 0xffff0000, 0xff000000,
+	0x9148, 0xffff0000, 0xff000000,
+	0x3f94, 0xffff0000, 0xff000000,
+	0x914c, 0xffff0000, 0xff000000,
+	0xc78, 0x00000080, 0x00000080,
+	0xbd4, 0x70073777, 0x00011003,
+	0xd02c, 0xbfffff1f, 0x08421000,
+	0xd0b8, 0x73773777, 0x02011003,
+	0x5bc0, 0x00200000, 0x50100000,
+	0x98f8, 0x33773777, 0x02011003,
+	0x98fc, 0xffffffff, 0x76541032,
+	0x7030, 0x31000311, 0x00000011,
+	0x2f48, 0x33773777, 0x42010001,
+	0x6b28, 0x00000010, 0x00000012,
+	0x7728, 0x00000010, 0x00000012,
+	0x10328, 0x00000010, 0x00000012,
+	0x10f28, 0x00000010, 0x00000012,
+	0x11b28, 0x00000010, 0x00000012,
+	0x12728, 0x00000010, 0x00000012,
+	0x240c, 0x000007ff, 0x00000000,
+	0x8a14, 0xf000001f, 0x00000007,
+	0x8b24, 0x3fff3fff, 0x00ff0fff,
+	0x8b10, 0x0000ff0f, 0x00000000,
+	0x28a4c, 0x07ffffff, 0x06000000,
+	0x10c, 0x00000001, 0x00010003,
+	0xa02c, 0xffffffff, 0x0000009b,
+	0x913c, 0x0000010f, 0x01000100,
+	0x8c04, 0xf8ff00ff, 0x40600060,
+	0x28350, 0x00000f01, 0x00000000,
+	0x9508, 0x3700001f, 0x00000002,
+	0x960c, 0xffffffff, 0x54763210,
+	0x88c4, 0x001f3ae3, 0x00000082,
+	0x88d0, 0xffffffff, 0x0f40df40,
+	0x88d4, 0x0000001f, 0x00000010,
+	0x8974, 0xffffffff, 0x00000000
+};
+
+static const u32 dvst_golden_registers2[] =
+{
+	0x8f8, 0xffffffff, 0,
+	0x8fc, 0x00380000, 0,
+	0x8f8, 0xffffffff, 1,
+	0x8fc, 0x0e000000, 0
+};
+
+static const u32 dvst_golden_registers[] =
+{
+	0x690, 0x3fff3fff, 0x20c00033,
+	0x918c, 0x0fff0fff, 0x00010006,
+	0x91a8, 0x0fff0fff, 0x00010006,
+	0x9150, 0xffffdfff, 0x6e944040,
+	0x917c, 0x0fff0fff, 0x00030002,
+	0x9198, 0x0fff0fff, 0x00030002,
+	0x915c, 0x0fff0fff, 0x00010000,
+	0x3f90, 0xffff0001, 0xff000000,
+	0x9178, 0x0fff0fff, 0x00070000,
+	0x9194, 0x0fff0fff, 0x00070000,
+	0x9148, 0xffff0001, 0xff000000,
+	0x9190, 0x0fff0fff, 0x00090008,
+	0x91ac, 0x0fff0fff, 0x00090008,
+	0x3f94, 0xffff0000, 0xff000000,
+	0x914c, 0xffff0000, 0xff000000,
+	0x929c, 0x00000fff, 0x00000001,
+	0x55e4, 0xff607fff, 0xfc000100,
+	0x8a18, 0xff000fff, 0x00000100,
+	0x8b28, 0xff000fff, 0x00000100,
+	0x9144, 0xfffc0fff, 0x00000100,
+	0x6ed8, 0x00010101, 0x00010000,
+	0x9830, 0xffffffff, 0x00000000,
+	0x9834, 0xf00fffff, 0x00000400,
+	0x9838, 0xfffffffe, 0x00000000,
+	0xd0c0, 0xff000fff, 0x00000100,
+	0xd02c, 0xbfffff1f, 0x08421000,
+	0xd0b8, 0x73773777, 0x12010001,
+	0x5bb0, 0x000000f0, 0x00000070,
+	0x98f8, 0x73773777, 0x12010001,
+	0x98fc, 0xffffffff, 0x00000010,
+	0x9b7c, 0x00ff0000, 0x00fc0000,
+	0x8030, 0x00001f0f, 0x0000100a,
+	0x2f48, 0x73773777, 0x12010001,
+	0x2408, 0x00030000, 0x000c007f,
+	0x8a14, 0xf000003f, 0x00000007,
+	0x8b24, 0x3fff3fff, 0x00ff0fff,
+	0x8b10, 0x0000ff0f, 0x00000000,
+	0x28a4c, 0x07ffffff, 0x06000000,
+	0x4d8, 0x00000fff, 0x00000100,
+	0xa008, 0xffffffff, 0x00010000,
+	0x913c, 0xffff03ff, 0x01000100,
+	0x8c00, 0x000000ff, 0x00000003,
+	0x8c04, 0xf8ff00ff, 0x40600060,
+	0x8cf0, 0x1fff1fff, 0x08e00410,
+	0x28350, 0x00000f01, 0x00000000,
+	0x9508, 0xf700071f, 0x00000002,
+	0x960c, 0xffffffff, 0x54763210,
+	0x20ef8, 0x01ff01ff, 0x00000002,
+	0x20e98, 0xfffffbff, 0x00200000,
+	0x2015c, 0xffffffff, 0x00000f40,
+	0x88c4, 0x001f3ae3, 0x00000082,
+	0x8978, 0x3fffffff, 0x04050140,
+	0x88d4, 0x0000001f, 0x00000010,
+	0x8974, 0xffffffff, 0x00000000
+};
+
+static const u32 scrapper_golden_registers[] =
+{
+	0x690, 0x3fff3fff, 0x20c00033,
+	0x918c, 0x0fff0fff, 0x00010006,
+	0x918c, 0x0fff0fff, 0x00010006,
+	0x91a8, 0x0fff0fff, 0x00010006,
+	0x91a8, 0x0fff0fff, 0x00010006,
+	0x9150, 0xffffdfff, 0x6e944040,
+	0x9150, 0xffffdfff, 0x6e944040,
+	0x917c, 0x0fff0fff, 0x00030002,
+	0x917c, 0x0fff0fff, 0x00030002,
+	0x9198, 0x0fff0fff, 0x00030002,
+	0x9198, 0x0fff0fff, 0x00030002,
+	0x915c, 0x0fff0fff, 0x00010000,
+	0x915c, 0x0fff0fff, 0x00010000,
+	0x3f90, 0xffff0001, 0xff000000,
+	0x3f90, 0xffff0001, 0xff000000,
+	0x9178, 0x0fff0fff, 0x00070000,
+	0x9178, 0x0fff0fff, 0x00070000,
+	0x9194, 0x0fff0fff, 0x00070000,
+	0x9194, 0x0fff0fff, 0x00070000,
+	0x9148, 0xffff0001, 0xff000000,
+	0x9148, 0xffff0001, 0xff000000,
+	0x9190, 0x0fff0fff, 0x00090008,
+	0x9190, 0x0fff0fff, 0x00090008,
+	0x91ac, 0x0fff0fff, 0x00090008,
+	0x91ac, 0x0fff0fff, 0x00090008,
+	0x3f94, 0xffff0000, 0xff000000,
+	0x3f94, 0xffff0000, 0xff000000,
+	0x914c, 0xffff0000, 0xff000000,
+	0x914c, 0xffff0000, 0xff000000,
+	0x929c, 0x00000fff, 0x00000001,
+	0x929c, 0x00000fff, 0x00000001,
+	0x55e4, 0xff607fff, 0xfc000100,
+	0x8a18, 0xff000fff, 0x00000100,
+	0x8a18, 0xff000fff, 0x00000100,
+	0x8b28, 0xff000fff, 0x00000100,
+	0x8b28, 0xff000fff, 0x00000100,
+	0x9144, 0xfffc0fff, 0x00000100,
+	0x9144, 0xfffc0fff, 0x00000100,
+	0x6ed8, 0x00010101, 0x00010000,
+	0x9830, 0xffffffff, 0x00000000,
+	0x9830, 0xffffffff, 0x00000000,
+	0x9834, 0xf00fffff, 0x00000400,
+	0x9834, 0xf00fffff, 0x00000400,
+	0x9838, 0xfffffffe, 0x00000000,
+	0x9838, 0xfffffffe, 0x00000000,
+	0xd0c0, 0xff000fff, 0x00000100,
+	0xd02c, 0xbfffff1f, 0x08421000,
+	0xd02c, 0xbfffff1f, 0x08421000,
+	0xd0b8, 0x73773777, 0x12010001,
+	0xd0b8, 0x73773777, 0x12010001,
+	0x5bb0, 0x000000f0, 0x00000070,
+	0x98f8, 0x73773777, 0x12010001,
+	0x98f8, 0x73773777, 0x12010001,
+	0x98fc, 0xffffffff, 0x00000010,
+	0x98fc, 0xffffffff, 0x00000010,
+	0x9b7c, 0x00ff0000, 0x00fc0000,
+	0x9b7c, 0x00ff0000, 0x00fc0000,
+	0x8030, 0x00001f0f, 0x0000100a,
+	0x8030, 0x00001f0f, 0x0000100a,
+	0x2f48, 0x73773777, 0x12010001,
+	0x2f48, 0x73773777, 0x12010001,
+	0x2408, 0x00030000, 0x000c007f,
+	0x8a14, 0xf000003f, 0x00000007,
+	0x8a14, 0xf000003f, 0x00000007,
+	0x8b24, 0x3fff3fff, 0x00ff0fff,
+	0x8b24, 0x3fff3fff, 0x00ff0fff,
+	0x8b10, 0x0000ff0f, 0x00000000,
+	0x8b10, 0x0000ff0f, 0x00000000,
+	0x28a4c, 0x07ffffff, 0x06000000,
+	0x28a4c, 0x07ffffff, 0x06000000,
+	0x4d8, 0x00000fff, 0x00000100,
+	0x4d8, 0x00000fff, 0x00000100,
+	0xa008, 0xffffffff, 0x00010000,
+	0xa008, 0xffffffff, 0x00010000,
+	0x913c, 0xffff03ff, 0x01000100,
+	0x913c, 0xffff03ff, 0x01000100,
+	0x90e8, 0x001fffff, 0x010400c0,
+	0x8c00, 0x000000ff, 0x00000003,
+	0x8c00, 0x000000ff, 0x00000003,
+	0x8c04, 0xf8ff00ff, 0x40600060,
+	0x8c04, 0xf8ff00ff, 0x40600060,
+	0x8c30, 0x0000000f, 0x00040005,
+	0x8cf0, 0x1fff1fff, 0x08e00410,
+	0x8cf0, 0x1fff1fff, 0x08e00410,
+	0x900c, 0x00ffffff, 0x0017071f,
+	0x28350, 0x00000f01, 0x00000000,
+	0x28350, 0x00000f01, 0x00000000,
+	0x9508, 0xf700071f, 0x00000002,
+	0x9508, 0xf700071f, 0x00000002,
+	0x9688, 0x00300000, 0x0017000f,
+	0x960c, 0xffffffff, 0x54763210,
+	0x960c, 0xffffffff, 0x54763210,
+	0x20ef8, 0x01ff01ff, 0x00000002,
+	0x20e98, 0xfffffbff, 0x00200000,
+	0x2015c, 0xffffffff, 0x00000f40,
+	0x88c4, 0x001f3ae3, 0x00000082,
+	0x88c4, 0x001f3ae3, 0x00000082,
+	0x8978, 0x3fffffff, 0x04050140,
+	0x8978, 0x3fffffff, 0x04050140,
+	0x88d4, 0x0000001f, 0x00000010,
+	0x88d4, 0x0000001f, 0x00000010,
+	0x8974, 0xffffffff, 0x00000000,
+	0x8974, 0xffffffff, 0x00000000
+};
+
+static void ni_init_golden_registers(struct radeon_device *rdev)
+{
+	switch (rdev->family) {
+	case CHIP_CAYMAN:
+		radeon_program_register_sequence(rdev,
+						 cayman_golden_registers,
+						 (const u32)ARRAY_SIZE(cayman_golden_registers));
+		radeon_program_register_sequence(rdev,
+						 cayman_golden_registers2,
+						 (const u32)ARRAY_SIZE(cayman_golden_registers2));
+		break;
+	case CHIP_ARUBA:
+		if ((rdev->pdev->device == 0x9900) ||
+		    (rdev->pdev->device == 0x9901) ||
+		    (rdev->pdev->device == 0x9903) ||
+		    (rdev->pdev->device == 0x9904) ||
+		    (rdev->pdev->device == 0x9905) ||
+		    (rdev->pdev->device == 0x9906) ||
+		    (rdev->pdev->device == 0x9907) ||
+		    (rdev->pdev->device == 0x9908) ||
+		    (rdev->pdev->device == 0x9909) ||
+		    (rdev->pdev->device == 0x990A) ||
+		    (rdev->pdev->device == 0x990B) ||
+		    (rdev->pdev->device == 0x990C) ||
+		    (rdev->pdev->device == 0x990D) ||
+		    (rdev->pdev->device == 0x990E) ||
+		    (rdev->pdev->device == 0x990F) ||
+		    (rdev->pdev->device == 0x9910) ||
+		    (rdev->pdev->device == 0x9913) ||
+		    (rdev->pdev->device == 0x9917) ||
+		    (rdev->pdev->device == 0x9918)) {
+			radeon_program_register_sequence(rdev,
+							 dvst_golden_registers,
+							 (const u32)ARRAY_SIZE(dvst_golden_registers));
+			radeon_program_register_sequence(rdev,
+							 dvst_golden_registers2,
+							 (const u32)ARRAY_SIZE(dvst_golden_registers2));
+		} else {
+			radeon_program_register_sequence(rdev,
+							 scrapper_golden_registers,
+							 (const u32)ARRAY_SIZE(scrapper_golden_registers));
+			radeon_program_register_sequence(rdev,
+							 dvst_golden_registers2,
+							 (const u32)ARRAY_SIZE(dvst_golden_registers2));
+		}
+		break;
+	default:
+		break;
+	}
+}
 
 #define BTC_IO_MC_REGS_SIZE 29
 
@@ -417,215 +695,17 @@ out:
 /*
  * Core functions
  */
-static u32 cayman_get_tile_pipe_to_backend_map(struct radeon_device *rdev,
-					       u32 num_tile_pipes,
-					       u32 num_backends_per_asic,
-					       u32 *backend_disable_mask_per_asic,
-					       u32 num_shader_engines)
-{
-	u32 backend_map = 0;
-	u32 enabled_backends_mask = 0;
-	u32 enabled_backends_count = 0;
-	u32 num_backends_per_se;
-	u32 cur_pipe;
-	u32 swizzle_pipe[CAYMAN_MAX_PIPES];
-	u32 cur_backend = 0;
-	u32 i;
-	bool force_no_swizzle;
-
-	/* force legal values */
-	if (num_tile_pipes < 1)
-		num_tile_pipes = 1;
-	if (num_tile_pipes > rdev->config.cayman.max_tile_pipes)
-		num_tile_pipes = rdev->config.cayman.max_tile_pipes;
-	if (num_shader_engines < 1)
-		num_shader_engines = 1;
-	if (num_shader_engines > rdev->config.cayman.max_shader_engines)
-		num_shader_engines = rdev->config.cayman.max_shader_engines;
-	if (num_backends_per_asic < num_shader_engines)
-		num_backends_per_asic = num_shader_engines;
-	if (num_backends_per_asic > (rdev->config.cayman.max_backends_per_se * num_shader_engines))
-		num_backends_per_asic = rdev->config.cayman.max_backends_per_se * num_shader_engines;
-
-	/* make sure we have the same number of backends per se */
-	num_backends_per_asic = ALIGN(num_backends_per_asic, num_shader_engines);
-	/* set up the number of backends per se */
-	num_backends_per_se = num_backends_per_asic / num_shader_engines;
-	if (num_backends_per_se > rdev->config.cayman.max_backends_per_se) {
-		num_backends_per_se = rdev->config.cayman.max_backends_per_se;
-		num_backends_per_asic = num_backends_per_se * num_shader_engines;
-	}
-
-	/* create enable mask and count for enabled backends */
-	for (i = 0; i < CAYMAN_MAX_BACKENDS; ++i) {
-		if (((*backend_disable_mask_per_asic >> i) & 1) == 0) {
-			enabled_backends_mask |= (1 << i);
-			++enabled_backends_count;
-		}
-		if (enabled_backends_count == num_backends_per_asic)
-			break;
-	}
-
-	/* force the backends mask to match the current number of backends */
-	if (enabled_backends_count != num_backends_per_asic) {
-		u32 this_backend_enabled;
-		u32 shader_engine;
-		u32 backend_per_se;
-
-		enabled_backends_mask = 0;
-		enabled_backends_count = 0;
-		*backend_disable_mask_per_asic = CAYMAN_MAX_BACKENDS_MASK;
-		for (i = 0; i < CAYMAN_MAX_BACKENDS; ++i) {
-			/* calc the current se */
-			shader_engine = i / rdev->config.cayman.max_backends_per_se;
-			/* calc the backend per se */
-			backend_per_se = i % rdev->config.cayman.max_backends_per_se;
-			/* default to not enabled */
-			this_backend_enabled = 0;
-			if ((shader_engine < num_shader_engines) &&
-			    (backend_per_se < num_backends_per_se))
-				this_backend_enabled = 1;
-			if (this_backend_enabled) {
-				enabled_backends_mask |= (1 << i);
-				*backend_disable_mask_per_asic &= ~(1 << i);
-				++enabled_backends_count;
-			}
-		}
-	}
-
-
-	memset((uint8_t *)&swizzle_pipe[0], 0, sizeof(u32) * CAYMAN_MAX_PIPES);
-	switch (rdev->family) {
-	case CHIP_CAYMAN:
-	case CHIP_ARUBA:
-		force_no_swizzle = true;
-		break;
-	default:
-		force_no_swizzle = false;
-		break;
-	}
-	if (force_no_swizzle) {
-		bool last_backend_enabled = false;
-
-		force_no_swizzle = false;
-		for (i = 0; i < CAYMAN_MAX_BACKENDS; ++i) {
-			if (((enabled_backends_mask >> i) & 1) == 1) {
-				if (last_backend_enabled)
-					force_no_swizzle = true;
-				last_backend_enabled = true;
-			} else
-				last_backend_enabled = false;
-		}
-	}
-
-	switch (num_tile_pipes) {
-	case 1:
-	case 3:
-	case 5:
-	case 7:
-		DRM_ERROR("odd number of pipes!\n");
-		break;
-	case 2:
-		swizzle_pipe[0] = 0;
-		swizzle_pipe[1] = 1;
-		break;
-	case 4:
-		if (force_no_swizzle) {
-			swizzle_pipe[0] = 0;
-			swizzle_pipe[1] = 1;
-			swizzle_pipe[2] = 2;
-			swizzle_pipe[3] = 3;
-		} else {
-			swizzle_pipe[0] = 0;
-			swizzle_pipe[1] = 2;
-			swizzle_pipe[2] = 1;
-			swizzle_pipe[3] = 3;
-		}
-		break;
-	case 6:
-		if (force_no_swizzle) {
-			swizzle_pipe[0] = 0;
-			swizzle_pipe[1] = 1;
-			swizzle_pipe[2] = 2;
-			swizzle_pipe[3] = 3;
-			swizzle_pipe[4] = 4;
-			swizzle_pipe[5] = 5;
-		} else {
-			swizzle_pipe[0] = 0;
-			swizzle_pipe[1] = 2;
-			swizzle_pipe[2] = 4;
-			swizzle_pipe[3] = 1;
-			swizzle_pipe[4] = 3;
-			swizzle_pipe[5] = 5;
-		}
-		break;
-	case 8:
-		if (force_no_swizzle) {
-			swizzle_pipe[0] = 0;
-			swizzle_pipe[1] = 1;
-			swizzle_pipe[2] = 2;
-			swizzle_pipe[3] = 3;
-			swizzle_pipe[4] = 4;
-			swizzle_pipe[5] = 5;
-			swizzle_pipe[6] = 6;
-			swizzle_pipe[7] = 7;
-		} else {
-			swizzle_pipe[0] = 0;
-			swizzle_pipe[1] = 2;
-			swizzle_pipe[2] = 4;
-			swizzle_pipe[3] = 6;
-			swizzle_pipe[4] = 1;
-			swizzle_pipe[5] = 3;
-			swizzle_pipe[6] = 5;
-			swizzle_pipe[7] = 7;
-		}
-		break;
-	}
-
-	for (cur_pipe = 0; cur_pipe < num_tile_pipes; ++cur_pipe) {
-		while (((1 << cur_backend) & enabled_backends_mask) == 0)
-			cur_backend = (cur_backend + 1) % CAYMAN_MAX_BACKENDS;
-
-		backend_map |= (((cur_backend & 0xf) << (swizzle_pipe[cur_pipe] * 4)));
-
-		cur_backend = (cur_backend + 1) % CAYMAN_MAX_BACKENDS;
-	}
-
-	return backend_map;
-}
-
-static u32 cayman_get_disable_mask_per_asic(struct radeon_device *rdev,
-					    u32 disable_mask_per_se,
-					    u32 max_disable_mask_per_se,
-					    u32 num_shader_engines)
-{
-	u32 disable_field_width_per_se = r600_count_pipe_bits(disable_mask_per_se);
-	u32 disable_mask_per_asic = disable_mask_per_se & max_disable_mask_per_se;
-
-	if (num_shader_engines == 1)
-		return disable_mask_per_asic;
-	else if (num_shader_engines == 2)
-		return disable_mask_per_asic | (disable_mask_per_asic << disable_field_width_per_se);
-	else
-		return 0xffffffff;
-}
-
 static void cayman_gpu_init(struct radeon_device *rdev)
 {
-	u32 cc_rb_backend_disable = 0;
-	u32 cc_gc_shader_pipe_config;
 	u32 gb_addr_config = 0;
 	u32 mc_shared_chmap, mc_arb_ramcfg;
-	u32 gb_backend_map;
 	u32 cgts_tcc_disable;
 	u32 sx_debug_1;
 	u32 smx_dc_ctl0;
-	u32 gc_user_shader_pipe_config;
-	u32 gc_user_rb_backend_disable;
-	u32 cgts_user_tcc_disable;
 	u32 cgts_sm_ctrl_reg;
 	u32 hdp_host_path_cntl;
 	u32 tmp;
+	u32 disabled_rb_mask;
 	int i, j;
 
 	switch (rdev->family) {
@@ -650,6 +730,7 @@ static void cayman_gpu_init(struct radeon_device *rdev)
 		rdev->config.cayman.sc_prim_fifo_size = 0x100;
 		rdev->config.cayman.sc_hiz_tile_fifo_size = 0x30;
 		rdev->config.cayman.sc_earlyz_tile_fifo_size = 0x130;
+		gb_addr_config = CAYMAN_GB_ADDR_CONFIG_GOLDEN;
 		break;
 	case CHIP_ARUBA:
 	default:
@@ -723,6 +804,7 @@ static void cayman_gpu_init(struct radeon_device *rdev)
 		rdev->config.cayman.sc_prim_fifo_size = 0x40;
 		rdev->config.cayman.sc_hiz_tile_fifo_size = 0x30;
 		rdev->config.cayman.sc_earlyz_tile_fifo_size = 0x130;
+		gb_addr_config = ARUBA_GB_ADDR_CONFIG_GOLDEN;
 		break;
 	}
 
@@ -742,39 +824,6 @@ static void cayman_gpu_init(struct radeon_device *rdev)
 	mc_shared_chmap = RREG32(MC_SHARED_CHMAP);
 	mc_arb_ramcfg = RREG32(MC_ARB_RAMCFG);
 
-	cc_rb_backend_disable = RREG32(CC_RB_BACKEND_DISABLE);
-	cc_gc_shader_pipe_config = RREG32(CC_GC_SHADER_PIPE_CONFIG);
-	cgts_tcc_disable = 0xffff0000;
-	for (i = 0; i < rdev->config.cayman.max_texture_channel_caches; i++)
-		cgts_tcc_disable &= ~(1 << (16 + i));
-	gc_user_rb_backend_disable = RREG32(GC_USER_RB_BACKEND_DISABLE);
-	gc_user_shader_pipe_config = RREG32(GC_USER_SHADER_PIPE_CONFIG);
-	cgts_user_tcc_disable = RREG32(CGTS_USER_TCC_DISABLE);
-
-	rdev->config.cayman.num_shader_engines = rdev->config.cayman.max_shader_engines;
-	tmp = ((~gc_user_shader_pipe_config) & INACTIVE_QD_PIPES_MASK) >> INACTIVE_QD_PIPES_SHIFT;
-	rdev->config.cayman.num_shader_pipes_per_simd = r600_count_pipe_bits(tmp);
-	rdev->config.cayman.num_tile_pipes = rdev->config.cayman.max_tile_pipes;
-	tmp = ((~gc_user_shader_pipe_config) & INACTIVE_SIMDS_MASK) >> INACTIVE_SIMDS_SHIFT;
-	rdev->config.cayman.num_simds_per_se = r600_count_pipe_bits(tmp);
-	tmp = ((~gc_user_rb_backend_disable) & BACKEND_DISABLE_MASK) >> BACKEND_DISABLE_SHIFT;
-	rdev->config.cayman.num_backends_per_se = r600_count_pipe_bits(tmp);
-	tmp = (gc_user_rb_backend_disable & BACKEND_DISABLE_MASK) >> BACKEND_DISABLE_SHIFT;
-	rdev->config.cayman.backend_disable_mask_per_asic =
-		cayman_get_disable_mask_per_asic(rdev, tmp, CAYMAN_MAX_BACKENDS_PER_SE_MASK,
-						 rdev->config.cayman.num_shader_engines);
-	rdev->config.cayman.backend_map =
-		cayman_get_tile_pipe_to_backend_map(rdev, rdev->config.cayman.num_tile_pipes,
-						    rdev->config.cayman.num_backends_per_se *
-						    rdev->config.cayman.num_shader_engines,
-						    &rdev->config.cayman.backend_disable_mask_per_asic,
-						    rdev->config.cayman.num_shader_engines);
-	tmp = ((~cgts_user_tcc_disable) & TCC_DISABLE_MASK) >> TCC_DISABLE_SHIFT;
-	rdev->config.cayman.num_texture_channel_caches = r600_count_pipe_bits(tmp);
-	tmp = (mc_arb_ramcfg & BURSTLENGTH_MASK) >> BURSTLENGTH_SHIFT;
-	rdev->config.cayman.mem_max_burst_length_bytes = (tmp + 1) * 256;
-	if (rdev->config.cayman.mem_max_burst_length_bytes > 512)
-		rdev->config.cayman.mem_max_burst_length_bytes = 512;
 	tmp = (mc_arb_ramcfg & NOOFCOLS_MASK) >> NOOFCOLS_SHIFT;
 	rdev->config.cayman.mem_row_size_in_kb = (4 * (1 << (8 + tmp))) / 1024;
 	if (rdev->config.cayman.mem_row_size_in_kb > 4)
@@ -783,73 +832,6 @@ static void cayman_gpu_init(struct radeon_device *rdev)
 	rdev->config.cayman.shader_engine_tile_size = 32;
 	rdev->config.cayman.num_gpus = 1;
 	rdev->config.cayman.multi_gpu_tile_size = 64;
-
-	//gb_addr_config = 0x02011003
-#if 0
-	gb_addr_config = RREG32(GB_ADDR_CONFIG);
-#else
-	gb_addr_config = 0;
-	switch (rdev->config.cayman.num_tile_pipes) {
-	case 1:
-	default:
-		gb_addr_config |= NUM_PIPES(0);
-		break;
-	case 2:
-		gb_addr_config |= NUM_PIPES(1);
-		break;
-	case 4:
-		gb_addr_config |= NUM_PIPES(2);
-		break;
-	case 8:
-		gb_addr_config |= NUM_PIPES(3);
-		break;
-	}
-
-	tmp = (rdev->config.cayman.mem_max_burst_length_bytes / 256) - 1;
-	gb_addr_config |= PIPE_INTERLEAVE_SIZE(tmp);
-	gb_addr_config |= NUM_SHADER_ENGINES(rdev->config.cayman.num_shader_engines - 1);
-	tmp = (rdev->config.cayman.shader_engine_tile_size / 16) - 1;
-	gb_addr_config |= SHADER_ENGINE_TILE_SIZE(tmp);
-	switch (rdev->config.cayman.num_gpus) {
-	case 1:
-	default:
-		gb_addr_config |= NUM_GPUS(0);
-		break;
-	case 2:
-		gb_addr_config |= NUM_GPUS(1);
-		break;
-	case 4:
-		gb_addr_config |= NUM_GPUS(2);
-		break;
-	}
-	switch (rdev->config.cayman.multi_gpu_tile_size) {
-	case 16:
-		gb_addr_config |= MULTI_GPU_TILE_SIZE(0);
-		break;
-	case 32:
-	default:
-		gb_addr_config |= MULTI_GPU_TILE_SIZE(1);
-		break;
-	case 64:
-		gb_addr_config |= MULTI_GPU_TILE_SIZE(2);
-		break;
-	case 128:
-		gb_addr_config |= MULTI_GPU_TILE_SIZE(3);
-		break;
-	}
-	switch (rdev->config.cayman.mem_row_size_in_kb) {
-	case 1:
-	default:
-		gb_addr_config |= ROW_SIZE(0);
-		break;
-	case 2:
-		gb_addr_config |= ROW_SIZE(1);
-		break;
-	case 4:
-		gb_addr_config |= ROW_SIZE(2);
-		break;
-	}
-#endif
 
 	tmp = (gb_addr_config & NUM_PIPES_MASK) >> NUM_PIPES_SHIFT;
 	rdev->config.cayman.num_tile_pipes = (1 << tmp);
@@ -864,17 +846,7 @@ static void cayman_gpu_init(struct radeon_device *rdev)
 	tmp = (gb_addr_config & ROW_SIZE_MASK) >> ROW_SIZE_SHIFT;
 	rdev->config.cayman.mem_row_size_in_kb = 1 << tmp;
 
-	//gb_backend_map = 0x76541032;
-#if 0
-	gb_backend_map = RREG32(GB_BACKEND_MAP);
-#else
-	gb_backend_map =
-		cayman_get_tile_pipe_to_backend_map(rdev, rdev->config.cayman.num_tile_pipes,
-						    rdev->config.cayman.num_backends_per_se *
-						    rdev->config.cayman.num_shader_engines,
-						    &rdev->config.cayman.backend_disable_mask_per_asic,
-						    rdev->config.cayman.num_shader_engines);
-#endif
+
 	/* setup tiling info dword.  gb_addr_config is not adequate since it does
 	 * not have bank info, so create a custom tiling dword.
 	 * bits 3:0   num_pipes
@@ -928,6 +900,8 @@ static void cayman_gpu_init(struct radeon_device *rdev)
 	if (ASIC_IS_DCE6(rdev))
 		WREG32(DMIF_ADDR_CALC, gb_addr_config);
 	WREG32(HDP_ADDR_CONFIG, gb_addr_config);
+	WREG32(DMA_TILING_CONFIG + DMA0_REGISTER_OFFSET, gb_addr_config);
+	WREG32(DMA_TILING_CONFIG + DMA1_REGISTER_OFFSET, gb_addr_config);
 
 	/* primary versions */
 	WREG32(CC_RB_BACKEND_DISABLE, cc_rb_backend_disable);
@@ -1044,7 +1018,7 @@ void cayman_pcie_gart_tlb_flush(struct radeon_device *rdev)
 	WREG32(VM_INVALIDATE_REQUEST, 1);
 }
 
-int cayman_pcie_gart_enable(struct radeon_device *rdev)
+static int cayman_pcie_gart_enable(struct radeon_device *rdev)
 {
 	int i, r;
 
@@ -1088,9 +1062,13 @@ int cayman_pcie_gart_enable(struct radeon_device *rdev)
 	WREG32(0x15DC, 0);
 
 	/* empty context1-7 */
+	/* Assign the pt base to something valid for now; the pts used for
+	 * the VMs are determined by the application and setup and assigned
+	 * on the fly in the vm part of radeon_gart.c
+	 */
 	for (i = 1; i < 8; i++) {
 		WREG32(VM_CONTEXT0_PAGE_TABLE_START_ADDR + (i << 2), 0);
-		WREG32(VM_CONTEXT0_PAGE_TABLE_END_ADDR + (i << 2), 0);
+		WREG32(VM_CONTEXT0_PAGE_TABLE_END_ADDR + (i << 2), rdev->vm_manager.max_pfn);
 		WREG32(VM_CONTEXT0_PAGE_TABLE_BASE_ADDR + (i << 2),
 			rdev->gart.table_addr >> 12);
 	}
@@ -1098,10 +1076,20 @@ int cayman_pcie_gart_enable(struct radeon_device *rdev)
 	/* enable context1-7 */
 	WREG32(VM_CONTEXT1_PROTECTION_FAULT_DEFAULT_ADDR,
 	       (u32)(rdev->dummy_page.addr >> 12));
-	WREG32(VM_CONTEXT1_CNTL2, 0);
-	WREG32(VM_CONTEXT1_CNTL, 0);
-	WREG32(VM_CONTEXT1_CNTL, ENABLE_CONTEXT | PAGE_TABLE_DEPTH(0) |
-				RANGE_PROTECTION_FAULT_ENABLE_DEFAULT);
+	WREG32(VM_CONTEXT1_CNTL2, 4);
+	WREG32(VM_CONTEXT1_CNTL, ENABLE_CONTEXT | PAGE_TABLE_DEPTH(1) |
+				RANGE_PROTECTION_FAULT_ENABLE_INTERRUPT |
+				RANGE_PROTECTION_FAULT_ENABLE_DEFAULT |
+				DUMMY_PAGE_PROTECTION_FAULT_ENABLE_INTERRUPT |
+				DUMMY_PAGE_PROTECTION_FAULT_ENABLE_DEFAULT |
+				PDE0_PROTECTION_FAULT_ENABLE_INTERRUPT |
+				PDE0_PROTECTION_FAULT_ENABLE_DEFAULT |
+				VALID_PROTECTION_FAULT_ENABLE_INTERRUPT |
+				VALID_PROTECTION_FAULT_ENABLE_DEFAULT |
+				READ_PROTECTION_FAULT_ENABLE_INTERRUPT |
+				READ_PROTECTION_FAULT_ENABLE_DEFAULT |
+				WRITE_PROTECTION_FAULT_ENABLE_INTERRUPT |
+				WRITE_PROTECTION_FAULT_ENABLE_DEFAULT);
 
 	cayman_pcie_gart_tlb_flush(rdev);
 	DRM_INFO("PCIE GART of %uM enabled (table at 0x%016llX).\n",
@@ -1111,7 +1099,7 @@ int cayman_pcie_gart_enable(struct radeon_device *rdev)
 	return 0;
 }
 
-void cayman_pcie_gart_disable(struct radeon_device *rdev)
+static void cayman_pcie_gart_disable(struct radeon_device *rdev)
 {
 	/* Disable all tables */
 	WREG32(VM_CONTEXT0_CNTL, 0);
@@ -1131,7 +1119,7 @@ void cayman_pcie_gart_disable(struct radeon_device *rdev)
 	radeon_gart_table_vram_unpin(rdev);
 }
 
-void cayman_pcie_gart_fini(struct radeon_device *rdev)
+static void cayman_pcie_gart_fini(struct radeon_device *rdev)
 {
 	cayman_pcie_gart_disable(rdev);
 	radeon_gart_table_vram_free(rdev);
@@ -1188,17 +1176,35 @@ void cayman_ring_ib_execute(struct radeon_device *rdev, struct radeon_ib *ib)
 #endif
 			  (ib->gpu_addr & 0xFFFFFFFC));
 	radeon_ring_write(ring, upper_32_bits(ib->gpu_addr) & 0xFF);
-	radeon_ring_write(ring, ib->length_dw | (ib->vm_id << 24));
+	radeon_ring_write(ring, ib->length_dw | 
+			  (ib->vm ? (ib->vm->id << 24) : 0));
 
 	/* flush read cache over gart for this vmid */
 	radeon_ring_write(ring, PACKET3(PACKET3_SET_CONFIG_REG, 1));
 	radeon_ring_write(ring, (CP_COHER_CNTL2 - PACKET3_SET_CONFIG_REG_START) >> 2);
-	radeon_ring_write(ring, ib->vm_id);
+	radeon_ring_write(ring, ib->vm ? ib->vm->id : 0);
 	radeon_ring_write(ring, PACKET3(PACKET3_SURFACE_SYNC, 3));
 	radeon_ring_write(ring, PACKET3_TC_ACTION_ENA | PACKET3_SH_ACTION_ENA);
 	radeon_ring_write(ring, 0xFFFFFFFF);
 	radeon_ring_write(ring, 0);
 	radeon_ring_write(ring, 10); /* poll interval */
+}
+
+void cayman_uvd_semaphore_emit(struct radeon_device *rdev,
+			       struct radeon_ring *ring,
+			       struct radeon_semaphore *semaphore,
+			       bool emit_wait)
+{
+	uint64_t addr = semaphore->gpu_addr;
+
+	radeon_ring_write(ring, PACKET0(UVD_SEMA_ADDR_LOW, 0));
+	radeon_ring_write(ring, (addr >> 3) & 0x000FFFFF);
+
+	radeon_ring_write(ring, PACKET0(UVD_SEMA_ADDR_HIGH, 0));
+	radeon_ring_write(ring, (addr >> 23) & 0x000FFFFF);
+
+	radeon_ring_write(ring, PACKET0(UVD_SEMA_CMD, 0));
+	radeon_ring_write(ring, 0x80 | (emit_wait ? 1 : 0));
 }
 
 static void cayman_cp_enable(struct radeon_device *rdev, bool enable)
@@ -1209,6 +1215,7 @@ static void cayman_cp_enable(struct radeon_device *rdev, bool enable)
 		radeon_ttm_set_active_vram_size(rdev, rdev->mc.visible_vram_size);
 		WREG32(CP_ME_CNTL, (CP_ME_HALT | CP_PFP_HALT));
 		WREG32(SCRATCH_UMSK, 0);
+		rdev->ring[RADEON_RING_TYPE_GFX_INDEX].ready = false;
 	}
 }
 
@@ -1311,7 +1318,7 @@ static void cayman_cp_fini(struct radeon_device *rdev)
 	radeon_ring_fini(rdev, &rdev->ring[RADEON_RING_TYPE_GFX_INDEX]);
 }
 
-int cayman_cp_resume(struct radeon_device *rdev)
+static int cayman_cp_resume(struct radeon_device *rdev)
 {
 	struct radeon_ring *ring;
 	u32 tmp;
@@ -1441,51 +1448,199 @@ int cayman_cp_resume(struct radeon_device *rdev)
 	return 0;
 }
 
-bool cayman_gpu_is_lockup(struct radeon_device *rdev, struct radeon_ring *ring)
+/*
+ * DMA
+ * Starting with R600, the GPU has an asynchronous
+ * DMA engine.  The programming model is very similar
+ * to the 3D engine (ring buffer, IBs, etc.), but the
+ * DMA controller has it's own packet format that is
+ * different form the PM4 format used by the 3D engine.
+ * It supports copying data, writing embedded data,
+ * solid fills, and a number of other things.  It also
+ * has support for tiling/detiling of buffers.
+ * Cayman and newer support two asynchronous DMA engines.
+ */
+/**
+ * cayman_dma_ring_ib_execute - Schedule an IB on the DMA engine
+ *
+ * @rdev: radeon_device pointer
+ * @ib: IB object to schedule
+ *
+ * Schedule an IB in the DMA ring (cayman-SI).
+ */
+void cayman_dma_ring_ib_execute(struct radeon_device *rdev,
+				struct radeon_ib *ib)
 {
-	u32 srbm_status;
-	u32 grbm_status;
-	u32 grbm_status_se0, grbm_status_se1;
-	struct r100_gpu_lockup *lockup = &rdev->config.cayman.lockup;
-	int r;
+	struct radeon_ring *ring = &rdev->ring[ib->ring];
 
-	srbm_status = RREG32(SRBM_STATUS);
-	grbm_status = RREG32(GRBM_STATUS);
-	grbm_status_se0 = RREG32(GRBM_STATUS_SE0);
-	grbm_status_se1 = RREG32(GRBM_STATUS_SE1);
-	if (!(grbm_status & GUI_ACTIVE)) {
-		r100_gpu_lockup_update(lockup, ring);
-		return false;
+	if (rdev->wb.enabled) {
+		u32 next_rptr = ring->wptr + 4;
+		while ((next_rptr & 7) != 5)
+			next_rptr++;
+		next_rptr += 3;
+		radeon_ring_write(ring, DMA_PACKET(DMA_PACKET_WRITE, 0, 0, 1));
+		radeon_ring_write(ring, ring->next_rptr_gpu_addr & 0xfffffffc);
+		radeon_ring_write(ring, upper_32_bits(ring->next_rptr_gpu_addr) & 0xff);
+		radeon_ring_write(ring, next_rptr);
 	}
-	/* force CP activities */
-	r = radeon_ring_lock(rdev, ring, 2);
-	if (!r) {
-		/* PACKET2 NOP */
-		radeon_ring_write(ring, 0x80000000);
-		radeon_ring_write(ring, 0x80000000);
-		radeon_ring_unlock_commit(rdev, ring);
-	}
-	/* XXX deal with CP0,1,2 */
-	ring->rptr = RREG32(ring->rptr_reg);
-	return r100_gpu_cp_is_lockup(rdev, lockup, ring);
+
+	/* The indirect buffer packet must end on an 8 DW boundary in the DMA ring.
+	 * Pad as necessary with NOPs.
+	 */
+	while ((ring->wptr & 7) != 5)
+		radeon_ring_write(ring, DMA_PACKET(DMA_PACKET_NOP, 0, 0, 0));
+	radeon_ring_write(ring, DMA_IB_PACKET(DMA_PACKET_INDIRECT_BUFFER, ib->vm ? ib->vm->id : 0, 0));
+	radeon_ring_write(ring, (ib->gpu_addr & 0xFFFFFFE0));
+	radeon_ring_write(ring, (ib->length_dw << 12) | (upper_32_bits(ib->gpu_addr) & 0xFF));
+
 }
 
-static int cayman_gpu_soft_reset(struct radeon_device *rdev)
+/**
+ * cayman_dma_stop - stop the async dma engines
+ *
+ * @rdev: radeon_device pointer
+ *
+ * Stop the async dma engines (cayman-SI).
+ */
+void cayman_dma_stop(struct radeon_device *rdev)
 {
-	struct evergreen_mc_save save;
+	u32 rb_cntl;
+
+	radeon_ttm_set_active_vram_size(rdev, rdev->mc.visible_vram_size);
+
+	/* dma0 */
+	rb_cntl = RREG32(DMA_RB_CNTL + DMA0_REGISTER_OFFSET);
+	rb_cntl &= ~DMA_RB_ENABLE;
+	WREG32(DMA_RB_CNTL + DMA0_REGISTER_OFFSET, rb_cntl);
+
+	/* dma1 */
+	rb_cntl = RREG32(DMA_RB_CNTL + DMA1_REGISTER_OFFSET);
+	rb_cntl &= ~DMA_RB_ENABLE;
+	WREG32(DMA_RB_CNTL + DMA1_REGISTER_OFFSET, rb_cntl);
+
+	rdev->ring[R600_RING_TYPE_DMA_INDEX].ready = false;
+	rdev->ring[CAYMAN_RING_TYPE_DMA1_INDEX].ready = false;
+}
+
+/**
+ * cayman_dma_resume - setup and start the async dma engines
+ *
+ * @rdev: radeon_device pointer
+ *
+ * Set up the DMA ring buffers and enable them. (cayman-SI).
+ * Returns 0 for success, error for failure.
+ */
+int cayman_dma_resume(struct radeon_device *rdev)
+{
+	struct radeon_ring *ring;
+	u32 rb_cntl, dma_cntl, ib_cntl;
+	u32 rb_bufsz;
+	u32 reg_offset, wb_offset;
+	int i, r;
+
+	/* Reset dma */
+	WREG32(SRBM_SOFT_RESET, SOFT_RESET_DMA | SOFT_RESET_DMA1);
+	RREG32(SRBM_SOFT_RESET);
+	udelay(50);
+	WREG32(SRBM_SOFT_RESET, 0);
+
+	for (i = 0; i < 2; i++) {
+		if (i == 0) {
+			ring = &rdev->ring[R600_RING_TYPE_DMA_INDEX];
+			reg_offset = DMA0_REGISTER_OFFSET;
+			wb_offset = R600_WB_DMA_RPTR_OFFSET;
+		} else {
+			ring = &rdev->ring[CAYMAN_RING_TYPE_DMA1_INDEX];
+			reg_offset = DMA1_REGISTER_OFFSET;
+			wb_offset = CAYMAN_WB_DMA1_RPTR_OFFSET;
+		}
+
+		WREG32(DMA_SEM_INCOMPLETE_TIMER_CNTL + reg_offset, 0);
+		WREG32(DMA_SEM_WAIT_FAIL_TIMER_CNTL + reg_offset, 0);
+
+		/* Set ring buffer size in dwords */
+		rb_bufsz = drm_order(ring->ring_size / 4);
+		rb_cntl = rb_bufsz << 1;
+#ifdef __BIG_ENDIAN
+		rb_cntl |= DMA_RB_SWAP_ENABLE | DMA_RPTR_WRITEBACK_SWAP_ENABLE;
+#endif
+		WREG32(DMA_RB_CNTL + reg_offset, rb_cntl);
+
+		/* Initialize the ring buffer's read and write pointers */
+		WREG32(DMA_RB_RPTR + reg_offset, 0);
+		WREG32(DMA_RB_WPTR + reg_offset, 0);
+
+		/* set the wb address whether it's enabled or not */
+		WREG32(DMA_RB_RPTR_ADDR_HI + reg_offset,
+		       upper_32_bits(rdev->wb.gpu_addr + wb_offset) & 0xFF);
+		WREG32(DMA_RB_RPTR_ADDR_LO + reg_offset,
+		       ((rdev->wb.gpu_addr + wb_offset) & 0xFFFFFFFC));
+
+		if (rdev->wb.enabled)
+			rb_cntl |= DMA_RPTR_WRITEBACK_ENABLE;
+
+		WREG32(DMA_RB_BASE + reg_offset, ring->gpu_addr >> 8);
+
+		/* enable DMA IBs */
+		ib_cntl = DMA_IB_ENABLE | CMD_VMID_FORCE;
+#ifdef __BIG_ENDIAN
+		ib_cntl |= DMA_IB_SWAP_ENABLE;
+#endif
+		WREG32(DMA_IB_CNTL + reg_offset, ib_cntl);
+
+		dma_cntl = RREG32(DMA_CNTL + reg_offset);
+		dma_cntl &= ~CTXEMPTY_INT_ENABLE;
+		WREG32(DMA_CNTL + reg_offset, dma_cntl);
+
+		ring->wptr = 0;
+		WREG32(DMA_RB_WPTR + reg_offset, ring->wptr << 2);
+
+		ring->rptr = RREG32(DMA_RB_RPTR + reg_offset) >> 2;
+
+		WREG32(DMA_RB_CNTL + reg_offset, rb_cntl | DMA_RB_ENABLE);
+
+		ring->ready = true;
+
+		r = radeon_ring_test(rdev, ring->idx, ring);
+		if (r) {
+			ring->ready = false;
+			return r;
+		}
+	}
+
+	radeon_ttm_set_active_vram_size(rdev, rdev->mc.real_vram_size);
+
+	return 0;
+}
+
+/**
+ * cayman_dma_fini - tear down the async dma engines
+ *
+ * @rdev: radeon_device pointer
+ *
+ * Stop the async dma engines and free the rings (cayman-SI).
+ */
+void cayman_dma_fini(struct radeon_device *rdev)
+{
+	cayman_dma_stop(rdev);
+	radeon_ring_fini(rdev, &rdev->ring[R600_RING_TYPE_DMA_INDEX]);
+	radeon_ring_fini(rdev, &rdev->ring[CAYMAN_RING_TYPE_DMA1_INDEX]);
+}
+
+static void cayman_gpu_soft_reset_gfx(struct radeon_device *rdev)
+{
 	u32 grbm_reset = 0;
 
 	if (!(RREG32(GRBM_STATUS) & GUI_ACTIVE))
-		return 0;
+		return;
 
-	dev_info(rdev->dev, "GPU softreset \n");
-	dev_info(rdev->dev, "  GRBM_STATUS=0x%08X\n",
+	dev_info(rdev->dev, "  GRBM_STATUS               = 0x%08X\n",
 		RREG32(GRBM_STATUS));
-	dev_info(rdev->dev, "  GRBM_STATUS_SE0=0x%08X\n",
+	dev_info(rdev->dev, "  GRBM_STATUS_SE0           = 0x%08X\n",
 		RREG32(GRBM_STATUS_SE0));
-	dev_info(rdev->dev, "  GRBM_STATUS_SE1=0x%08X\n",
+	dev_info(rdev->dev, "  GRBM_STATUS_SE1           = 0x%08X\n",
 		RREG32(GRBM_STATUS_SE1));
-	dev_info(rdev->dev, "  SRBM_STATUS=0x%08X\n",
+	dev_info(rdev->dev, "  SRBM_STATUS               = 0x%08X\n",
 		RREG32(SRBM_STATUS));
 	dev_info(rdev->dev, "  VM_CONTEXT0_PROTECTION_FAULT_ADDR   0x%08X\n",
 		 RREG32(0x14F8));
@@ -1524,16 +1679,14 @@ static int cayman_gpu_soft_reset(struct radeon_device *rdev)
 	udelay(50);
 	WREG32(GRBM_SOFT_RESET, 0);
 	(void)RREG32(GRBM_SOFT_RESET);
-	/* Wait a little for things to settle down */
-	udelay(50);
 
-	dev_info(rdev->dev, "  GRBM_STATUS=0x%08X\n",
+	dev_info(rdev->dev, "  GRBM_STATUS               = 0x%08X\n",
 		RREG32(GRBM_STATUS));
-	dev_info(rdev->dev, "  GRBM_STATUS_SE0=0x%08X\n",
+	dev_info(rdev->dev, "  GRBM_STATUS_SE0           = 0x%08X\n",
 		RREG32(GRBM_STATUS_SE0));
-	dev_info(rdev->dev, "  GRBM_STATUS_SE1=0x%08X\n",
+	dev_info(rdev->dev, "  GRBM_STATUS_SE1           = 0x%08X\n",
 		RREG32(GRBM_STATUS_SE1));
-	dev_info(rdev->dev, "  SRBM_STATUS=0x%08X\n",
+	dev_info(rdev->dev, "  SRBM_STATUS               = 0x%08X\n",
 		RREG32(SRBM_STATUS));
 	evergreen_mc_resume(rdev, &save);
 	return 0;
@@ -1614,6 +1767,16 @@ static int cayman_startup(struct radeon_device *rdev)
 		return r;
 	}
 
+	r = rv770_uvd_resume(rdev);
+	if (!r) {
+		r = radeon_fence_driver_start_ring(rdev,
+						   R600_RING_TYPE_UVD_INDEX);
+		if (r)
+			dev_err(rdev->dev, "UVD fences init error (%d).\n", r);
+	}
+	if (r)
+		rdev->ring[R600_RING_TYPE_UVD_INDEX].ring_size = 0;
+
 	r = radeon_fence_driver_start_ring(rdev, CAYMAN_RING_TYPE_CP1_INDEX);
 	if (r) {
 		dev_err(rdev->dev, "failed initializing CP fences (%d).\n", r);
@@ -1623,6 +1786,18 @@ static int cayman_startup(struct radeon_device *rdev)
 	r = radeon_fence_driver_start_ring(rdev, CAYMAN_RING_TYPE_CP2_INDEX);
 	if (r) {
 		dev_err(rdev->dev, "failed initializing CP fences (%d).\n", r);
+		return r;
+	}
+
+	r = radeon_fence_driver_start_ring(rdev, R600_RING_TYPE_DMA_INDEX);
+	if (r) {
+		dev_err(rdev->dev, "failed initializing DMA fences (%d).\n", r);
+		return r;
+	}
+
+	r = radeon_fence_driver_start_ring(rdev, CAYMAN_RING_TYPE_DMA1_INDEX);
+	if (r) {
+		dev_err(rdev->dev, "failed initializing DMA fences (%d).\n", r);
 		return r;
 	}
 
@@ -1646,6 +1821,23 @@ static int cayman_startup(struct radeon_device *rdev)
 			     0, 0xfffff, RADEON_CP_PACKET2);
 	if (r)
 		return r;
+
+	ring = &rdev->ring[R600_RING_TYPE_DMA_INDEX];
+	r = radeon_ring_init(rdev, ring, ring->ring_size, R600_WB_DMA_RPTR_OFFSET,
+			     DMA_RB_RPTR + DMA0_REGISTER_OFFSET,
+			     DMA_RB_WPTR + DMA0_REGISTER_OFFSET,
+			     2, 0x3fffc, DMA_PACKET(DMA_PACKET_NOP, 0, 0, 0));
+	if (r)
+		return r;
+
+	ring = &rdev->ring[CAYMAN_RING_TYPE_DMA1_INDEX];
+	r = radeon_ring_init(rdev, ring, ring->ring_size, CAYMAN_WB_DMA1_RPTR_OFFSET,
+			     DMA_RB_RPTR + DMA1_REGISTER_OFFSET,
+			     DMA_RB_WPTR + DMA1_REGISTER_OFFSET,
+			     2, 0x3fffc, DMA_PACKET(DMA_PACKET_NOP, 0, 0, 0));
+	if (r)
+		return r;
+
 	r = cayman_cp_load_microcode(rdev);
 	if (r)
 		return r;
@@ -1657,14 +1849,15 @@ static int cayman_startup(struct radeon_device *rdev)
 	if (r)
 		return r;
 
-	r = radeon_ib_test(rdev, RADEON_RING_TYPE_GFX_INDEX, &rdev->ring[RADEON_RING_TYPE_GFX_INDEX]);
-	if (r) {
-		DRM_ERROR("radeon: failed testing IB (%d).\n", r);
-		rdev->accel_working = false;
+	r = radeon_ib_ring_tests(rdev);
+	if (r)
 		return r;
-	}
 
 	r = radeon_vm_manager_start(rdev);
+	if (r)
+		return r;
+
+	r = r600_audio_init(rdev);
 	if (r)
 		return r;
 
@@ -1694,6 +1887,7 @@ int cayman_resume(struct radeon_device *rdev)
 
 int cayman_suspend(struct radeon_device *rdev)
 {
+	r600_audio_fini(rdev);
 	/* FIXME: we should wait for ring to be empty */
 	radeon_ib_pool_suspend(rdev);
 	radeon_vm_manager_suspend(rdev);
@@ -1717,10 +1911,6 @@ int cayman_init(struct radeon_device *rdev)
 	struct radeon_ring *ring = &rdev->ring[RADEON_RING_TYPE_GFX_INDEX];
 	int r;
 
-	/* This don't do much */
-	r = radeon_gem_init(rdev);
-	if (r)
-		return r;
 	/* Read BIOS */
 	if (!radeon_get_bios(rdev)) {
 		if (ASIC_IS_AVIVO(rdev))
@@ -1773,6 +1963,22 @@ int cayman_init(struct radeon_device *rdev)
 	if (r)
 		return r;
 
+	r = cayman_dma_resume(rdev);
+	if (r)
+		return r;
+
+	ring = &rdev->ring[R600_RING_TYPE_UVD_INDEX];
+	if (ring->ring_size) {
+		r = radeon_ring_init(rdev, ring, ring->ring_size,
+				     R600_WB_UVD_RPTR_OFFSET,
+				     UVD_RBC_RB_RPTR, UVD_RBC_RB_WPTR,
+				     0, 0xfffff, RADEON_CP_PACKET2);
+		if (!r)
+			r = r600_uvd_init(rdev);
+		if (r)
+			DRM_ERROR("radeon: failed initializing UVD (%d).\n", r);
+	}
+
 	r = radeon_ib_pool_init(rdev);
 	rdev->accel_working = true;
 	if (r) {
@@ -1788,6 +1994,7 @@ int cayman_init(struct radeon_device *rdev)
 	if (r) {
 		dev_err(rdev->dev, "disabling GPU acceleration\n");
 		cayman_cp_fini(rdev);
+		cayman_dma_fini(rdev);
 		r600_irq_fini(rdev);
 		if (rdev->flags & RADEON_IS_IGP)
 			si_rlc_fini(rdev);
@@ -1818,6 +2025,7 @@ void cayman_fini(struct radeon_device *rdev)
 {
 	r600_blit_fini(rdev);
 	cayman_cp_fini(rdev);
+	cayman_dma_fini(rdev);
 	r600_irq_fini(rdev);
 	if (rdev->flags & RADEON_IS_IGP)
 		si_rlc_fini(rdev);
@@ -1825,10 +2033,10 @@ void cayman_fini(struct radeon_device *rdev)
 	radeon_vm_manager_fini(rdev);
 	r100_ib_fini(rdev);
 	radeon_irq_kms_fini(rdev);
+	radeon_uvd_fini(rdev);
 	cayman_pcie_gart_fini(rdev);
 	r600_vram_scratch_fini(rdev);
 	radeon_gem_fini(rdev);
-	radeon_semaphore_driver_fini(rdev);
 	radeon_fence_driver_fini(rdev);
 	radeon_bo_fini(rdev);
 	radeon_atombios_fini(rdev);
@@ -1857,53 +2065,16 @@ void cayman_vm_fini(struct radeon_device *rdev)
 {
 }
 
-int cayman_vm_bind(struct radeon_device *rdev, struct radeon_vm *vm, int id)
-{
-	WREG32(VM_CONTEXT0_PAGE_TABLE_START_ADDR + (id << 2), 0);
-	WREG32(VM_CONTEXT0_PAGE_TABLE_END_ADDR + (id << 2), vm->last_pfn);
-	WREG32(VM_CONTEXT0_PAGE_TABLE_BASE_ADDR + (id << 2), vm->pt_gpu_addr >> 12);
-	/* flush hdp cache */
-	WREG32(HDP_MEM_COHERENCY_FLUSH_CNTL, 0x1);
-	/* bits 0-7 are the VM contexts0-7 */
-	WREG32(VM_INVALIDATE_REQUEST, 1 << id);
-	return 0;
-}
-
-void cayman_vm_unbind(struct radeon_device *rdev, struct radeon_vm *vm)
-{
-	WREG32(VM_CONTEXT0_PAGE_TABLE_START_ADDR + (vm->id << 2), 0);
-	WREG32(VM_CONTEXT0_PAGE_TABLE_END_ADDR + (vm->id << 2), 0);
-	WREG32(VM_CONTEXT0_PAGE_TABLE_BASE_ADDR + (vm->id << 2), 0);
-	/* flush hdp cache */
-	WREG32(HDP_MEM_COHERENCY_FLUSH_CNTL, 0x1);
-	/* bits 0-7 are the VM contexts0-7 */
-	WREG32(VM_INVALIDATE_REQUEST, 1 << vm->id);
-}
-
-void cayman_vm_tlb_flush(struct radeon_device *rdev, struct radeon_vm *vm)
-{
-	if (vm->id == -1)
-		return;
-
-	/* flush hdp cache */
-	WREG32(HDP_MEM_COHERENCY_FLUSH_CNTL, 0x1);
-	/* bits 0-7 are the VM contexts0-7 */
-	WREG32(VM_INVALIDATE_REQUEST, 1 << vm->id);
-}
-
-#define R600_PTE_VALID     (1 << 0)
+#define R600_ENTRY_VALID   (1 << 0)
 #define R600_PTE_SYSTEM    (1 << 1)
 #define R600_PTE_SNOOPED   (1 << 2)
 #define R600_PTE_READABLE  (1 << 5)
 #define R600_PTE_WRITEABLE (1 << 6)
 
-uint32_t cayman_vm_page_flags(struct radeon_device *rdev,
-			      struct radeon_vm *vm,
-			      uint32_t flags)
+uint32_t cayman_vm_page_flags(struct radeon_device *rdev, uint32_t flags)
 {
 	uint32_t r600_flags = 0;
-
-	r600_flags |= (flags & RADEON_VM_PAGE_VALID) ? R600_PTE_VALID : 0;
+	r600_flags |= (flags & RADEON_VM_PAGE_VALID) ? R600_ENTRY_VALID : 0;
 	r600_flags |= (flags & RADEON_VM_PAGE_READABLE) ? R600_PTE_READABLE : 0;
 	r600_flags |= (flags & RADEON_VM_PAGE_WRITEABLE) ? R600_PTE_WRITEABLE : 0;
 	if (flags & RADEON_VM_PAGE_SYSTEM) {
@@ -1913,12 +2084,162 @@ uint32_t cayman_vm_page_flags(struct radeon_device *rdev,
 	return r600_flags;
 }
 
-void cayman_vm_set_page(struct radeon_device *rdev, struct radeon_vm *vm,
-			unsigned pfn, uint64_t addr, uint32_t flags)
+/**
+ * cayman_vm_set_page - update the page tables using the CP
+ *
+ * @rdev: radeon_device pointer
+ * @ib: indirect buffer to fill with commands
+ * @pe: addr of the page entry
+ * @addr: dst addr to write into pe
+ * @count: number of page entries to update
+ * @incr: increase next addr by incr bytes
+ * @flags: access flags
+ *
+ * Update the page tables using the CP (cayman/TN).
+ */
+void cayman_vm_set_page(struct radeon_device *rdev,
+			struct radeon_ib *ib,
+			uint64_t pe,
+			uint64_t addr, unsigned count,
+			uint32_t incr, uint32_t flags)
 {
-	void __iomem *ptr = (void *)vm->pt;
+	uint32_t r600_flags = cayman_vm_page_flags(rdev, flags);
+	uint64_t value;
+	unsigned ndw;
 
-	addr = addr & 0xFFFFFFFFFFFFF000ULL;
-	addr |= flags;
-	writeq(addr, ptr + (pfn * 8));
+	if (rdev->asic->vm.pt_ring_index == RADEON_RING_TYPE_GFX_INDEX) {
+		while (count) {
+			ndw = 1 + count * 2;
+			if (ndw > 0x3FFF)
+				ndw = 0x3FFF;
+
+			ib->ptr[ib->length_dw++] = PACKET3(PACKET3_ME_WRITE, ndw);
+			ib->ptr[ib->length_dw++] = pe;
+			ib->ptr[ib->length_dw++] = upper_32_bits(pe) & 0xff;
+			for (; ndw > 1; ndw -= 2, --count, pe += 8) {
+				if (flags & RADEON_VM_PAGE_SYSTEM) {
+					value = radeon_vm_map_gart(rdev, addr);
+					value &= 0xFFFFFFFFFFFFF000ULL;
+				} else if (flags & RADEON_VM_PAGE_VALID) {
+					value = addr;
+				} else {
+					value = 0;
+				}
+				addr += incr;
+				value |= r600_flags;
+				ib->ptr[ib->length_dw++] = value;
+				ib->ptr[ib->length_dw++] = upper_32_bits(value);
+			}
+		}
+	} else {
+		if ((flags & RADEON_VM_PAGE_SYSTEM) ||
+		    (count == 1)) {
+			while (count) {
+				ndw = count * 2;
+				if (ndw > 0xFFFFE)
+					ndw = 0xFFFFE;
+
+				/* for non-physically contiguous pages (system) */
+				ib->ptr[ib->length_dw++] = DMA_PACKET(DMA_PACKET_WRITE, 0, 0, ndw);
+				ib->ptr[ib->length_dw++] = pe;
+				ib->ptr[ib->length_dw++] = upper_32_bits(pe) & 0xff;
+				for (; ndw > 0; ndw -= 2, --count, pe += 8) {
+					if (flags & RADEON_VM_PAGE_SYSTEM) {
+						value = radeon_vm_map_gart(rdev, addr);
+						value &= 0xFFFFFFFFFFFFF000ULL;
+					} else if (flags & RADEON_VM_PAGE_VALID) {
+						value = addr;
+					} else {
+						value = 0;
+					}
+					addr += incr;
+					value |= r600_flags;
+					ib->ptr[ib->length_dw++] = value;
+					ib->ptr[ib->length_dw++] = upper_32_bits(value);
+				}
+			}
+			while (ib->length_dw & 0x7)
+				ib->ptr[ib->length_dw++] = DMA_PACKET(DMA_PACKET_NOP, 0, 0, 0);
+		} else {
+			while (count) {
+				ndw = count * 2;
+				if (ndw > 0xFFFFE)
+					ndw = 0xFFFFE;
+
+				if (flags & RADEON_VM_PAGE_VALID)
+					value = addr;
+				else
+					value = 0;
+				/* for physically contiguous pages (vram) */
+				ib->ptr[ib->length_dw++] = DMA_PTE_PDE_PACKET(ndw);
+				ib->ptr[ib->length_dw++] = pe; /* dst addr */
+				ib->ptr[ib->length_dw++] = upper_32_bits(pe) & 0xff;
+				ib->ptr[ib->length_dw++] = r600_flags; /* mask */
+				ib->ptr[ib->length_dw++] = 0;
+				ib->ptr[ib->length_dw++] = value; /* value */
+				ib->ptr[ib->length_dw++] = upper_32_bits(value);
+				ib->ptr[ib->length_dw++] = incr; /* increment size */
+				ib->ptr[ib->length_dw++] = 0;
+				pe += ndw * 4;
+				addr += (ndw / 2) * incr;
+				count -= ndw / 2;
+			}
+		}
+		while (ib->length_dw & 0x7)
+			ib->ptr[ib->length_dw++] = DMA_PACKET(DMA_PACKET_NOP, 0, 0, 0);
+	}
 }
+
+/**
+ * cayman_vm_flush - vm flush using the CP
+ *
+ * @rdev: radeon_device pointer
+ *
+ * Update the page table base and flush the VM TLB
+ * using the CP (cayman-si).
+ */
+void cayman_vm_flush(struct radeon_device *rdev, int ridx, struct radeon_vm *vm)
+{
+	struct radeon_ring *ring = &rdev->ring[ridx];
+
+	if (vm == NULL)
+		return;
+
+	radeon_ring_write(ring, PACKET0(VM_CONTEXT0_PAGE_TABLE_BASE_ADDR + (vm->id << 2), 0));
+	radeon_ring_write(ring, vm->pd_gpu_addr >> 12);
+
+	/* flush hdp cache */
+	radeon_ring_write(ring, PACKET0(HDP_MEM_COHERENCY_FLUSH_CNTL, 0));
+	radeon_ring_write(ring, 0x1);
+
+	/* bits 0-7 are the VM contexts0-7 */
+	radeon_ring_write(ring, PACKET0(VM_INVALIDATE_REQUEST, 0));
+	radeon_ring_write(ring, 1 << vm->id);
+
+	/* sync PFP to ME, otherwise we might get invalid PFP reads */
+	radeon_ring_write(ring, PACKET3(PACKET3_PFP_SYNC_ME, 0));
+	radeon_ring_write(ring, 0x0);
+}
+
+void cayman_dma_vm_flush(struct radeon_device *rdev, int ridx, struct radeon_vm *vm)
+{
+	struct radeon_ring *ring = &rdev->ring[ridx];
+
+	if (vm == NULL)
+		return;
+
+	radeon_ring_write(ring, DMA_PACKET(DMA_PACKET_SRBM_WRITE, 0, 0, 0));
+	radeon_ring_write(ring, (0xf << 16) | ((VM_CONTEXT0_PAGE_TABLE_BASE_ADDR + (vm->id << 2)) >> 2));
+	radeon_ring_write(ring, vm->pd_gpu_addr >> 12);
+
+	/* flush hdp cache */
+	radeon_ring_write(ring, DMA_PACKET(DMA_PACKET_SRBM_WRITE, 0, 0, 0));
+	radeon_ring_write(ring, (0xf << 16) | (HDP_MEM_COHERENCY_FLUSH_CNTL >> 2));
+	radeon_ring_write(ring, 1);
+
+	/* bits 0-7 are the VM contexts0-7 */
+	radeon_ring_write(ring, DMA_PACKET(DMA_PACKET_SRBM_WRITE, 0, 0, 0));
+	radeon_ring_write(ring, (0xf << 16) | (VM_INVALIDATE_REQUEST >> 2));
+	radeon_ring_write(ring, 1 << vm->id);
+}
+

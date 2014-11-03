@@ -1,0 +1,26 @@
+--- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+@@ -1212,6 +1266,7 @@
+ 		priv->hw->desc->prepare_tx_desc(desc, 0, len, csum_insertion);
+ 		wmb();
+ 		priv->hw->desc->set_tx_owner(desc);
++		wmb();
+ 	}
+ 
+ 	/* Interrupt on completition only for the latest segment */
+@@ -1227,6 +1282,7 @@
+ 
+ 	/* To avoid raise condition */
+ 	priv->hw->desc->set_tx_owner(first);
++	wmb();
+ 
+ 	priv->cur_tx++;
+ 
+@@ -1290,6 +1346,7 @@
+ 		}
+ 		wmb();
+ 		priv->hw->desc->set_rx_owner(p + entry);
++		wmb();
+ 	}
+ }
+ 

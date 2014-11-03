@@ -1,0 +1,10 @@
+--- drivers/pci/pcie/aer/aerdrv_core.c
++++ drivers/pci/pcie/aer/aerdrv_core.c
+@@ -630,6 +644,7 @@
+ 			continue;
+ 		}
+ 		do_recovery(pdev, entry.severity);
++		pci_dev_put(pdev);
+ 	}
+ }
+ #endif

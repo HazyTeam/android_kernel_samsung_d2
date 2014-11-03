@@ -826,7 +826,7 @@ static int max17040_set_property(struct power_supply *psy,
 	return 0;
 }
 
-static int __devinit max17040_probe(struct i2c_client *client,
+static int max17040_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
 	struct i2c_adapter *adapter = to_i2c_adapter(client->dev.parent);
@@ -838,7 +838,7 @@ static int __devinit max17040_probe(struct i2c_client *client,
 
 	pr_info("%s: MAX17043 driver Loading!\n", __func__);
 
-	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
+	chip = devm_kzalloc(&client->dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip)
 		return -ENOMEM;
 
@@ -946,7 +946,7 @@ err_kfree:
 	return ret;
 }
 
-static int __devexit max17040_remove(struct i2c_client *client)
+static int max17040_remove(struct i2c_client *client)
 {
 	struct max17040_chip *chip = i2c_get_clientdata(client);
 
@@ -996,11 +996,10 @@ MODULE_DEVICE_TABLE(i2c, max17040_id);
 static struct i2c_driver max17040_i2c_driver = {
 	.driver	= {
 		.name	= "max17040",
+		.pm	= MAX17040_PM_OPS,
 	},
 	.probe		= max17040_probe,
-	.remove		= __devexit_p(max17040_remove),
-	.suspend	= max17040_suspend,
-	.resume		= max17040_resume,
+	.remove		= max17040_remove,
 	.id_table	= max17040_id,
 };
 

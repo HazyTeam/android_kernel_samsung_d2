@@ -1,0 +1,11 @@
+--- sound/core/pcm_lib.c
++++ sound/core/pcm_lib.c
+@@ -2542,7 +2574,7 @@
+  * @info_ret: store struct snd_pcm_chmap instance if non-NULL
+  *
+  * Create channel-mapping control elements assigned to the given PCM stream(s).
+- * Returns zero if succeed, or a negative error value.
++ * Return: Zero if successful, or a negative error value.
+  */
+ int snd_pcm_add_chmap_ctls(struct snd_pcm *pcm, int stream,
+ 			   const struct snd_pcm_chmap_elem *chmap,

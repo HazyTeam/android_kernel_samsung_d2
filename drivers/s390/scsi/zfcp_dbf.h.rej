@@ -1,0 +1,10 @@
+--- drivers/s390/scsi/zfcp_dbf.h
++++ drivers/s390/scsi/zfcp_dbf.h
+@@ -154,6 +154,7 @@
+ 	ZFCP_DBF_HBA_RES	= 1,
+ 	ZFCP_DBF_HBA_USS	= 2,
+ 	ZFCP_DBF_HBA_BIT	= 3,
++	ZFCP_DBF_HBA_BASIC	= 4,
+ };
+ 
+ /**
